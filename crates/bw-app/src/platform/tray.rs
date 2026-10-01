@@ -1,7 +1,10 @@
 //! Icône de la zone de notification et son menu.
 
+use std::cell::Cell;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+
+use bw_i18n::tr;
 
 use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
@@ -10,9 +13,16 @@ use crate::platform::TrayCommand;
 
 pub struct Tray {
     _icon: TrayIcon,
+    settings: MenuItem,
+    open: MenuItem,
+    reload: MenuItem,
     claude_hooks: MenuItem,
+    claude_hooks_installed: Cell<bool>,
     autostart: CheckMenuItem,
     autostart_state: Arc<AtomicBool>,
+    pause: CheckMenuItem,
+    update: MenuItem,
+    quit: MenuItem,
 }
 
 impl Tray {
@@ -21,20 +31,24 @@ impl Tray {
     pub fn new(
         autostart: bool,
         claude_hooks_installed: bool,
+        update_label: &str,
         on_command: impl Fn(TrayCommand) + Send + Sync + 'static,
     ) -> anyhow::Result<Self> {
         let title = MenuItem::new("BoringWindows", false, None);
-        let open = MenuItem::new("Ouvrir la configuration", true, None);
-        let reload = MenuItem::new("Recharger la configuration", true, None);
-        let autostart_item = CheckMenuItem::new("Lancer au démarrage", true, autostart, None);
-        let pause = CheckMenuItem::new("Masquer l'île", true, false, None);
+        let settings = MenuItem::new(settings_label(), true, None);
+        let open = MenuItem::new(open_label(), true, None);
+        let reload = MenuItem::new(reload_label(), true, None);
+        let autostart_item = CheckMenuItem::new(autostart_label(), true, autostart, None);
+        let pause = CheckMenuItem::new(pause_label(), true, false, None);
         let claude_hooks = MenuItem::new(claude_hooks_label(claude_hooks_installed), true, None);
-        let quit = MenuItem::new("Quitter", true, None);
+        let update = MenuItem::new(update_label, true, None);
+        let quit = MenuItem::new(quit_label(), true, None);
 
         let menu = Menu::new();
         menu.append_items(&[
             &title,
             &PredefinedMenuItem::separator(),
+            &settings,
             &open,
             &reload,
             &PredefinedMenuItem::separator(),
@@ -43,6 +57,7 @@ impl Tray {
             &autostart_item,
             &pause,
             &PredefinedMenuItem::separator(),
+            &update,
             &quit,
         ])?;
 
@@ -51,23 +66,27 @@ impl Tray {
         let autostart_state = Arc::new(AtomicBool::new(autostart));
         let pause_state = AtomicBool::new(false);
         let ids = (
+            settings.id().clone(),
             open.id().clone(),
             reload.id().clone(),
             autostart_item.id().clone(),
             pause.id().clone(),
             claude_hooks.id().clone(),
+            update.id().clone(),
             quit.id().clone(),
         );
         let autostart_flag = autostart_state.clone();
         MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
-            let (open, reload, autostart, pause, claude, quit) = &ids;
+            let (settings, open, reload, autostart, pause, claude, update, quit) = &ids;
             let toggle = |flag: &AtomicBool| !flag.fetch_xor(true, Ordering::Relaxed);
             let command = match &event.id {
+                id if id == settings => TrayCommand::Settings,
                 id if id == open => TrayCommand::OpenConfig,
                 id if id == reload => TrayCommand::ReloadConfig,
                 id if id == autostart => TrayCommand::Autostart(toggle(&autostart_flag)),
                 id if id == pause => TrayCommand::Pause(toggle(&pause_state)),
                 id if id == claude => TrayCommand::ClaudeHooks,
+                id if id == update => TrayCommand::Update,
                 id if id == quit => TrayCommand::Quit,
                 _ => return,
             };
@@ -82,14 +101,37 @@ impl Tray {
 
         Ok(Self {
             _icon: icon,
+            settings,
+            open,
+            reload,
             claude_hooks,
+            claude_hooks_installed: Cell::new(claude_hooks_installed),
             autostart: autostart_item,
             autostart_state,
+            pause,
+            update,
+            quit,
         })
     }
 
     pub fn set_claude_hooks_installed(&self, installed: bool) {
+        self.claude_hooks_installed.set(installed);
         self.claude_hooks.set_text(claude_hooks_label(installed));
+    }
+
+    pub fn set_update_label(&self, label: &str) {
+        self.update.set_text(label);
+    }
+
+    /// Remet les textes du menu dans la langue courante.
+    pub fn retranslate(&self) {
+        self.settings.set_text(settings_label());
+        self.open.set_text(open_label());
+        self.reload.set_text(reload_label());
+        self.set_claude_hooks_installed(self.claude_hooks_installed.get());
+        self.autostart.set_text(autostart_label());
+        self.pause.set_text(pause_label());
+        self.quit.set_text(quit_label());
     }
 
     /// Corrige la case si l'écriture dans le registre a échoué.
@@ -99,11 +141,41 @@ impl Tray {
     }
 }
 
-fn claude_hooks_label(installed: bool) -> &'static str {
+fn settings_label() -> String {
+    tr!("Settings…", "Réglages…")
+}
+
+fn open_label() -> String {
+    tr!("Open configuration file", "Ouvrir la configuration")
+}
+
+fn reload_label() -> String {
+    tr!("Reload configuration", "Recharger la configuration")
+}
+
+fn autostart_label() -> String {
+    tr!("Start with Windows", "Lancer au démarrage")
+}
+
+fn pause_label() -> String {
+    tr!("Hide the island", "Masquer l'île")
+}
+
+fn quit_label() -> String {
+    tr!("Quit", "Quitter")
+}
+
+fn claude_hooks_label(installed: bool) -> String {
     if installed {
-        "Claude Code : retirer les hooks…"
+        tr!(
+            "Claude Code: remove hooks…",
+            "Claude Code : retirer les hooks…"
+        )
     } else {
-        "Claude Code : installer les hooks…"
+        tr!(
+            "Claude Code: install hooks…",
+            "Claude Code : installer les hooks…"
+        )
     }
 }
 

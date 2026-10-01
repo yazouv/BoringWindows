@@ -108,7 +108,7 @@ pub fn events_between(ics: &str, from: DateTime<Utc>, to: DateTime<Utc>) -> Vec<
                 out.push(Event {
                     uid: r.uid.clone(),
                     title: if r.summary.is_empty() {
-                        "(sans titre)".into()
+                        bw_i18n::tr!("(untitled)", "(sans titre)")
                     } else {
                         r.summary.clone()
                     },

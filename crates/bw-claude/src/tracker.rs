@@ -1,6 +1,7 @@
 //! Suivi des sessions Claude Code à partir des événements reçus. Logique pure :
 //! le temps est passé en paramètre pour rester testable.
 
+use bw_i18n::tr;
 use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
@@ -135,15 +136,18 @@ impl Tracker {
             ("PostToolUseFailure", _) => (SessionKind::Working, None),
             // Sans réponse possible dans l'île, Claude demandera dans le terminal.
             ("PermissionRequest", _) => (SessionKind::NeedsYou, Some(permission_label(e))),
-            ("Notification", Some("permission_prompt")) => {
-                (SessionKind::NeedsYou, Some("demande une permission".into()))
-            }
-            ("Notification", Some("idle_prompt")) => {
-                (SessionKind::NeedsYou, Some("attend ta réponse".into()))
-            }
-            ("Notification", Some("agent_needs_input" | "elicitation_dialog")) => {
-                (SessionKind::NeedsYou, Some("a une question".into()))
-            }
+            ("Notification", Some("permission_prompt")) => (
+                SessionKind::NeedsYou,
+                Some(tr!("needs a permission", "demande une permission")),
+            ),
+            ("Notification", Some("idle_prompt")) => (
+                SessionKind::NeedsYou,
+                Some(tr!("waiting for you", "attend ta réponse")),
+            ),
+            ("Notification", Some("agent_needs_input" | "elicitation_dialog")) => (
+                SessionKind::NeedsYou,
+                Some(tr!("has a question", "a une question")),
+            ),
             ("Stop", _) => (SessionKind::Done, None),
             _ => return closed,
         };
@@ -208,7 +212,10 @@ impl Tracker {
             (s.kind, s.detail) = match decision {
                 Decision::Allow | Decision::Deny => (SessionKind::Working, None),
                 // Claude va poser la question dans le terminal.
-                Decision::Ask => (SessionKind::NeedsYou, Some("demande une permission".into())),
+                Decision::Ask => (
+                    SessionKind::NeedsYou,
+                    Some(tr!("needs a permission", "demande une permission")),
+                ),
             };
         }
         true
@@ -290,24 +297,24 @@ impl Tracker {
 
 fn permission_label(e: &HookEvent) -> String {
     match e.tool_name.as_deref() {
-        Some("AskUserQuestion") => return "te pose une question".into(),
-        Some("ExitPlanMode") => return "plan à valider".into(),
+        Some("AskUserQuestion") => return tr!("is asking you a question", "te pose une question"),
+        Some("ExitPlanMode") => return tr!("plan to review", "plan à valider"),
         _ => {}
     }
-    format!(
-        "autoriser {} ?",
-        e.tool_name.as_deref().unwrap_or("un outil")
-    )
+    match e.tool_name.as_deref() {
+        Some(tool) => tr!("allow {tool}?", "autoriser {tool} ?"),
+        None => tr!("allow a tool?", "autoriser un outil ?"),
+    }
 }
 
 fn status_text(s: &Session) -> String {
     match (s.kind, &s.detail) {
-        (SessionKind::Idle, _) => "en pause".into(),
+        (SessionKind::Idle, _) => tr!("paused", "en pause"),
         (SessionKind::Working, Some(tool)) => tool.clone(),
-        (SessionKind::Working, None) => "réfléchit…".into(),
-        (SessionKind::Done, _) => "terminé".into(),
+        (SessionKind::Working, None) => tr!("thinking…", "réfléchit…"),
+        (SessionKind::Done, _) => tr!("done", "terminé"),
         (_, Some(d)) => d.clone(),
-        (_, None) => "attend ta réponse".into(),
+        (_, None) => tr!("waiting for you", "attend ta réponse"),
     }
 }
 
@@ -371,6 +378,8 @@ mod tests {
     }
 
     fn tracker() -> (Tracker, Instant) {
+        // Les textes vérifiés ici sont en français.
+        bw_i18n::set(bw_i18n::Lang::Fr);
         (Tracker::new(Duration::from_secs(8)), Instant::now())
     }
 

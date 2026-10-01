@@ -4,6 +4,8 @@
 //! au chargement, et surveillé pour être rechargé à chaud.
 
 mod color;
+mod edit;
+mod theme;
 mod watch;
 
 use std::collections::BTreeMap;
@@ -11,7 +13,11 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
+use bw_i18n::tr;
+
 pub use color::Color;
+pub use edit::{ConfigEditor, Value};
+pub use theme::{BUILTIN_THEMES, THEME_KEYS, available_themes, themes_dir};
 pub use watch::{ConfigWatcher, watch};
 
 /// Modèle du fichier créé au premier lancement. Il doit rester équivalent à
@@ -20,14 +26,14 @@ pub const DEFAULT_TOML: &str = include_str!("default.toml");
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
-    #[error("impossible d'accéder à {path} : {source}")]
+    #[error("{}", tr!("cannot access {} : {}", "impossible d'accéder à {} : {}", path.display(), source))]
     Io {
         path: PathBuf,
         source: std::io::Error,
     },
-    #[error("config.toml invalide : {0}")]
+    #[error("{}", tr!("invalid config.toml: {}", "config.toml invalide : {}", .0))]
     Parse(#[from] toml::de::Error),
-    #[error("config.toml invalide :\n  - {}", .0.join("\n  - "))]
+    #[error("{}", tr!("invalid config.toml:\n  - {}", "config.toml invalide :\n  - {}", .0.join("\n  - ")))]
     Invalid(Vec<String>),
 }
 
@@ -48,6 +54,9 @@ pub struct General {
     pub hide_in_fullscreen: bool,
     pub open_on: OpenOn,
     pub collapse_delay_ms: u32,
+    pub language: Language,
+    /// Installer les mises à jour (releases GitHub) automatiquement.
+    pub auto_update: bool,
 }
 
 impl Default for General {
@@ -57,6 +66,8 @@ impl Default for General {
             hide_in_fullscreen: true,
             open_on: OpenOn::Hover,
             collapse_delay_ms: 350,
+            language: Language::Auto,
+            auto_update: true,
         }
     }
 }
@@ -66,6 +77,15 @@ impl Default for General {
 pub enum MonitorChoice {
     Primary,
     Cursor,
+}
+
+/// Langue de l'interface ; `Auto` suit celle de Windows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Language {
+    Auto,
+    En,
+    Fr,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -78,9 +98,15 @@ pub enum OpenOn {
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Theme {
+    /// Thème de base (`default`, `light`… ou `themes/<nom>.toml`).
+    pub name: String,
     pub background: Color,
     pub foreground: Color,
     pub accent: Color,
+    /// Contour de l'île (transparent : pas de contour).
+    pub border: Color,
+    /// Police ; vide : celle du système.
+    pub font: String,
     pub corner_radius: f32,
     pub animation_ms: u32,
     pub top_offset: f32,
@@ -92,9 +118,17 @@ pub struct Theme {
 impl Default for Theme {
     fn default() -> Self {
         Self {
+            name: "default".into(),
             background: Color::rgb(0x00, 0x00, 0x00),
             foreground: Color::rgb(0xFF, 0xFF, 0xFF),
             accent: Color::rgb(0xFF, 0x8A, 0x3D),
+            border: Color {
+                r: 0,
+                g: 0,
+                b: 0,
+                a: 0,
+            },
+            font: String::new(),
             corner_radius: 22.0,
             animation_ms: 240,
             top_offset: 0.0,
@@ -135,8 +169,20 @@ impl Default for Layout {
 }
 
 impl Config {
+    /// Lit une config ; les thèmes personnels sont cherchés à côté de
+    /// config.toml, dans le dossier habituel.
     pub fn from_toml_str(s: &str) -> Result<Self, ConfigError> {
-        let config: Config = toml::from_str(s)?;
+        Self::parse(s, &config_dir())
+    }
+
+    /// Lit une config dont les thèmes personnels sont dans
+    /// `config_dir/themes`.
+    pub fn parse(s: &str, config_dir: &Path) -> Result<Self, ConfigError> {
+        // Premier passage sur le texte brut : messages d'erreur avec la ligne.
+        toml::from_str::<Config>(s)?;
+        let mut table: toml::Table = s.parse()?;
+        theme::resolve(&mut table, config_dir).map_err(|e| ConfigError::Invalid(vec![e]))?;
+        let config: Config = toml::Value::Table(table).try_into()?;
         config.validate()?;
         Ok(config)
     }
@@ -149,7 +195,7 @@ impl Config {
             source,
         };
         match std::fs::read_to_string(path) {
-            Ok(s) => Self::from_toml_str(&s),
+            Ok(s) => Self::parse(&s, path.parent().unwrap_or(Path::new("."))),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 if let Some(dir) = path.parent() {
                     std::fs::create_dir_all(dir).map_err(io_err)?;
@@ -185,30 +231,45 @@ impl Config {
                 || size.width > 4000.0
                 || size.height > 2000.0
             {
-                errors.push(format!(
+                errors.push(tr!(
+                    "{name}: size out of range ({}x{})",
                     "{name} : taille hors limites ({}x{})",
-                    size.width, size.height
+                    size.width,
+                    size.height
                 ));
             }
         }
         if t.expanded.width < t.attention.width.max(t.compact.width)
             || t.expanded.height < t.attention.height.max(t.compact.height)
         {
-            errors.push(
-                "theme.expanded doit être au moins aussi grand que compact et attention".into(),
-            );
+            errors.push(tr!(
+                "theme.expanded must be at least as large as compact and attention",
+                "theme.expanded doit être au moins aussi grand que compact et attention"
+            ));
         }
         if !(0.0..=500.0).contains(&t.corner_radius) {
-            errors.push("theme.corner_radius doit être entre 0 et 500".into());
+            errors.push(tr!(
+                "theme.corner_radius must be between 0 and 500",
+                "theme.corner_radius doit être entre 0 et 500"
+            ));
         }
         if t.animation_ms > 2000 {
-            errors.push("theme.animation_ms doit être ≤ 2000".into());
+            errors.push(tr!(
+                "theme.animation_ms must be ≤ 2000",
+                "theme.animation_ms doit être ≤ 2000"
+            ));
         }
         if !(0.0..=500.0).contains(&t.top_offset) {
-            errors.push("theme.top_offset doit être entre 0 et 500".into());
+            errors.push(tr!(
+                "theme.top_offset must be between 0 and 500",
+                "theme.top_offset doit être entre 0 et 500"
+            ));
         }
         if self.general.collapse_delay_ms > 10_000 {
-            errors.push("general.collapse_delay_ms doit être ≤ 10000".into());
+            errors.push(tr!(
+                "general.collapse_delay_ms must be ≤ 10000",
+                "general.collapse_delay_ms doit être ≤ 10000"
+            ));
         }
 
         if errors.is_empty() {

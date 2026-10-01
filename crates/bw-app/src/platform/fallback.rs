@@ -74,6 +74,7 @@ impl Tray {
     pub fn new(
         _autostart: bool,
         _claude_hooks_installed: bool,
+        _update_label: &str,
         _on_command: impl Fn(TrayCommand) + Send + Sync + 'static,
     ) -> anyhow::Result<Self> {
         Ok(Self)
@@ -82,6 +83,10 @@ impl Tray {
     pub fn set_autostart_checked(&self, _checked: bool) {}
 
     pub fn set_claude_hooks_installed(&self, _installed: bool) {}
+
+    pub fn retranslate(&self) {}
+
+    pub fn set_update_label(&self, _label: &str) {}
 }
 
 pub fn autostart_enabled() -> bool {
@@ -89,7 +94,10 @@ pub fn autostart_enabled() -> bool {
 }
 
 pub fn set_autostart(_enabled: bool) -> anyhow::Result<()> {
-    anyhow::bail!("démarrage automatique pas encore disponible sur ce système")
+    anyhow::bail!(bw_i18n::tr!(
+        "starting with the system isn't available on this platform yet",
+        "démarrage automatique pas encore disponible sur ce système"
+    ))
 }
 
 /// Pas de boîte de dialogue native ici : on accepte et on journalise.
@@ -104,6 +112,15 @@ pub fn focus_terminal(_ancestors: &[u32], _console_window: Option<i64>) -> bool 
 }
 
 pub fn attach_parent_console() {}
+
+pub fn creating_island<R>(f: impl FnOnce() -> R) -> R {
+    f()
+}
+
+/// Pas de sélecteur de fichier natif ici : le chemin se tape à la main.
+pub fn pick_ics_file() -> Option<std::path::PathBuf> {
+    None
+}
 
 pub fn alert_sound() {}
 

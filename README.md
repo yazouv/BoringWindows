@@ -11,7 +11,8 @@ Inspiré de [boring.notch](https://github.com/TheBoredTeam/boring.notch) et [cou
 
 📖 **Documentation : [yazouv.github.io/BoringWindows](https://yazouv.github.io/BoringWindows/)**
 (installation, configuration de l'agenda pour Google / Outlook / iCloud…,
-Claude Code, dépannage). Sources dans [`docs/`](docs/src).
+Claude Code, dépannage) · 🇬🇧 [English](https://yazouv.github.io/BoringWindows/en/).
+Sources dans [`docs/`](docs/).
 
 👉 Voir le [plan du projet](PLAN.md).
 
@@ -25,6 +26,13 @@ Claude Code, dépannage). Sources dans [`docs/`](docs/src).
   barre de progression cliquable, île teintée à la couleur de la pochette.
 - **Phase 3** (agenda) : prochaines réunions depuis tes calendriers ICS, rappel
   avant le début, bouton « Rejoindre » (Teams, Meet, Zoom, Webex…).
+- **Phase 3.5** (réglages) : fenêtre de réglages (clic droit sur l'icône ›
+  **Réglages…**) : plus besoin d'éditer `config.toml`, assistant d'ajout de
+  calendrier avec bouton **Tester**, hooks et diagnostic Claude Code.
+- **Phase 4** (en cours) : thèmes (`default`, `light`, `midnight`, `glass` ou
+  les tiens dans `themes/<nom>.toml`), au choix dans Réglages › Apparence.
+- **Langues** : l'app est en français ou en anglais (celle de Windows par
+  défaut, `general.language` pour forcer), changement à chaud.
 
 ## Musique
 
@@ -41,7 +49,9 @@ l'overlay de volume. Ça couvre Spotify, Apple Music, Deezer, les navigateurs
 
 ## Agenda
 
-Ajoute le lien ICS privé de chaque calendrier dans `config.toml` :
+Le plus simple : clic droit sur l'icône › **Réglages…** › **Agenda**, choisis
+ton service, colle le lien, **Tester**, **Ajouter**. Ou, à la main, ajoute le
+lien ICS privé de chaque calendrier dans `config.toml` :
 
 ```toml
 [[modules.calendar.sources]]
@@ -132,7 +142,7 @@ animations sans vrais modules :
 enabled = true
 ```
 
-Clic droit sur l'icône de la zone de notification : ouvrir la config, lancer au
+Clic droit sur l'icône de la zone de notification : réglages, ouvrir la config, lancer au
 démarrage, masquer l'île, quitter.
 
 ## Structure
@@ -144,11 +154,39 @@ démarrage, masquer l'île, quitter.
 | `bw-claude` | relais de hooks, protocole IPC, suivi des sessions, installation dans `settings.json` |
 | `bw-media` | musique : contrôles média de Windows (GSMTC), pochette, couleur d'accent |
 | `bw-calendar` | agenda : lecture ICS, récurrences, rappels, liens de visio |
+| `bw-i18n` | langue courante et macro `tr!("anglais", "français")` pour les textes côté Rust |
+| `bw-net` | requêtes HTTP (client de Windows, `curl` ailleurs) |
+| `bw-update` | mises à jour depuis les releases GitHub (empreinte vérifiée) |
 | `bw-app` | binaire : île Slint (`ui/island.slint`), intégration Win32, icône de notification |
 
 Le code Win32 est isolé dans `crates/bw-app/src/platform/win32.rs`. Sur macOS et
 Linux, l'île s'ouvre comme une fenêtre flottante (macOS : icône de barre de menus,
 pas d'icône dans le Dock) ; le port macOS complet est décrit dans le plan.
 
-La CI construit un `.exe` Windows et un binaire macOS (Apple Silicon) à chaque
-push : onglet *Actions* → run → *Artifacts*.
+## Versions et CI/CD
+
+- **PR vers `main`** : `ci.yml` vérifie format, clippy (Linux, Windows et macOS)
+  et tests sur un seul runner Linux, le moins cher en minutes.
+- **Push sur `main`** : [release-please](https://github.com/googleapis/release-please)
+  tient à jour une PR « chore: release x.y.z » (version dans `Cargo.toml`,
+  `CHANGELOG.md`). **La fusionner publie la release** : tag `vx.y.z`, puis
+  binaires Windows, macOS et Linux (+ empreintes `.sha256`) attachés à la
+  release, et liens de téléchargement en tête des notes.
+- **Mise à jour automatique** : l'app lit la dernière release et remplace son
+  exécutable (voir la doc, *Installation › Mises à jour*).
+- **Doc** : publiée sur GitHub Pages quand `docs/` change sur `main`.
+
+Les messages de commit (ou titres de PR fusionnées en *squash*) suivent
+[Conventional Commits](https://www.conventionalcommits.org/fr/) : c'est ce qui
+décide de la version et du changelog.
+
+| Préfixe | Effet |
+|---|---|
+| `feat: …` | nouvelle fonction → version mineure (0.1.0 → 0.2.0) |
+| `fix: …` | correction → version corrective (0.2.0 → 0.2.1) |
+| `feat!: …` ou `BREAKING CHANGE:` | changement incompatible |
+| `docs:`, `chore:`, `ci:`, `refactor:` | pas de nouvelle version à eux seuls |
+
+Réglage du dépôt nécessaire une fois : *Settings › Actions › General › Workflow
+permissions* : **Read and write permissions** et **Allow GitHub Actions to
+create and approve pull requests**.

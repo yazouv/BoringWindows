@@ -4,6 +4,7 @@
 use chrono::{DateTime, Duration, Local, Utc};
 
 use bw_core::Attention;
+use bw_i18n::{Lang, tr};
 
 use crate::config::CalendarConfig;
 use crate::ics::Event;
@@ -72,14 +73,14 @@ pub fn agenda(
         None => format!("{when} · {}", e.title),
     };
     let (attention, summary) = match next_meeting {
-        Some(e) if e.start <= now => (Attention::High, Some(line("Commencé".into(), e))),
+        Some(e) if e.start <= now => (Attention::High, Some(line(tr!("Started", "Commencé"), e))),
         Some(e) if e.start - now <= remind => (
             Attention::High,
             Some(line(capitalize(&countdown(e.start - now)), e)),
         ),
         Some(e) if e.start - now <= COUNTDOWN => (
             Attention::Low,
-            Some(line(format!("À {}", clock(e.start)), e)),
+            Some(line(tr!("At {}", "À {}", clock(e.start)), e)),
         ),
         _ => (Attention::None, None),
     };
@@ -101,7 +102,7 @@ fn item(e: &Event, now: DateTime<Utc>, remind: Duration) -> AgendaItem {
     let relative = if e.all_day {
         None
     } else if ongoing {
-        Some("en cours".into())
+        Some(tr!("ongoing", "en cours"))
     } else if until <= COUNTDOWN {
         Some(countdown(until))
     } else {
@@ -110,14 +111,14 @@ fn item(e: &Event, now: DateTime<Utc>, remind: Duration) -> AgendaItem {
     AgendaItem {
         title: e.title.clone(),
         time: if e.all_day {
-            "toute la journée".into()
+            tr!("all day", "toute la journée")
         } else {
             match (e.start.with_timezone(&Local).date_naive()
                 - now.with_timezone(&Local).date_naive())
             .num_days()
             {
                 ..=0 => clock(e.start),
-                1 => format!("demain {}", clock(e.start)),
+                1 => tr!("tomorrow {}", "demain {}", clock(e.start)),
                 _ => format!("{} {}", weekday(e.start), clock(e.start)),
             }
         },
@@ -137,8 +138,11 @@ fn room(e: &Event) -> Option<String> {
 
 fn weekday(t: DateTime<Utc>) -> &'static str {
     use chrono::Datelike;
-    ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."]
-        [t.with_timezone(&Local).weekday().num_days_from_monday() as usize]
+    let days = match bw_i18n::lang() {
+        Lang::Fr => ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."],
+        Lang::En => ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    };
+    days[t.with_timezone(&Local).weekday().num_days_from_monday() as usize]
 }
 
 fn capitalize(s: &str) -> String {
@@ -153,14 +157,19 @@ fn clock(t: DateTime<Utc>) -> String {
     t.with_timezone(&Local).format("%H:%M").to_string()
 }
 
-/// « dans 12 min », « dans 1 h 05 », « maintenant ».
+/// « dans 12 min », « dans 1 h 05 », « maintenant » (ou en anglais).
 fn countdown(d: Duration) -> String {
     // Minute entamée : à 4 min 10 s, on annonce « dans 5 min ».
     let minutes = (d.num_seconds() + 59) / 60;
     match minutes {
-        ..=0 => "maintenant".into(),
-        1..=59 => format!("dans {minutes} min"),
-        _ => format!("dans {} h {:02}", minutes / 60, minutes % 60),
+        ..=0 => tr!("now", "maintenant"),
+        1..=59 => tr!("in {minutes} min", "dans {minutes} min"),
+        _ => tr!(
+            "in {} h {:02}",
+            "dans {} h {:02}",
+            minutes / 60,
+            minutes % 60
+        ),
     }
 }
 
@@ -214,6 +223,8 @@ mod tests {
     }
 
     fn config() -> CalendarConfig {
+        // Tous les tests de ce crate vérifient les textes en français.
+        bw_i18n::set(Lang::Fr);
         CalendarConfig::default()
     }
 
@@ -319,6 +330,7 @@ mod tests {
 
     #[test]
     fn countdown_text() {
+        bw_i18n::set(Lang::Fr);
         assert_eq!(countdown(Duration::seconds(0)), "maintenant");
         assert_eq!(countdown(Duration::seconds(30)), "dans 1 min");
         assert_eq!(countdown(Duration::minutes(65)), "dans 1 h 05");

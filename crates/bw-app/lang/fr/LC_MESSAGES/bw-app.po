@@ -1,0 +1,214 @@
+# Traduction française de l'interface Slint de BoringWindows.
+# msgid = texte anglais des fichiers .slint ; msgstr = français.
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: fr\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+msgid "(no name)"
+msgstr "(sans nom)"
+
+msgid ".ics file"
+msgstr "Fichier .ics"
+
+msgid "Accent color"
+msgstr "Couleur d'accent"
+
+msgid "Add"
+msgstr "Ajouter"
+
+msgid "Add a calendar"
+msgstr "Ajouter un calendrier"
+
+msgid "After installing, restart your Claude Code sessions: they only read their hooks at startup."
+msgstr "Après une installation, relance tes sessions Claude Code : elles ne lisent leurs hooks qu'au démarrage."
+
+msgid "All quiet"
+msgstr "Rien à signaler"
+
+msgid "Allow"
+msgstr "Autoriser"
+
+msgid "Animation duration (ms)"
+msgstr "Durée des animations (ms)"
+
+msgid "Answer permission requests from the island"
+msgstr "Répondre aux demandes de permission depuis l'île"
+
+msgid "Appearance"
+msgstr "Apparence"
+
+msgid "Automatic (Windows)"
+msgstr "Automatique (Windows)"
+
+msgid "Background color"
+msgstr "Couleur de fond"
+
+msgid "BoringWindows · Settings"
+msgstr "BoringWindows · Réglages"
+
+msgid "Browse…"
+msgstr "Parcourir…"
+
+msgid "Calendar"
+msgstr "Agenda"
+
+msgid "Changes apply to the island right away. Picking a theme replaces the colors above with the theme's; your own themes go in the themes folder (one .toml file each, see the documentation). The accent color is replaced by the album art color while music plays (Music tab)."
+msgstr "Les changements s'appliquent tout de suite sur l'île. Choisir un thème remplace les couleurs ci-dessus par les siennes ; tes propres thèmes vont dans le dossier des thèmes (un fichier .toml chacun, voir la documentation). La couleur d'accent est remplacée par celle de la pochette quand la musique joue (onglet Musique)."
+
+msgid "Corner radius of the open island"
+msgstr "Arrondi de l'île ouverte"
+
+msgid "Deny"
+msgstr "Refuser"
+
+msgid "Display"
+msgstr "Affichage"
+
+msgid "Documentation"
+msgstr "Documentation"
+
+msgid "General"
+msgstr "Général"
+
+msgid "Hide the island when an app is full screen"
+msgstr "Cacher l'île quand une application est en plein écran"
+
+msgid "Hooks installed ✓"
+msgstr "Hooks installés ✓"
+
+msgid "Hooks not installed"
+msgstr "Hooks non installés"
+
+msgid "ICS link"
+msgstr "Lien ICS"
+
+msgid "Install hooks"
+msgstr "Installer les hooks"
+
+msgid "Join"
+msgstr "Rejoindre"
+
+msgid "Language"
+msgstr "Langue"
+
+msgid "Music"
+msgstr "Musique"
+
+msgid "My calendars"
+msgstr "Mes calendriers"
+
+msgid "Name (optional)"
+msgstr "Nom (facultatif)"
+
+msgid "No calendar yet: add one below."
+msgstr "Aucun calendrier pour l'instant : ajoute-en un ci-dessous."
+
+msgid "Open config.toml"
+msgstr "Ouvrir config.toml"
+
+msgid "Open the island"
+msgstr "Ouvrir l'île"
+
+msgid "Players to ignore"
+msgstr "Lecteurs à ignorer"
+
+msgid "Refresh every (min)"
+msgstr "Mise à jour toutes les (min)"
+
+msgid "Reminder before start (min)"
+msgstr "Rappel avant le début (min)"
+
+msgid "Remove"
+msgstr "Supprimer"
+
+msgid "Remove hooks"
+msgstr "Retirer les hooks"
+
+msgid "Run diagnostic"
+msgstr "Lancer le diagnostic"
+
+msgid "Running diagnostic…"
+msgstr "Diagnostic en cours…"
+
+msgid "Screen"
+msgstr "Écran"
+
+msgid "Separate names with commas; part of the name is enough. Spotify, Apple Music, browsers, VLC… are detected automatically."
+msgstr "Sépare les noms par des virgules ; un morceau du nom suffit. Spotify, Apple Music, navigateurs, VLC… sont détectés automatiquement."
+
+msgid "Service"
+msgstr "Service"
+
+msgid "Show all-day events"
+msgstr "Afficher les événements « toute la journée »"
+
+msgid "Sound when Claude is waiting for you (question, plan, permission)"
+msgstr "Son quand Claude t'attend (question, plan, permission)"
+
+msgid "Start BoringWindows with Windows"
+msgstr "Lancer BoringWindows au démarrage de Windows"
+
+msgid "Step-by-step guide"
+msgstr "Guide détaillé"
+
+msgid "Terminal"
+msgstr "Terminal"
+
+msgid "Test"
+msgstr "Tester"
+
+msgid "Testing…"
+msgstr "Test…"
+
+msgid "Time span shown (hours)"
+msgstr "Horizon affiché (heures)"
+
+msgid "Time to answer in the island (s)"
+msgstr "Délai de réponse dans l'île (s)"
+
+msgid "Tint the island with the album art color"
+msgstr "Teinter l'île avec la couleur de la pochette"
+
+msgid "Work, School, Personal…"
+msgstr "Pro, Cours, Perso…"
+
+msgid "https://…  or  webcal://…"
+msgstr "https://…  ou  webcal://…"
+
+msgid "main screen"
+msgstr "écran principal"
+
+msgid "on click"
+msgstr "au clic"
+
+msgid "on hover"
+msgstr "au survol"
+
+msgid "screen under the mouse (at startup)"
+msgstr "écran de la souris (au lancement)"
+
+msgid "{} wants to use {}"
+msgstr "{} veut utiliser {}"
+
+msgid "Theme"
+msgstr "Thème"
+
+msgid "Themes folder"
+msgstr "Dossier des thèmes"
+
+msgid "Install updates automatically"
+msgstr "Installer les mises à jour automatiquement"
+
+msgid "Version {}"
+msgstr "Version {}"
+
+msgid "Restart to update"
+msgstr "Redémarrer pour mettre à jour"
+
+msgid "Checking…"
+msgstr "Recherche…"
+
+msgid "Check for updates"
+msgstr "Rechercher une mise à jour"

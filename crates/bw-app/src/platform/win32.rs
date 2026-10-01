@@ -77,6 +77,19 @@ pub fn single_instance() -> Option<SingleInstance> {
 // ---------------------------------------------------------------------------
 // Fenêtre de l'île
 
+thread_local! {
+    static CREATING_ISLAND: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Crée l'île : seules les fenêtres créées dans `f` reçoivent les attributs
+/// de l'île (Slint applique le hook à toutes les fenêtres).
+pub fn creating_island<R>(f: impl FnOnce() -> R) -> R {
+    CREATING_ISLAND.set(true);
+    let result = f();
+    CREATING_ISLAND.set(false);
+    result
+}
+
 pub fn configure_backend(selector: BackendSelector) -> BackendSelector {
     selector.with_winit_window_attributes_hook(window_attributes)
 }
@@ -84,6 +97,9 @@ pub fn configure_backend(selector: BackendSelector) -> BackendSelector {
 /// Attributs appliqués dès la création : la fenêtre n'apparaît jamais dans la
 /// barre des tâches et ne prend pas le focus en s'affichant.
 fn window_attributes(attrs: WindowAttributes) -> WindowAttributes {
+    if !CREATING_ISLAND.get() {
+        return attrs;
+    }
     attrs
         .with_skip_taskbar(true)
         .with_active(false)
@@ -506,4 +522,37 @@ pub fn alert_sound() {
     unsafe {
         let _ = MessageBeep(MB_ICONASTERISK);
     }
+}
+
+/// Boîte de dialogue « Ouvrir » filtrée sur les calendriers .ics.
+pub fn pick_ics_file() -> Option<std::path::PathBuf> {
+    use windows::Win32::UI::Controls::Dialogs::{
+        GetOpenFileNameW, OFN_FILEMUSTEXIST, OFN_NOCHANGEDIR, OFN_PATHMUSTEXIST, OPENFILENAMEW,
+    };
+    use windows::core::PWSTR;
+
+    let filter: Vec<u16> = bw_i18n::tr!(
+        "Calendars (*.ics)\0*.ics\0All files\0*.*\0\0",
+        "Calendriers (*.ics)\0*.ics\0Tous les fichiers\0*.*\0\0"
+    )
+    .encode_utf16()
+    .collect();
+    let mut buffer = vec![0u16; 1024];
+    let mut ofn = OPENFILENAMEW {
+        lStructSize: size_of::<OPENFILENAMEW>() as u32,
+        lpstrFilter: PCWSTR(filter.as_ptr()),
+        lpstrFile: PWSTR(buffer.as_mut_ptr()),
+        nMaxFile: buffer.len() as u32,
+        Flags: OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR,
+        ..Default::default()
+    };
+    // SAFETY: `filter` et `buffer` vivent pendant l'appel modal.
+    let ok = unsafe { GetOpenFileNameW(&mut ofn) }.as_bool();
+    if !ok {
+        return None;
+    }
+    let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
+    Some(std::path::PathBuf::from(String::from_utf16_lossy(
+        &buffer[..len],
+    )))
 }

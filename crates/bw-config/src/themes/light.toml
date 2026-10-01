@@ -1,0 +1,6 @@
+# Clair : pour les fonds d'écran et barres des tâches clairs.
+background = "#F5F5F7F5"
+foreground = "#1C1C1E"
+accent = "#0A84FF"
+border = "#0000001F"
+corner_radius = 22.0

@@ -1,0 +1,22 @@
+[package]
+name = "bw-net"
+description = "Requêtes HTTP GET de BoringWindows : client HTTP de Windows, curl ailleurs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Foundation",
+    "Storage_Streams",
+    "Web_Http",
+    "Web_Http_Filters",
+    "Web_Http_Headers",
+] }
+
+[lints]
+workspace = true

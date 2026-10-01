@@ -2,7 +2,8 @@
 
 Le fichier se trouve dans `%APPDATA%\BoringWindows\config.toml` (clic droit
 sur l'icône › **Ouvrir la configuration**). Il est créé au premier lancement
-avec toutes les options commentées.
+avec toutes les options commentées. Les réglages courants se changent aussi
+sans toucher au fichier : clic droit › **Réglages…**.
 
 - **Enregistre : c'est appliqué aussitôt**, sans redémarrage.
 - Une option absente prend sa valeur par défaut : tu peux ne garder que ce que
@@ -34,6 +35,8 @@ name = "Pro"
 |---|---|---|---|
 | `monitor` | `"primary"` | `"primary"`, `"cursor"` | écran de l'île : principal, ou celui où se trouve la souris au lancement |
 | `hide_in_fullscreen` | `true` | `true`, `false` | cacher l'île quand une application est en plein écran |
+| `auto_update` | `true` | `true`, `false` | installer les nouvelles versions automatiquement (voir [Installation](installation.md#mises-à-jour)) |
+| `language` | `"auto"` | `"auto"`, `"fr"`, `"en"` | langue de l'interface (`auto` : celle de Windows) |
 | `open_on` | `"hover"` | `"hover"`, `"click"` | ouvrir l'île au survol ou au clic |
 | `collapse_delay_ms` | `350` | 0 à 10000 | délai avant de refermer quand la souris s'en va (ms) |
 
@@ -41,10 +44,13 @@ name = "Pro"
 
 | Option | Défaut | Valeurs | Rôle |
 |---|---|---|---|
-| `background` | `"#000000"` | `"#RRGGBB"` ou `"#RRGGBBAA"` | fond de l'île |
-| `foreground` | `"#FFFFFF"` | idem | texte |
-| `accent` | `"#FF8A3D"` | idem | couleur d'accent (urgent, boutons) ; remplacée par la couleur de la pochette quand la musique joue (voir `[modules.media]`) |
-| `corner_radius` | `22.0` | 0 à 500 | arrondi des coins de l'île ouverte |
+| `name` | `"default"` | `"default"`, `"light"`, `"midnight"`, `"glass"` ou un thème perso | thème de base (voir [Thèmes](themes.md)) ; les clés ci-dessous passent devant |
+| `background` | selon le thème | `"#RRGGBB"` ou `"#RRGGBBAA"` | fond de l'île |
+| `foreground` | selon le thème | idem | texte |
+| `accent` | selon le thème | idem | couleur d'accent (urgent, boutons) ; remplacée par la couleur de la pochette quand la musique joue (voir `[modules.media]`) |
+| `border` | selon le thème | idem | contour de l'île (`"#00000000"` : aucun) |
+| `font` | `""` | nom d'une police installée | police de l'île (vide : celle du système) |
+| `corner_radius` | selon le thème | 0 à 500 | arrondi des coins de l'île ouverte |
 | `animation_ms` | `240` | 0 à 2000 | durée des animations, `0` pour aucune |
 | `top_offset` | `0.0` | 0 à 500 | décalage depuis le haut de l'écran ; au-delà de 0, les coins du haut s'arrondissent aussi |
 

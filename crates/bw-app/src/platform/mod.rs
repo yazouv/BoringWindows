@@ -31,11 +31,15 @@ pub enum PlatformEvent {
 #[cfg_attr(not(windows), allow(dead_code))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrayCommand {
+    /// Ouvrir la fenêtre de réglages.
+    Settings,
     OpenConfig,
     ReloadConfig,
     Autostart(bool),
     Pause(bool),
     /// Installer ou retirer les hooks Claude Code.
     ClaudeHooks,
+    /// Rechercher une mise à jour, ou redémarrer si elle est installée.
+    Update,
     Quit,
 }

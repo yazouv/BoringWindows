@@ -1,5 +1,8 @@
 //! Orchestration sur le thread UI : config, modules, forme de l'île, système.
 
+mod settings;
+mod update;
+
 use std::cell::{Cell, OnceCell, RefCell};
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
@@ -11,6 +14,7 @@ use bw_claude::install::Installer;
 use bw_claude::{ClaudeConfig, ClaudeModule, SessionKind, Snapshot};
 use bw_config::{Config, ConfigError, ConfigWatcher, OpenOn};
 use bw_core::{Action, Arbiter, Attention, Module, ModuleEvent, ModuleEventKind, ModuleHost};
+use bw_i18n::tr;
 use bw_media::{MediaConfig, MediaModule, MediaSnapshot};
 use slint::winit_030::WinitWindowAccessor;
 use slint::{
@@ -45,15 +49,19 @@ fn post(f: impl FnOnce(&Rc<Controller>) + Send + 'static) {
     });
 }
 
-pub fn run() -> anyhow::Result<()> {
+/// `open_settings` : ouvrir la fenêtre de réglages dès le démarrage (`--settings`).
+pub fn run(open_settings: bool) -> anyhow::Result<()> {
     let path = bw_config::config_path();
     let (config, config_error) = match Config::load_or_create(&path) {
         Ok(config) => (config, None),
         Err(e) => (Config::default(), Some(e)),
     };
+    bw_i18n::set(language(config.general.language));
 
     let controller = Rc::new(Controller {
-        ui: Island::new()?,
+        // Seule l'île reçoit les attributs de fenêtre spéciaux (pas de focus,
+        // transparente…) ; les autres fenêtres restent normales.
+        ui: platform::creating_island(Island::new)?,
         arbiter: RefCell::new(Arbiter::new(config.layout.compact.clone())),
         config: RefCell::new(config),
         path,
@@ -74,6 +82,10 @@ pub fn run() -> anyhow::Result<()> {
         installer: Installer::default(),
         media: RefCell::new(None),
         calendar: RefCell::new(None),
+        settings: RefCell::new(None),
+        open_settings_at_start: Cell::new(open_settings),
+        update_state: Cell::new(update::UpdateState::Idle),
+        update_timer: Timer::default(),
         artwork: RefCell::new(None),
         progress_timer: Timer::default(),
     });
@@ -114,10 +126,15 @@ pub struct Controller {
     artwork: RefCell<Option<(Arc<Vec<u8>>, Image)>>,
     progress_timer: Timer,
     calendar: RefCell<Option<Arc<CalendarSnapshot>>>,
+    settings: RefCell<Option<settings::SettingsState>>,
+    open_settings_at_start: Cell<bool>,
+    update_state: Cell<update::UpdateState>,
+    update_timer: Timer,
 }
 
 impl Controller {
     fn start(self: &Rc<Self>, config_error: Option<ConfigError>) -> anyhow::Result<()> {
+        select_ui_language();
         self.apply_theme();
         let (choice, size) = self.placement();
         if let Some(pos) = platform::initial_position(choice, size) {
@@ -190,6 +207,9 @@ impl Controller {
 
     fn on_platform_ready(self: &Rc<Self>, platform: Platform) {
         log::info!("intégration système prête");
+        if self.open_settings_at_start.get() {
+            self.open_settings();
+        }
         self.fullscreen.set(platform.fullscreen_now());
         *self.platform.borrow_mut() = Some(platform);
         self.update_visibility();
@@ -197,15 +217,24 @@ impl Controller {
 
         // Créée boucle d'événements lancée : exigé par macOS.
         let hooks_installed = self.installer.is_installed();
-        match Tray::new(platform::autostart_enabled(), hooks_installed, |cmd| {
-            post(move |c| c.on_tray(cmd));
-        }) {
+        match Tray::new(
+            platform::autostart_enabled(),
+            hooks_installed,
+            &self.update_tray_label(),
+            |cmd| {
+                post(move |c| c.on_tray(cmd));
+            },
+        ) {
             Ok(tray) => *self.tray.borrow_mut() = Some(tray),
             Err(e) => log::error!("icône de notification indisponible : {e:#}"),
         }
+        self.start_updates();
 
         if !hooks_installed && self.module_ids.borrow().contains(&bw_claude::MODULE_ID) {
-            self.flash("Claude Code : hooks non installés · clic droit sur l'icône");
+            self.flash(&tr!(
+                "Claude Code: hooks not installed · right-click the icon",
+                "Claude Code : hooks non installés · clic droit sur l'icône"
+            ));
         }
 
         // Hooks d'une version précédente : on complète l'installation.
@@ -216,7 +245,10 @@ impl Controller {
             match self.installer.install(&exe) {
                 Ok(report) => {
                     log::info!("hooks Claude mis à jour (sauvegarde : {:?})", report.backup);
-                    self.flash("Hooks Claude mis à jour · relance tes sessions Claude");
+                    self.flash(&tr!(
+                        "Claude hooks updated · restart your Claude sessions",
+                        "Hooks Claude mis à jour · relance tes sessions Claude"
+                    ));
                 }
                 Err(e) => log::warn!("mise à jour des hooks Claude : {e:#}"),
             }
@@ -387,6 +419,8 @@ impl Controller {
         ui.set_anim(t.animation_ms.into());
         ui.set_bg(color(t.background));
         ui.set_fg(color(t.foreground));
+        ui.set_border(color(t.border));
+        ui.set_font(t.font.as_str().into());
         drop(config);
         self.apply_accent();
     }
@@ -406,6 +440,7 @@ impl Controller {
         self.arbiter
             .borrow_mut()
             .set_priority(config.layout.compact.clone());
+        let relabel = old.general.language != config.general.language;
         let moved = old.general.monitor != config.general.monitor
             || geometry::window_size(&old.theme) != geometry::window_size(&config.theme);
         drop(config);
@@ -418,9 +453,25 @@ impl Controller {
         self.refresh_shape();
         self.sync_region();
         self.update_visibility();
-        if old.modules != self.config.borrow().modules {
+        if relabel {
+            bw_i18n::set(language(self.config.borrow().general.language));
+            select_ui_language();
+            self.retranslate();
+        }
+        if relabel || old.modules != self.config.borrow().modules {
+            // Les textes des modules (agenda, Claude…) sont refaits au redémarrage.
             self.restart_modules();
         }
+    }
+
+    /// Remet dans la langue courante les textes produits côté Rust.
+    fn retranslate(self: &Rc<Self>) {
+        if let Some(tray) = self.tray.borrow().as_ref() {
+            tray.retranslate();
+        }
+        self.sync_update_ui();
+        self.update_clock();
+        self.retranslate_settings();
     }
 
     fn report_config_error(&self, e: &ConfigError) {
@@ -761,11 +812,13 @@ impl Controller {
         let installed = installer.is_installed();
         let settings = installer.settings_path.display();
         let question = if installed {
-            format!(
+            tr!(
+                "Remove the BoringWindows hooks from {settings}?\n\nA backup of the file is made first.",
                 "Retirer les hooks BoringWindows de {settings} ?\n\nUne sauvegarde du fichier est faite avant modification."
             )
         } else {
-            format!(
+            tr!(
+                "BoringWindows will add its hooks to {settings} for these events:\n{}\n\nYour other settings and hooks are left untouched, and a backup of the file is made first.\nThe relay is copied to {}.",
                 "BoringWindows va ajouter ses hooks à {settings} pour les événements :\n{}\n\nTes autres réglages et hooks ne sont pas modifiés, et une sauvegarde du fichier est faite avant.\nLe relais est copié dans {}.",
                 bw_claude::install::HOOK_EVENTS.join(", "),
                 installer.binary_path.display()
@@ -790,15 +843,18 @@ impl Controller {
                     report.settings_path.display(),
                     report.backup
                 );
-                self.flash(if installed {
-                    "Hooks Claude Code retirés"
+                self.flash(&if installed {
+                    tr!("Claude Code hooks removed", "Hooks Claude Code retirés")
                 } else {
-                    "Hooks Claude Code installés"
+                    tr!("Claude Code hooks installed", "Hooks Claude Code installés")
                 });
             }
             Err(e) => {
                 log::error!("hooks Claude : {e:#}");
-                self.flash("⚠ Échec des hooks Claude (voir les logs)");
+                self.flash(&tr!(
+                    "⚠ Claude hooks failed (see the logs)",
+                    "⚠ Échec des hooks Claude (voir les logs)"
+                ));
             }
         }
         if let Some(tray) = self.tray.borrow().as_ref() {
@@ -859,7 +915,9 @@ impl Controller {
                 self.paused.set(paused);
                 self.update_visibility();
             }
+            TrayCommand::Settings => self.open_settings(),
             TrayCommand::ClaudeHooks => self.toggle_claude_hooks(),
+            TrayCommand::Update => self.update_command(),
             TrayCommand::Quit => {
                 let _ = slint::quit_event_loop();
             }
@@ -932,6 +990,27 @@ fn with<A>(
         if let Some(c) = weak.upgrade() {
             f(&c, arg);
         }
+    }
+}
+
+/// Langue de l'interface choisie dans la config.
+fn language(setting: bw_config::Language) -> bw_i18n::Lang {
+    match setting {
+        bw_config::Language::Auto => bw_i18n::Lang::system(),
+        bw_config::Language::En => bw_i18n::Lang::En,
+        bw_config::Language::Fr => bw_i18n::Lang::Fr,
+    }
+}
+
+/// Aligne les textes Slint (`@tr`) sur la langue courante. L'anglais est la
+/// langue source des fichiers `.slint` : « "" » la sélectionne.
+fn select_ui_language() {
+    let code = match bw_i18n::lang() {
+        bw_i18n::Lang::Fr => "fr",
+        bw_i18n::Lang::En => "",
+    };
+    if let Err(e) = slint::select_bundled_translation(code) {
+        log::warn!("langue de l'interface : {e}");
     }
 }
 

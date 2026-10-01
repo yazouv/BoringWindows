@@ -1,0 +1,17 @@
+/* Bouton de langue dans la barre du haut (même fichier en fr et en). */
+.lang-switch {
+  display: inline-block;
+  margin: 0 10px;
+  padding: 2px 8px;
+  border: 1px solid var(--icons);
+  border-radius: 6px;
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 2.4rem;
+  color: var(--icons) !important;
+  text-decoration: none !important;
+}
+.lang-switch:hover {
+  color: var(--icons-hover) !important;
+  border-color: var(--icons-hover);
+}

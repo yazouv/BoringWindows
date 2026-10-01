@@ -4,6 +4,7 @@
 //! le reste du fichier est conservé tel quel, dans le même ordre. Une
 //! sauvegarde datée est faite avant chaque écriture.
 
+use bw_i18n::tr;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -169,14 +170,22 @@ pub fn is_current(settings: &Value, command: &str) -> bool {
 
 pub fn with_hooks(settings: Value, command: &str) -> anyhow::Result<Value> {
     let mut settings = without_hooks(settings);
-    let root = settings
-        .as_object_mut()
-        .context("settings.json doit contenir un objet JSON")?;
+    let root = settings.as_object_mut().with_context(|| {
+        tr!(
+            "settings.json must contain a JSON object",
+            "settings.json doit contenir un objet JSON"
+        )
+    })?;
     let hooks = root
         .entry("hooks")
         .or_insert_with(|| Value::Object(Map::new()))
         .as_object_mut()
-        .context("« hooks » doit être un objet")?;
+        .with_context(|| {
+            tr!(
+                "\"hooks\" must be an object",
+                "« hooks » doit être un objet"
+            )
+        })?;
 
     for event in HOOK_EVENTS {
         let group = hook_group(event, command);
@@ -184,7 +193,12 @@ pub fn with_hooks(settings: Value, command: &str) -> anyhow::Result<Value> {
             .entry(event)
             .or_insert_with(|| Value::Array(Vec::new()))
             .as_array_mut()
-            .with_context(|| format!("« hooks.{event} » doit être une liste"))?
+            .with_context(|| {
+                tr!(
+                    "\"hooks.{event}\" must be a list",
+                    "« hooks.{event} » doit être une liste"
+                )
+            })?
             .push(group);
     }
     Ok(settings)
@@ -252,8 +266,13 @@ impl Installer {
         if let Some(dir) = self.binary_path.parent() {
             std::fs::create_dir_all(dir)?;
         }
-        std::fs::copy(source, &self.binary_path)
-            .with_context(|| format!("copie du relais vers {}", self.binary_path.display()))?;
+        std::fs::copy(source, &self.binary_path).with_context(|| {
+            tr!(
+                "copying the relay to {}",
+                "copie du relais vers {}",
+                self.binary_path.display()
+            )
+        })?;
         Ok(true)
     }
 
@@ -261,12 +280,15 @@ impl Installer {
         match std::fs::read_to_string(&self.settings_path) {
             Ok(s) if s.trim().is_empty() => Ok(json!({})),
             Ok(s) => serde_json::from_str(&s).with_context(|| {
-                format!("{} n'est pas du JSON valide", self.settings_path.display())
+                tr!(
+                    "{} is not valid JSON",
+                    "{} n'est pas du JSON valide",
+                    self.settings_path.display()
+                )
             }),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(json!({})),
-            Err(e) => {
-                Err(e).with_context(|| format!("lecture de {}", self.settings_path.display()))
-            }
+            Err(e) => Err(e)
+                .with_context(|| tr!("reading {}", "lecture de {}", self.settings_path.display())),
         }
     }
 
@@ -281,7 +303,7 @@ impl Installer {
                 .map_or(0, |d| d.as_secs());
             let backup = path.with_extension(format!("json.bak-{stamp}"));
             std::fs::copy(path, &backup)
-                .with_context(|| format!("sauvegarde de {}", path.display()))?;
+                .with_context(|| tr!("backing up {}", "sauvegarde de {}", path.display()))?;
             Some(backup)
         } else {
             None
@@ -292,7 +314,8 @@ impl Installer {
         let mut text = serde_json::to_string_pretty(settings)?;
         text.push('\n');
         std::fs::write(&tmp, text)?;
-        std::fs::rename(&tmp, path).with_context(|| format!("écriture de {}", path.display()))?;
+        std::fs::rename(&tmp, path)
+            .with_context(|| tr!("writing {}", "écriture de {}", path.display()))?;
         Ok(Report {
             settings_path: path.clone(),
             backup,

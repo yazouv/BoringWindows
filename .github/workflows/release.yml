@@ -1,0 +1,136 @@
+name: Release
+
+# À chaque push sur main, release-please tient à jour une PR « chore: release x.y.z »
+# (version + CHANGELOG à partir des commits feat:/fix:…). Fusionner cette PR crée
+# la release et son tag ; les binaires Windows, macOS et Linux y sont alors attachés.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      created: ${{ steps.rp.outputs.release_created }}
+      tag: ${{ steps.rp.outputs.tag_name }}
+      pr: ${{ steps.rp.outputs.pr }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: rp
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # La PR de release change la version dans Cargo.toml : on aligne Cargo.lock
+  # dans la même PR, sinon le premier `cargo build` le modifierait chez chacun.
+  lockfile:
+    needs: release-please
+    if: needs.release-please.outputs.pr != '' && needs.release-please.outputs.created != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ fromJSON(needs.release-please.outputs.pr).headBranchName }}
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo update --workspace
+      - name: Commit Cargo.lock
+        run: |
+          if git diff --quiet Cargo.lock; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore: Cargo.lock à la version de la release"
+          git push
+
+  build:
+    needs: release-please
+    if: needs.release-please.outputs.created == 'true'
+    name: build (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows-x64
+            asset: boringwindows-windows-x64.exe
+          - os: macos-latest
+            name: macos-arm64
+            asset: boringwindows-macos-arm64.tar.gz
+          # 22.04 : glibc plus ancienne, le binaire tourne sur plus de distributions.
+          - os: ubuntu-22.04
+            name: linux-x64
+            asset: boringwindows-linux-x64.tar.gz
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag }}
+      - name: Dépendances système (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.name }}
+      - run: cargo build --release
+      - name: Paquet et empreinte
+        shell: bash
+        run: |
+          mkdir dist
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp target/release/boringwindows.exe "dist/${{ matrix.asset }}"
+          else
+            tar -czf "dist/${{ matrix.asset }}" -C target/release boringwindows
+          fi
+          cd dist
+          if command -v sha256sum >/dev/null; then
+            sha256sum "${{ matrix.asset }}" > "${{ matrix.asset }}.sha256"
+          else
+            shasum -a 256 "${{ matrix.asset }}" > "${{ matrix.asset }}.sha256"
+          fi
+          cat "${{ matrix.asset }}.sha256"
+      - name: Ajout à la release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ needs.release-please.outputs.tag }}" dist/* --clobber
+
+  # Liens de téléchargement en tête des notes de version.
+  notes:
+    needs: [release-please, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Téléchargements dans les notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release-please.outputs.tag }}
+        run: |
+          base="https://github.com/${{ github.repository }}/releases/download/$TAG"
+          body=$(gh release view "$TAG" --repo "${{ github.repository }}" --json body -q .body)
+          cat > notes.md <<NOTES
+          ## Téléchargements
+
+          | Système | Fichier |
+          |---|---|
+          | Windows 10/11 (x64) | [boringwindows-windows-x64.exe]($base/boringwindows-windows-x64.exe) |
+          | macOS (Apple Silicon) | [boringwindows-macos-arm64.tar.gz]($base/boringwindows-macos-arm64.tar.gz) |
+          | Linux (x64) | [boringwindows-linux-x64.tar.gz]($base/boringwindows-linux-x64.tar.gz) |
+
+          Déjà installé ? BoringWindows se met à jour tout seul (Réglages › Général).
+          Chaque fichier a son empreinte \`.sha256\`. macOS : binaire non signé, voir
+          la [documentation](https://yazouv.github.io/BoringWindows/installation.html).
+
+          NOTES
+          printf '%s\n' "$body" >> notes.md
+          gh release edit "$TAG" --repo "${{ github.repository }}" --notes-file notes.md

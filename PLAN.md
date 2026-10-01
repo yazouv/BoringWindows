@@ -214,7 +214,7 @@ Modules tiers en **WASM** (via `extism` ou `wasmtime`), sandboxés, qui publient
 ## 5. Roadmap
 
 ### Phase 0 — Fondations ✅
-- [x] Workspace Cargo + CI GitHub Actions Windows / macOS / Linux (clippy, fmt, tests, binaires release, cache)
+- [x] Workspace Cargo (la CI GitHub Actions a été retirée : trop de minutes consommées ; vérifs en local)
 - [x] Fenêtre île : sans bordure, transparente, topmost, no-activate, centrée en haut
 - [x] États compact / attention / ouvert + animations (morph de taille)
 - [x] Zone cliquable limitée à la pilule (`SetWindowRgn`), le reste laisse passer les clics
@@ -274,7 +274,17 @@ Teams replié sur deux lignes, récurrence Outlook, journée entière, clic sur
 Objectif : qu'on n'ait jamais besoin d'ouvrir `config.toml`. Il reste la source
 de vérité (versionnable, partageable), mais une interface l'édite pour nous.
 
-**Fenêtre de réglages** (clic droit sur l'icône › « Réglages… »)
+**Fenêtre de réglages** (clic droit sur l'icône › « Réglages… ») ✅
+- [x] Fenêtre Slint (style Fluent), `boringwindows --settings` pour l'ouvrir au lancement
+- [x] Écriture `toml_edit` (`bw-config::ConfigEditor`) : commentaires conservés,
+      validation complète (modules compris) avant d'écrire, écriture atomique
+- [x] Général, Apparence (accent avec pastilles, fond, arrondi, animations),
+      Agenda (assistant 6 services, guide détaillé, Parcourir…, Tester, nom par défaut),
+      Claude Code (hooks, son, délai, diagnostic dans la fenêtre), Musique
+- [ ] Musique : lecteurs vus récemment à cocher (pour l'instant, liste séparée par des virgules)
+- [ ] Captures d'écran par service dans l'assistant
+- [ ] Tailles de l'île (compacte / ouverte) et ordre des modules
+
 - Fenêtre Slint séparée, créée à l'ouverture et détruite à la fermeture : coût
   nul en RAM le reste du temps.
 - Écriture via `toml_edit` : les commentaires et l'ordre du fichier sont
@@ -298,7 +308,23 @@ de vérité (versionnable, partageable), mais une interface l'édite pour nous.
 - Plus tard : connexion Google / Microsoft (OAuth) directement depuis
   l'assistant, pour les agendas pro dont la publication ICS est interdite.
 
-**Documentation en ligne (GitHub Pages)** ✅ (`docs/`, publiée depuis `main`)
+**Langues de l'app** ✅ français + anglais
+- [x] `general.language = "auto" | "fr" | "en"`, réglable dans la fenêtre (onglet Général), appliqué à chaud
+- [x] Slint : textes source en anglais `@tr(...)`, français dans `crates/bw-app/lang/fr/LC_MESSAGES/bw-app.po`
+      (embarqué), test qui refuse un texte sans traduction
+- [x] Rust : crate `bw-i18n`, macro `tr!("anglais", "français")` (agenda, Claude, diagnostic, menu, erreurs de config)
+- [ ] Commentaires du `config.toml` par défaut (restent en français)
+- [ ] Journal du relais et logs (volontairement en français : destinés au débogage)
+
+Prévu à l'origine :
+- Réglage `general.language = "auto" | "fr" | "en"` (auto = langue de Windows).
+- Textes de l'UI Slint marqués `@tr(...)`, traductions embarquées dans le
+  binaire (`slint-build` + fichiers `.po`) : changement de langue à chaud.
+- Textes côté Rust (statuts Claude, agenda, menus de l'icône, messages)
+  regroupés dans un petit catalogue `bw-i18n` au lieu d'être écrits en dur.
+- La doc et l'app partagent les mêmes termes (glossaire fr/en dans `docs/`).
+
+**Documentation en ligne (GitHub Pages)** ✅ français + anglais (`docs/fr`, `docs/en`), publiée depuis `main`
 - Site statique généré depuis `docs/` (mdBook ou page simple) et publié par une
   GitHub Action à chaque push sur la branche principale.
 - Pages : installation, premier lancement, un guide par source d'agenda
@@ -311,7 +337,9 @@ Ordre conseillé : la doc d'abord (rapide, utile tout de suite, et elle sert
 de texte aux écrans de l'assistant), puis la fenêtre de réglages.
 
 ### Phase 4 — Customisation avancée
-- [ ] Système de thèmes + 2–3 thèmes fournis
+- [x] Thèmes : `theme.name`, 4 fournis (default, light, midnight, glass), thèmes perso
+      `themes/<nom>.toml` rechargés à chaud, clés de `[theme]` prioritaires, contour et police,
+      choix dans Réglages › Apparence, page de doc FR + EN
 - [ ] Layouts `.slint` au runtime + doc de l'API de données
 
 ### Phase 5 — Extensions
@@ -335,9 +363,13 @@ Note : sur Mac, boring.notch existe déjà ; l'intérêt est surtout d'avoir la 
 île et la même config sur les deux machines.
 
 ### Phase 6 — Distribution
+- [x] release-please : PR de release (version + CHANGELOG) ; la fusionner publie la release
+- [x] Binaires Windows / macOS / Linux + `.sha256` attachés à chaque release (`release.yml`)
+- [x] CI des PR sur un seul runner Linux (clippy des 3 OS, tests)
+- [x] Mise à jour automatique (GitHub Releases, empreinte vérifiée, jeton facultatif pour un dépôt privé)
 - [ ] Installeur (MSI via `cargo-wix` ou Inno Setup) + package **winget**
 - [ ] Signature de code (ex. SignPath, gratuit pour l'open source) pour éviter SmartScreen
-- [ ] Mise à jour automatique (GitHub Releases)
+- [ ] macOS : bundle `.app` signé + binaire Intel / universel
 - [ ] (opt.) MSIX pour débloquer les API à identité de package (notifications)
 
 ---

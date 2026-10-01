@@ -134,6 +134,10 @@ export component Island inherits Window {
     in property <color> bg: black;
     in property <color> fg: white;
     in property <color> accent: #ff8a3d;
+    in property <color> border: transparent;
+    // Police ; vide : celle du système.
+    in property <string> font;
+    default-font-family: root.font;
 
     // --- État ---
     in property <bool> expanded;
@@ -176,6 +180,8 @@ export component Island inherits Window {
         height: root.expanded ? root.expanded-height
             : root.has-attention ? root.attention-height : root.compact-height;
         background: root.bg;
+        border-width: root.border.alpha > 0 ? 1px : 0px;
+        border-color: root.border;
         clip: true;
         border-top-left-radius: self.top-radius;
         border-top-right-radius: self.top-radius;
@@ -396,7 +402,7 @@ export component Island inherits Window {
                     spacing: 6px;
 
                     Text {
-                        text: root.prompt.project + " veut utiliser " + root.prompt.tool;
+                        text: @tr("{} wants to use {}", root.prompt.project, root.prompt.tool);
                         color: root.accent;
                         font-size: 14px;
                         font-weight: 600;
@@ -415,21 +421,21 @@ export component Island inherits Window {
                         spacing: 8px;
 
                         PillButton {
-                            text: "Autoriser";
+                            text: @tr("Allow");
                             fill: root.accent;
                             ink: root.bg;
                             clicked => { root.claude-decide(root.prompt.id, "allow"); }
                         }
 
                         PillButton {
-                            text: "Refuser";
+                            text: @tr("Deny");
                             fill: root.fg.with-alpha(0.12);
                             ink: root.fg;
                             clicked => { root.claude-decide(root.prompt.id, "deny"); }
                         }
 
                         PillButton {
-                            text: "Terminal";
+                            text: @tr("Terminal");
                             fill: transparent;
                             ink: root.fg.with-alpha(0.8);
                             line: root.fg.with-alpha(0.25);
@@ -495,7 +501,7 @@ export component Island inherits Window {
                                 background: join-ta.has-hover ? root.accent.brighter(0.15) : root.accent;
 
                                 join-label := Text {
-                                    text: "Rejoindre";
+                                    text: @tr("Join");
                                     color: root.bg;
                                     font-size: 11px;
                                     font-weight: 700;
@@ -556,7 +562,7 @@ export component Island inherits Window {
                 }
 
                 if !root.has-prompt && !root.has-media && root.claude-rows.length == 0 && root.agenda-rows.length == 0: Text {
-                    text: root.has-attention ? root.attention-label : "Rien à signaler";
+                    text: root.has-attention ? root.attention-label : @tr("All quiet");
                     color: root.has-attention && root.urgent ? root.accent : root.fg.with-alpha(0.75);
                     font-size: 14px;
                     overflow: elide;

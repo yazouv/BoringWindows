@@ -26,7 +26,11 @@ lookahead_hours = 48
 
 ## Fichier .ics sur ton disque
 
-Un fichier exporté ou reçu par mail marche aussi : indique son chemin.
+Un fichier exporté ou reçu par mail marche aussi. Le plus simple :
+**Réglages…** › **Agenda** › service « Fichier .ics sur le disque » ›
+**Parcourir…**, puis **Tester** et **Ajouter**.
+
+À la main, indique son chemin :
 
 ```toml
 [[modules.calendar.sources]]

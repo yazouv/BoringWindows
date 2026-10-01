@@ -4,15 +4,16 @@ use std::time::Duration;
 use notify_debouncer_mini::notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_mini::{DebounceEventResult, Debouncer, new_debouncer};
 
-use crate::{Config, ConfigError};
+use crate::{Config, ConfigError, themes_dir};
 
 /// Garde la surveillance active tant qu'elle est en vie.
 pub struct ConfigWatcher {
     _debouncer: Debouncer<RecommendedWatcher>,
 }
 
-/// Surveille `path` et appelle `on_change` (sur un thread de `notify`) à chaque
-/// modification, avec la nouvelle config ou l'erreur de chargement.
+/// Surveille `path` (et les thèmes personnels à côté) et appelle `on_change`
+/// (sur un thread de `notify`) à chaque modification, avec la nouvelle config
+/// ou l'erreur de chargement.
 ///
 /// C'est le dossier parent qui est surveillé : beaucoup d'éditeurs remplacent
 /// le fichier au lieu de le réécrire, ce qui casserait une surveillance directe.
@@ -21,8 +22,11 @@ where
     F: FnMut(Result<Config, ConfigError>) + Send + 'static,
 {
     let dir = path.parent().unwrap_or(Path::new(".")).to_owned();
+    let themes = themes_dir(&dir);
     let target: PathBuf = path.to_owned();
-    let file_name = path.file_name().map(ToOwned::to_owned);
+    // Certains systèmes (inotify) signalent aussi les lectures : on ne prévient
+    // que si le résultat change, sinon chaque rechargement en déclencherait un autre.
+    let mut last = summary(&load(path));
 
     let io_err = |e: notify_debouncer_mini::notify::Error| ConfigError::Io {
         path: dir.clone(),
@@ -33,12 +37,21 @@ where
         Duration::from_millis(150),
         move |res: DebounceEventResult| match res {
             Ok(events) => {
-                if events
-                    .iter()
-                    .any(|e| e.path.file_name() == file_name.as_deref())
-                {
-                    on_change(load(&target));
+                let relevant = events.iter().any(|e| {
+                    e.path.file_name() == target.file_name()
+                        || (e.path.starts_with(&themes)
+                            && e.path.extension().is_some_and(|x| x == "toml"))
+                });
+                if !relevant {
+                    return;
                 }
+                let result = load(&target);
+                let now = summary(&result);
+                if now == last {
+                    return;
+                }
+                last = now;
+                on_change(result);
             }
             Err(e) => log::warn!("surveillance de la config : {e}"),
         },
@@ -47,7 +60,7 @@ where
 
     debouncer
         .watcher()
-        .watch(&dir, RecursiveMode::NonRecursive)
+        .watch(&dir, RecursiveMode::Recursive)
         .map_err(io_err)?;
 
     Ok(ConfigWatcher {
@@ -55,12 +68,20 @@ where
     })
 }
 
+/// Ce qui compte pour décider s'il faut prévenir.
+fn summary(result: &Result<Config, ConfigError>) -> Result<Config, String> {
+    match result {
+        Ok(config) => Ok(config.clone()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
 fn load(path: &Path) -> Result<Config, ConfigError> {
     let s = std::fs::read_to_string(path).map_err(|source| ConfigError::Io {
         path: path.to_owned(),
         source,
     })?;
-    Config::from_toml_str(&s)
+    Config::parse(&s, path.parent().unwrap_or(Path::new(".")))
 }
 
 #[cfg(test)]
@@ -101,5 +122,21 @@ mod tests {
 
         std::fs::write(&path, "[general]\nopen_on = \"never\"").unwrap();
         wait_for(&|r| r.is_err());
+
+        // Un thème personnel modifié recharge aussi la config.
+        std::fs::create_dir(themes_dir(dir.path())).unwrap();
+        std::fs::write(
+            themes_dir(dir.path()).join("perso.toml"),
+            "corner_radius = 5.0",
+        )
+        .unwrap();
+        std::fs::write(&path, "[theme]\nname = \"perso\"").unwrap();
+        wait_for(&|r| r.as_ref().is_ok_and(|c| c.theme.corner_radius == 5.0));
+        std::fs::write(
+            themes_dir(dir.path()).join("perso.toml"),
+            "corner_radius = 9.0",
+        )
+        .unwrap();
+        wait_for(&|r| r.as_ref().is_ok_and(|c| c.theme.corner_radius == 9.0));
     }
 }

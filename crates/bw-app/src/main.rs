@@ -6,6 +6,8 @@ mod controller;
 mod demo;
 mod geometry;
 mod platform;
+#[cfg(test)]
+mod translations;
 
 slint::include_modules!();
 
@@ -20,7 +22,17 @@ fn main() -> anyhow::Result<()> {
 
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
-    let Some(_instance) = platform::single_instance() else {
+    // Après une mise à jour, l'ancienne version peut mettre un instant à se fermer.
+    let restarted = std::env::args().any(|a| a == "--restarted");
+    let mut instance = platform::single_instance();
+    for _ in 0..50 {
+        if instance.is_some() || !restarted {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        instance = platform::single_instance();
+    }
+    let Some(_instance) = instance else {
         log::info!("BoringWindows est déjà lancé");
         return Ok(());
     };
@@ -30,7 +42,7 @@ fn main() -> anyhow::Result<()> {
         .renderer_name("femtovg".into());
     platform::configure_backend(selector).select()?;
 
-    controller::run()
+    controller::run(std::env::args().any(|a| a == "--settings"))
 }
 
 /// `boringwindows doctor` : diagnostic Claude Code, affiché et enregistré.

@@ -7,6 +7,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
+use bw_i18n::tr;
 use serde_json::Value;
 
 use crate::event::HookEvent;
@@ -36,7 +37,7 @@ impl Report {
         let _ = writeln!(self.text, "         {}", msg.as_ref());
     }
 
-    fn section(&mut self, title: &str) {
+    fn section(&mut self, title: impl std::fmt::Display) {
         let _ = writeln!(self.text, "\n{title}");
     }
 }
@@ -44,49 +45,74 @@ impl Report {
 /// Lance le diagnostic et retourne le rapport. `app_exe` : l'exécutable courant.
 pub fn run(app_exe: &Path) -> String {
     let mut r = Report {
-        text: String::from("Diagnostic BoringWindows × Claude Code\n"),
+        text: tr!(
+            "BoringWindows × Claude Code diagnostic\n",
+            "Diagnostic BoringWindows × Claude Code\n"
+        ),
         problems: 0,
     };
     let installer = Installer::default();
     let endpoint = ipc::endpoint();
 
-    r.section("1. Hooks dans settings.json");
+    r.section(tr!(
+        "1. Hooks in settings.json",
+        "1. Hooks dans settings.json"
+    ));
     let command = check_settings(&mut r, &installer);
 
-    r.section("2. Relais");
+    r.section(tr!("2. Relay", "2. Relais"));
     check_binary(&mut r, &installer, app_exe);
 
-    r.section("3. BoringWindows en cours d'exécution");
+    r.section(tr!(
+        "3. BoringWindows running",
+        "3. BoringWindows en cours d'exécution"
+    ));
     let reachable = check_app(&mut r, &endpoint);
 
     // Lu avant le test 4, qui écrit lui-même dans le journal.
     let journal = std::fs::read_to_string(install::hook_log_path()).ok();
 
-    r.section("4. Relais lancé comme le fait Claude Code");
+    r.section(tr!(
+        "4. Relay launched the way Claude Code does",
+        "4. Relais lancé comme le fait Claude Code"
+    ));
     if let Some(command) = &command {
         check_like_claude(&mut r, command);
     } else {
-        r.info("(sauté : hooks non installés)");
+        r.info(tr!(
+            "(skipped: hooks not installed)",
+            "(sauté : hooks non installés)"
+        ));
     }
 
-    r.section("5. Journal du relais (derniers appels de Claude Code)");
+    r.section(tr!(
+        "5. Relay log (latest calls from Claude Code)",
+        "5. Journal du relais (derniers appels de Claude Code)"
+    ));
     check_journal(&mut r, journal);
 
     if reachable {
-        r.section("6. Test visuel");
+        r.section(tr!("6. Visual test", "6. Test visuel"));
         visual_test(&endpoint);
-        r.info("L'île doit afficher « diagnostic · attend ta réponse » pendant 6 secondes.");
+        r.info(tr!(
+            "The island should show \"diagnostic · waiting for you\" for 6 seconds.",
+            "L'île doit afficher « diagnostic · attend ta réponse » pendant 6 secondes."
+        ));
     }
 
     let _ = writeln!(
         r.text,
         "\n{}",
         if r.problems == 0 {
-            "Aucun problème détecté. Si l'île reste vide, relance tes sessions Claude Code \
-             (les hooks sont lus au démarrage) puis regarde le journal (point 5)."
-                .to_owned()
+            tr!(
+                "No problem found. If the island stays empty, restart your Claude Code sessions \
+                 (hooks are read at startup), then check the log (point 5).",
+                "Aucun problème détecté. Si l'île reste vide, relance tes sessions Claude Code \
+                 (les hooks sont lus au démarrage) puis regarde le journal (point 5)."
+            )
         } else {
-            format!(
+            tr!(
+                "{} problem(s) found, see the [!!] lines.",
                 "{} problème(s) détecté(s), voir les lignes [!!].",
                 r.problems
             )
@@ -97,19 +123,25 @@ pub fn run(app_exe: &Path) -> String {
 
 fn check_settings(r: &mut Report, installer: &Installer) -> Option<String> {
     let path = &installer.settings_path;
-    r.info(format!("fichier : {}", path.display()));
+    r.info(tr!("file: {}", "fichier : {}", path.display()));
     let settings = match installer.read() {
         Ok(s) => s,
         Err(e) => {
-            r.bad(format!("lecture impossible : {e:#}"));
+            r.bad(tr!("cannot read: {e:#}", "lecture impossible : {e:#}"));
             return None;
         }
     };
     if !path.exists() {
-        r.bad("le fichier n'existe pas : hooks jamais installés");
+        r.bad(tr!(
+            "the file doesn't exist: hooks never installed",
+            "le fichier n'existe pas : hooks jamais installés"
+        ));
     }
     if settings.get("disableAllHooks").and_then(Value::as_bool) == Some(true) {
-        r.bad("\"disableAllHooks\": true — Claude Code ignore tous les hooks");
+        r.bad(tr!(
+            "\"disableAllHooks\": true — Claude Code ignores every hook",
+            "\"disableAllHooks\": true — Claude Code ignore tous les hooks"
+        ));
     }
 
     let mut command = None;
@@ -127,19 +159,32 @@ fn check_settings(r: &mut Report, installer: &Installer) -> Option<String> {
                 found.push(event);
                 command.get_or_insert_with(|| c.to_owned());
             }
-            None => r.bad(format!("pas de hook BoringWindows pour {event}")),
+            None => r.bad(tr!(
+                "no BoringWindows hook for {event}",
+                "pas de hook BoringWindows pour {event}"
+            )),
         }
     }
     if found.len() == install::HOOK_EVENTS.len() {
-        r.ok(format!("{} événements branchés", found.len()));
+        r.ok(tr!(
+            "{} events connected",
+            "{} événements branchés",
+            found.len()
+        ));
         if !install::is_current(&settings, &install::hook_command(&installer.binary_path)) {
-            r.info("hooks d'une version précédente : mis à jour au prochain lancement de l'app");
+            r.info(tr!(
+                "hooks from an older version: updated next time the app starts",
+                "hooks d'une version précédente : mis à jour au prochain lancement de l'app"
+            ));
         }
     }
     if let Some(c) = &command {
-        r.info(format!("commande : {c}"));
+        r.info(tr!("command: {c}", "commande : {c}"));
     } else {
-        r.info("→ clic droit sur l'icône BoringWindows › « Claude Code : installer les hooks… »");
+        r.info(tr!(
+            "→ right-click the BoringWindows icon › \"Claude Code: install hooks…\"",
+            "→ clic droit sur l'icône BoringWindows › « Claude Code : installer les hooks… »"
+        ));
     }
     command
 }
@@ -148,13 +193,21 @@ fn check_binary(r: &mut Report, installer: &Installer, app_exe: &Path) {
     let path = &installer.binary_path;
     match (path.metadata(), app_exe.metadata()) {
         (Ok(bin), Ok(app)) => {
-            r.ok(format!("{} ({} Ko)", path.display(), bin.len() / 1024));
+            r.ok(tr!(
+                "{} ({} KB)",
+                "{} ({} Ko)",
+                path.display(),
+                bin.len() / 1024
+            ));
             if bin.len() != app.len() {
-                r.info("copie différente de l'exécutable courant (mise à jour au prochain lancement de l'app)");
+                r.info(tr!("copy differs from the current executable (updated next time the app starts)", "copie différente de l'exécutable courant (mise à jour au prochain lancement de l'app)"));
             }
         }
-        (Err(_), _) => r.bad(format!("{} introuvable", path.display())),
-        (_, Err(e)) => r.info(format!("exécutable courant illisible : {e}")),
+        (Err(_), _) => r.bad(tr!("{} not found", "{} introuvable", path.display())),
+        (_, Err(e)) => r.info(tr!(
+            "current executable unreadable: {e}",
+            "exécutable courant illisible : {e}"
+        )),
     }
 }
 
@@ -175,19 +228,27 @@ fn doctor_message(kind: &str, notification: Option<&str>) -> Message {
 }
 
 fn check_app(r: &mut Report, endpoint: &str) -> bool {
-    r.info(format!("canal : {endpoint}"));
+    r.info(tr!("channel: {endpoint}", "canal : {endpoint}"));
     let start = Instant::now();
     match hook::relay(endpoint, &doctor_message("SessionEnd", None)) {
         Outcome::Sent => {
-            r.ok(format!("l'app répond ({} ms)", start.elapsed().as_millis()));
+            r.ok(tr!(
+                "the app responds ({} ms)",
+                "l'app répond ({} ms)",
+                start.elapsed().as_millis()
+            ));
             true
         }
         other => {
             r.bad(format!("{other}"));
-            r.info(
-                "→ BoringWindows n'est pas lancé : démarre-le (cargo run) dans un autre terminal,",
-            );
-            r.info("  laisse-le ouvert, puis relance ce diagnostic.");
+            r.info(tr!(
+                "→ BoringWindows isn't running: start it (cargo run) in another terminal,",
+                "→ BoringWindows n'est pas lancé : démarre-le (cargo run) dans un autre terminal,"
+            ));
+            r.info(tr!(
+                "  leave it open, then run this diagnostic again.",
+                "  laisse-le ouvert, puis relance ce diagnostic."
+            ));
             false
         }
     }
@@ -215,7 +276,7 @@ fn check_like_claude(r: &mut Report, command: &str) {
         let mut child = match child {
             Ok(c) => c,
             Err(_) => {
-                r.info(format!("{} : non disponible", shell.name));
+                r.info(tr!("{}: not available", "{} : non disponible", shell.name));
                 continue;
             }
         };
@@ -224,20 +285,30 @@ fn check_like_claude(r: &mut Report, command: &str) {
         }
         match wait_with_timeout(child, Duration::from_secs(10)) {
             Some(out) if out.status.success() => {
-                r.ok(format!(
+                r.ok(tr!(
+                    "via {}: exit code 0 in {} ms",
                     "via {} : code 0 en {} ms",
                     shell.name,
                     start.elapsed().as_millis()
                 ));
             }
             Some(out) => {
-                r.bad(format!("via {} : échec ({})", shell.name, out.status));
+                r.bad(tr!(
+                    "via {}: failed ({})",
+                    "via {} : échec ({})",
+                    shell.name,
+                    out.status
+                ));
                 let err = String::from_utf8_lossy(&out.stderr);
                 for line in err.lines().take(5) {
                     r.info(line);
                 }
             }
-            None => r.bad(format!("via {} : bloqué plus de 10 s", shell.name)),
+            None => r.bad(tr!(
+                "via {}: stuck for more than 10 s",
+                "via {} : bloqué plus de 10 s",
+                shell.name
+            )),
         }
     }
 }
@@ -277,7 +348,7 @@ fn shells() -> Vec<Shell> {
             raw: false,
         }),
         None => shells.push(Shell {
-            name: "Git Bash (introuvable)".into(),
+            name: tr!("Git Bash (not found)", "Git Bash (introuvable)"),
             program: "git-bash-introuvable".into(),
             raw: false,
         }),
@@ -346,10 +417,16 @@ fn wait_with_timeout(
 
 fn check_journal(r: &mut Report, journal: Option<String>) {
     let path = install::hook_log_path();
-    r.info(format!("fichier : {}", path.display()));
+    r.info(tr!("file: {}", "fichier : {}", path.display()));
     let Some(text) = journal else {
-        r.bad("aucun journal : Claude Code n'a jamais lancé le relais");
-        r.info("→ relance tes sessions Claude Code après l'installation des hooks");
+        r.bad(tr!(
+            "no log: Claude Code never ran the relay",
+            "aucun journal : Claude Code n'a jamais lancé le relais"
+        ));
+        r.info(tr!(
+            "→ restart your Claude Code sessions after installing the hooks",
+            "→ relance tes sessions Claude Code après l'installation des hooks"
+        ));
         return;
     };
     let lines: Vec<&str> = text.lines().collect();
@@ -359,7 +436,10 @@ fn check_journal(r: &mut Report, journal: Option<String>) {
     // Seul le dernier appel compte : les échecs plus anciens datent souvent
     // d'un moment où l'app était simplement fermée.
     if lines.last().is_some_and(|l| l.contains("injoignable")) {
-        r.bad("le dernier appel de Claude n'a pas joint l'app (était-elle lancée ?)");
+        r.bad(tr!(
+            "Claude's last call didn't reach the app (was it running?)",
+            "le dernier appel de Claude n'a pas joint l'app (était-elle lancée ?)"
+        ));
     }
 }
 

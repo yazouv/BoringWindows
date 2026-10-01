@@ -35,11 +35,17 @@ impl ClaudeConfig {
         };
         anyhow::ensure!(
             (5..=280).contains(&config.permission_wait_secs),
-            "modules.claude.permission_wait_secs doit être entre 5 et 280"
+            bw_i18n::tr!(
+                "modules.claude.permission_wait_secs must be between 5 and 280",
+                "modules.claude.permission_wait_secs doit être entre 5 et 280"
+            )
         );
         anyhow::ensure!(
             config.done_secs <= 600,
-            "modules.claude.done_secs doit être ≤ 600"
+            bw_i18n::tr!(
+                "modules.claude.done_secs must be ≤ 600",
+                "modules.claude.done_secs doit être ≤ 600"
+            )
         );
         Ok(config)
     }
