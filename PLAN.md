@@ -213,15 +213,20 @@ Modules tiers en **WASM** (via `extism` ou `wasmtime`), sandboxés, qui publient
 
 ## 5. Roadmap
 
-### Phase 0 — Fondations
-- [ ] Workspace Cargo + CI GitHub Actions `windows-latest` (build, clippy, fmt, tests)
-- [ ] Fenêtre île : sans bordure, transparente, topmost, no-activate, centrée en haut
-- [ ] États compact / étendu + animations (morph de taille)
-- [ ] Tray icon, démarrage avec Windows, instance unique
-- [ ] `bw-config` : TOML + hot reload
-- [ ] Masquage en plein écran, multi-écrans, DPI
-- [ ] Bus d'événements + trait `Module` + arbitrage d'attention
-- [ ] Mesure perfs dès le début (RAM/CPU suivis en CI ou script)
+### Phase 0 — Fondations ✅ (à valider sur une vraie machine Windows)
+- [x] Workspace Cargo + CI GitHub Actions `windows-latest` (build, clippy, fmt, tests)
+- [x] Fenêtre île : sans bordure, transparente, topmost, no-activate, centrée en haut
+- [x] États compact / attention / ouvert + animations (morph de taille)
+- [x] Zone cliquable limitée à la pilule (`SetWindowRgn`), le reste laisse passer les clics
+- [x] Tray icon, démarrage avec Windows, instance unique
+- [x] `bw-config` : TOML + hot reload, erreurs de config affichées dans l'île
+- [x] Masquage en plein écran (notification appbar `ABN_FULLSCREENAPP`, sans polling), multi-écrans, DPI
+- [x] Bus d'événements + trait `Module` + arbitrage d'attention (+ module `demo`)
+- [x] Mesure perfs : `scripts/measure-idle.ps1`, exécuté en CI à titre indicatif
+
+Reste à vérifier à la main sous Windows : transparence réelle, clics qui
+traversent hors de la pilule, focus jamais volé, plein écran (jeu, vidéo F11),
+changement d'écran / de DPI, chiffres RAM/CPU sur un vrai GPU.
 
 ### Phase 1 — Claude Code (MVP publiable)
 - [ ] `bw-hook.exe` + named pipe + timeout 300 ms

@@ -1,0 +1,49 @@
+# Configuration de BoringWindows.
+# Sauvegarde ce fichier : l'île se met à jour instantanément.
+
+[general]
+# Écran de l'île : "primary" (écran principal) ou "cursor" (écran sous la souris au lancement).
+monitor = "primary"
+# Cache l'île quand une appli est en plein écran (jeu, vidéo, présentation).
+hide_in_fullscreen = true
+# Ouverture de l'île : "hover" (survol) ou "click".
+open_on = "hover"
+# Délai avant de refermer l'île quand la souris s'en va (ms).
+collapse_delay_ms = 350
+
+[theme]
+# Couleurs au format "#RRGGBB" ou "#RRGGBBAA".
+background = "#000000"
+foreground = "#FFFFFF"
+accent = "#FF8A3D"
+# Rayon des coins de l'île ouverte (la pilule compacte est toujours arrondie au max).
+corner_radius = 22.0
+# Durée des animations (ms). 0 = pas d'animation.
+animation_ms = 240
+# Décalage depuis le haut de l'écran (px).
+top_offset = 0.0
+
+[theme.compact]
+width = 190.0
+height = 32.0
+
+[theme.attention]
+# Taille de la pilule quand un module réclame l'attention.
+width = 300.0
+height = 36.0
+
+[theme.expanded]
+width = 520.0
+height = 170.0
+
+[layout]
+# Ordre de priorité des modules quand plusieurs réclament l'attention en même temps.
+compact = ["claude", "media", "calendar"]
+
+# Chaque module se configure dans sa section [modules.<nom>].
+# Un module absent ou avec enabled = false n'est même pas démarré.
+
+[modules.demo]
+# Module de démonstration : fait varier l'attention toutes les quelques secondes
+# pour tester les animations. À désactiver une fois les vrais modules en place.
+enabled = false

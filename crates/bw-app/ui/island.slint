@@ -1,0 +1,141 @@
+// L'île : une pilule en haut-centre de l'écran, dans une fenêtre transparente
+// fixe dimensionnée pour l'état ouvert. Toute la logique (quand ouvrir, quoi
+// afficher) vit côté Rust ; ce fichier ne fait que dessiner l'état reçu.
+//
+// Seules les transitions déclenchent un rendu : aucune animation en boucle,
+// pour rester à ~0 % CPU au repos.
+
+export component Island inherits Window {
+    title: "BoringWindows";
+    no-frame: true;
+    always-on-top: true;
+    background: transparent;
+
+    // --- Thème (depuis config.toml) ---
+    in property <length> compact-width: 190px;
+    in property <length> compact-height: 32px;
+    in property <length> attention-width: 300px;
+    in property <length> attention-height: 36px;
+    in property <length> expanded-width: 520px;
+    in property <length> expanded-height: 170px;
+    in property <length> corner-radius: 22px;
+    in property <length> top-offset: 0px;
+    in property <duration> anim: 240ms;
+    in property <color> bg: black;
+    in property <color> fg: white;
+    in property <color> accent: #ff8a3d;
+
+    // --- État ---
+    in property <bool> expanded;
+    in property <bool> has-attention;
+    in property <bool> urgent;
+    in property <string> attention-label;
+    in property <string> time-text: "--:--";
+    in property <string> date-text;
+
+    callback hover-changed(bool);
+    callback clicked();
+
+    // Taille fixe de la fenêtre : la pilule grandit dedans, la zone cliquable
+    // est restreinte à la pilule côté Win32.
+    width: root.expanded-width;
+    height: root.expanded-height + root.top-offset;
+
+    pill := Rectangle {
+        property <length> radius: root.expanded ? root.corner-radius : self.height / 2;
+        // Collée en haut de l'écran : coins supérieurs carrés, façon encoche.
+        property <length> top-radius: root.top-offset > 0 ? self.radius : 0;
+
+        y: root.top-offset;
+        x: (root.width - self.width) / 2;
+        width: root.expanded ? root.expanded-width
+            : root.has-attention ? root.attention-width : root.compact-width;
+        height: root.expanded ? root.expanded-height
+            : root.has-attention ? root.attention-height : root.compact-height;
+        background: root.bg;
+        clip: true;
+        border-top-left-radius: self.top-radius;
+        border-top-right-radius: self.top-radius;
+        border-bottom-left-radius: self.radius;
+        border-bottom-right-radius: self.radius;
+
+        animate width, height, radius { duration: root.anim; easing: ease-out-quint; }
+
+        // Contenu compact : le module qui réclame l'attention.
+        HorizontalLayout {
+            padding-left: 14px;
+            padding-right: 14px;
+            spacing: 8px;
+            opacity: root.has-attention && !root.expanded ? 1 : 0;
+            animate opacity { duration: root.anim / 2; }
+
+            Rectangle {
+                width: 8px;
+                height: 8px;
+                y: (parent.height - self.height) / 2;
+                border-radius: 4px;
+                background: root.urgent ? root.accent : root.fg.with-alpha(0.6);
+            }
+
+            Text {
+                text: root.attention-label;
+                color: root.fg;
+                font-size: 13px;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+        }
+
+        // Contenu ouvert.
+        VerticalLayout {
+            padding: 20px;
+            padding-top: 14px + root.top-offset / 2;
+            spacing: 4px;
+            opacity: root.expanded ? 1 : 0;
+            animate opacity { duration: root.anim; }
+
+            HorizontalLayout {
+                spacing: 12px;
+
+                Text {
+                    text: root.time-text;
+                    color: root.fg;
+                    font-size: 34px;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: root.date-text;
+                    color: root.fg.with-alpha(0.6);
+                    font-size: 14px;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: root.fg.with-alpha(0.12);
+            }
+
+            Text {
+                text: root.has-attention ? root.attention-label : "Rien à signaler";
+                color: root.has-attention && root.urgent ? root.accent : root.fg.with-alpha(0.75);
+                font-size: 14px;
+                vertical-alignment: top;
+                overflow: elide;
+                vertical-stretch: 1;
+            }
+        }
+
+        TouchArea {
+            changed has-hover => {
+                root.hover-changed(self.has-hover);
+            }
+            clicked => {
+                root.clicked();
+            }
+        }
+    }
+}
