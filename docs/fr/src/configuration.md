@@ -114,6 +114,15 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 | `username` | CalDAV | identifiant de connexion |
 | `password` | CalDAV | mot de passe d'application, de préférence `secret:<id>` |
 
+## `[modules.timer]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `false` | | activer le [minuteur](minuteur.md) |
+| `presets` | `[5, 15, 25]` | 1 à 5 durées, 1 à 600 | durées proposées (min) |
+| `sound` | `true` | | son à la fin |
+| `done_secs` | `20` | 1 à 600 | durée de l'alerte « terminé » (s) |
+
 ## `[modules.demo]`
 
 | Option | Défaut | Rôle |

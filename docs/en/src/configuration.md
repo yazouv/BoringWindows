@@ -113,6 +113,15 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 | `username` | CalDAV | login |
 | `password` | CalDAV | app password, preferably `secret:<id>` |
 
+## `[modules.timer]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `false` | | turn on the [timer](minuteur.md) |
+| `presets` | `[5, 15, 25]` | 1 to 5 durations, 1 to 600 | offered durations (min) |
+| `sound` | `true` | | sound when it ends |
+| `done_secs` | `20` | 1 to 600 | how long the "done" alert stays (s) |
+
 ## `[modules.demo]`
 
 | Option | Default | Role |
