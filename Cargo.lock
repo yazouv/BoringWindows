@@ -477,6 +477,7 @@ dependencies = [
  "bw-secrets",
  "bw-timer",
  "bw-update",
+ "bw-viz",
  "bw-volume",
  "chrono",
  "env_logger",
@@ -613,6 +614,20 @@ dependencies = [
  "serde_json",
  "sha2",
  "tempfile",
+]
+
+[[package]]
+name = "bw-viz"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bw-core",
+ "bw-i18n",
+ "log",
+ "serde",
+ "tokio",
+ "toml",
+ "windows",
 ]
 
 [[package]]

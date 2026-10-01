@@ -98,6 +98,7 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         custom_view: RefCell::new(None),
         shelf: RefCell::new(Shelf::load(&shelf_file)),
         shelf_file,
+        viz_active: Cell::new(false),
         timer_tick: Timer::default(),
         media_seen: RefCell::new(BTreeSet::new()),
     });
@@ -143,6 +144,7 @@ pub struct Controller {
     custom_view: RefCell<Option<custom_view::CustomView>>,
     shelf: RefCell<Shelf>,
     shelf_file: PathBuf,
+    viz_active: Cell<bool>,
     timer_tick: Timer,
     /// Lecteurs vus depuis le lancement (jetons `ignore`), pour les réglages.
     media_seen: RefCell<BTreeSet<String>>,
@@ -333,6 +335,7 @@ impl Controller {
         if self.expanded.replace(expanded) != expanded {
             self.refresh_shape();
             self.update_progress();
+            self.update_viz_activity();
             self.update_timer_ui();
             self.sync_custom_view();
         }
@@ -564,6 +567,8 @@ impl Controller {
 
         *self.calendar.borrow_mut() = None;
         *self.timer.borrow_mut() = None;
+        self.viz_active.set(false);
+        self.ui.set_viz_bars(ModelRc::default());
         self.timer_tick.stop();
         self.ui.set_has_timer(false);
         self.apply_claude(None);
@@ -606,6 +611,8 @@ impl Controller {
             ModuleEventKind::State(state) => {
                 if let Some(snapshot) = state.downcast_ref::<MediaSnapshot>() {
                     self.apply_media(event.module, Arc::new(snapshot.clone()));
+                } else if let Some(snapshot) = state.downcast_ref::<bw_viz::VizSnapshot>() {
+                    self.apply_viz(snapshot);
                 } else if let Some(snapshot) = state.downcast_ref::<TimerSnapshot>() {
                     self.apply_timer(snapshot.clone());
                 } else if let Ok(snapshot) = state.clone().downcast::<CalendarSnapshot>() {
@@ -618,6 +625,44 @@ impl Controller {
                 }
             }
         }
+    }
+
+    // --- Visualiseur --------------------------------------------------------
+
+    /// La capture audio ne tourne que si l'île est ouverte et qu'une musique joue.
+    fn update_viz_activity(&self) {
+        let enabled = self.module_ids.borrow().contains(&bw_viz::MODULE_ID);
+        let playing = self
+            .media
+            .borrow()
+            .as_ref()
+            .is_some_and(|(_, s)| s.now_playing.as_ref().is_some_and(|n| n.playing));
+        let active = enabled && self.expanded.get() && playing;
+        if active == self.viz_active.replace(active) {
+            return;
+        }
+        if let Some(host) = self.host.borrow().as_ref() {
+            host.send_action(Action {
+                module: bw_viz::MODULE_ID.into(),
+                name: if active { "start" } else { "stop" }.into(),
+            });
+        }
+        if !active {
+            self.ui.set_viz_bars(ModelRc::default());
+            self.sync_custom_view();
+        }
+    }
+
+    fn apply_viz(&self, snapshot: &bw_viz::VizSnapshot) {
+        // Barres à zéro : elles disparaissent au lieu de rester à plat.
+        let flat = snapshot.bands.iter().all(|b| *b <= 0.001);
+        let bars = if flat || !self.viz_active.get() {
+            ModelRc::default()
+        } else {
+            ModelRc::new(VecModel::from(snapshot.bands.clone()))
+        };
+        self.ui.set_viz_bars(bars);
+        self.sync_custom_view();
     }
 
     // --- Étagère ------------------------------------------------------------
@@ -890,6 +935,7 @@ impl Controller {
         self.layout_rows();
         self.apply_accent();
         self.update_progress();
+        self.update_viz_activity();
         self.refresh_shape();
     }
 
@@ -1213,6 +1259,12 @@ fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
         match bw_volume::VolumeConfig::from_table(config.modules.get(bw_volume::MODULE_ID)) {
             Ok(c) => modules.push(Box::new(bw_volume::VolumeModule::new(c))),
             Err(e) => errors.push(format!("modules.volume : {e:#}")),
+        }
+    }
+    if bw_viz::VizModule::is_supported() && config.module_enabled(bw_viz::MODULE_ID, false) {
+        match bw_viz::VizConfig::from_table(config.modules.get(bw_viz::MODULE_ID)) {
+            Ok(c) => modules.push(Box::new(bw_viz::VizModule::new(c))),
+            Err(e) => errors.push(format!("modules.visualizer : {e:#}")),
         }
     }
     if config.module_enabled("demo", false) {

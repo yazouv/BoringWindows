@@ -293,3 +293,6 @@ msgstr "Glisse des fichiers sur l'île pour les garder sous la main ; un clic le
 
 msgid "Show volume changes in the island"
 msgstr "Afficher les changements de volume dans l'île"
+
+msgid "Audio visualizer (uses some CPU while the island is open and music plays)"
+msgstr "Visualiseur audio (consomme un peu de CPU tant que l'île est ouverte et que la musique joue)"

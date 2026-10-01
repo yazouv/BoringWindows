@@ -195,6 +195,15 @@ impl Controller {
         set("media-can-next", Value::Bool(media.can_next));
         set("media-can-toggle", Value::Bool(media.can_toggle));
         set("media-can-seek", Value::Bool(media.can_seek));
+        set(
+            "viz-bars",
+            model(
+                ui.get_viz_bars()
+                    .iter()
+                    .map(|v| Value::Number(f64::from(v)))
+                    .collect(),
+            ),
+        );
         set("has-media-art", Value::Bool(media.has_art));
         set("media-art", Value::Image(media.art));
 

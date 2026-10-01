@@ -138,6 +138,14 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 | `enabled` | `false` | | afficher les changements de [volume](volume.md) dans l'île (Windows) |
 | `show_secs` | `2` | 1 à 10 | durée d'affichage (s) |
 
+## `[modules.visualizer]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `false` | | [visualiseur audio](musique.md#visualiseur-audio-optionnel) (Windows) |
+| `bands` | `12` | 4 à 32 | nombre de barres |
+| `fps` | `30` | 10 à 60 | images par seconde |
+
 ## `[modules.demo]`
 
 | Option | Défaut | Rôle |

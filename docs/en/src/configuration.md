@@ -137,6 +137,14 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 | `enabled` | `false` | | show [volume](volume.md) changes in the island (Windows) |
 | `show_secs` | `2` | 1 to 10 | how long it shows (s) |
 
+## `[modules.visualizer]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `false` | | [audio visualizer](musique.md#audio-visualizer-optional) (Windows) |
+| `bands` | `12` | 4 to 32 | number of bars |
+| `fps` | `30` | 10 to 60 | frames per second |
+
 ## `[modules.demo]`
 
 | Option | Default | Role |

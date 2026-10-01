@@ -154,6 +154,7 @@ impl Controller {
         fill_layout(ui, &config.layout.compact);
         ui.set_view_name(config.layout.view.as_str().into());
         ui.set_volume_enabled(config.module_enabled(bw_volume::MODULE_ID, false));
+        ui.set_viz_enabled(config.module_enabled(bw_viz::MODULE_ID, false));
         let shelf = crate::shelf::ShelfConfig::from_table(config.modules.get("shelf"))
             .unwrap_or_default();
         ui.set_shelf_enabled(shelf.enabled);
@@ -665,6 +666,10 @@ impl Controller {
             "modules.media.accent_from_artwork" => Some((
                 vec!["modules", "media", "accent_from_artwork"],
                 Value::Bool(ui.get_media_accent()),
+            )),
+            "modules.visualizer.enabled" => Some((
+                vec!["modules", "visualizer", "enabled"],
+                Value::Bool(ui.get_viz_enabled()),
             )),
             "modules.volume.enabled" => Some((
                 vec!["modules", "volume", "enabled"],

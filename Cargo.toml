@@ -21,6 +21,7 @@ bw-update = { path = "crates/bw-update" }
 bw-secrets = { path = "crates/bw-secrets" }
 bw-timer = { path = "crates/bw-timer" }
 bw-volume = { path = "crates/bw-volume" }
+bw-viz = { path = "crates/bw-viz" }
 anyhow = "1"
 log = "0.4"
 serde = { version = "1", features = ["derive"] }

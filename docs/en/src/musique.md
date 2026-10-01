@@ -43,3 +43,22 @@ enabled = true               # false to turn it off completely
 accent_from_artwork = true   # tint the island with the artwork
 ignore = []
 ```
+
+## Audio visualizer (optional)
+
+Small animated equalizer bars in the island's header, driven by the sound the
+system actually plays. This is the **only feature that works continuously**, so
+it is off by default; capture only runs while the island is open **and** music
+is playing, and stops as soon as either stops being true.
+
+Turn it on in Settings › **Music**, or in `config.toml`:
+
+```toml
+[modules.visualizer]
+enabled = true
+bands = 12   # number of bars (4 to 32)
+fps = 30     # frames per second (10 to 60)
+```
+
+Windows only (loopback capture of the default output device). It picks up
+everything the system plays, not only the player shown.

@@ -165,6 +165,7 @@ export component Island inherits Window {
     in property <bool> has-media;
     in property <MediaInfo> media;
     in property <[AgendaRow]> agenda-rows;
+    in property <[float]> viz-bars;
     in property <[ShelfRow]> shelf-rows;
     in property <string> shelf-more;
     callback shelf-open(int);
@@ -300,6 +301,22 @@ export component Island inherits Window {
                         font-size: 12px;
                         vertical-alignment: center;
                         horizontal-stretch: 1;
+                    }
+
+                    // Visualiseur audio (désactivé par défaut) : barres d'équaliseur.
+                    if root.viz-bars.length > 0 && root.has-media: HorizontalLayout {
+                        spacing: 2px;
+                        alignment: end;
+                        height: 14px;
+                        y: (parent.height - self.height) / 2;
+
+                        for level in root.viz-bars: Rectangle {
+                            width: 3px;
+                            y: parent.height - self.height;
+                            height: max(2px, 14px * clamp(level, 0, 1));
+                            border-radius: 1.5px;
+                            background: root.accent;
+                        }
                     }
 
                     // Source de la musique ; cliquable s'il y en a plusieurs.

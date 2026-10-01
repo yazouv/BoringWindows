@@ -65,6 +65,7 @@ export component SettingsWindow inherits Window {
     in-out property <bool> hide-fullscreen;
     in-out property <bool> autostart;
     in-out property <bool> volume-enabled;
+    in-out property <bool> viz-enabled;
     // --- Apparence ---
     in property <[string]> themes;
     in-out property <int> theme-index;
@@ -614,6 +615,12 @@ export component SettingsWindow inherits Window {
                         text: player.name;
                         checked: player.ignored;
                         toggled => { root.player-toggled(player.token, self.checked); }
+                    }
+
+                    CheckBox {
+                        text: @tr("Audio visualizer (uses some CPU while the island is open and music plays)");
+                        checked <=> root.viz-enabled;
+                        toggled => { root.changed("modules.visualizer.enabled"); }
                     }
 
                     Row {

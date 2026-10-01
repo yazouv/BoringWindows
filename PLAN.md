@@ -247,7 +247,7 @@ Vérifié sous Linux (Xvfb) de bout en bout : événements reçus, clic sur
 - [x] Accent couleur depuis la pochette (teinte dominante, éclaircie pour le fond noir)
 - [x] Sélection de la source : celle qui joue d'abord, `⇄` pour changer, liste `ignore`
 - [x] 100 % événementiel ; la progression ne tourne (1 Hz) que quand l'île est ouverte et que ça joue
-- [ ] (opt.) visualiseur WASAPI
+- [x] (opt.) visualiseur WASAPI (`bw-viz`, loopback, seulement île ouverte + musique en cours)
 
 Vérifié sous Linux avec le lecteur du module `demo` (mêmes données que GSMTC) :
 pause, suivant, seek, changement de pochette et d'accent, pilule avec pochette.
