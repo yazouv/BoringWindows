@@ -190,7 +190,8 @@ fn print_decision(decision: Decision) {
         }
     });
     if decision == Decision::Deny {
-        out["hookSpecificOutput"]["decision"]["message"] = "Refusé depuis BoringWindows".into();
+        out["hookSpecificOutput"]["decision"]["message"] =
+            bw_i18n::tr!("Denied from BoringWindows", "Refusé depuis BoringWindows").into();
     }
     println!("{out}");
 }

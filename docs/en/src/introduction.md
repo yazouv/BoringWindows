@@ -20,6 +20,7 @@ What it shows:
 It is lightweight (written in Rust, no embedded browser), never steals focus
 and hides itself when a video or a game goes full screen.
 
-> The interface of the app itself is in French for now; English is planned.
+> The app follows the language of Windows (English or French); you can change
+> it in **Settings… › General › Language**.
 
 👉 Start with the [installation](installation.md).

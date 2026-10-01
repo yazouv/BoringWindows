@@ -3,7 +3,7 @@
 ## The island doesn't show up
 
 - Check whether the icon is in the notification area (^ arrow). If so, make
-  sure **Masquer l'île** (hide the island) isn't ticked.
+  sure **Hide the island** isn't ticked.
 - Is an app full screen on that screen? The island then hides on purpose
   (`hide_in_fullscreen`).
 - Several screens: the island goes to the **main** screen by default
@@ -11,7 +11,7 @@
 - BoringWindows only runs once: a second launch does nothing if the first one
   is already running.
 
-## "⚠ config.toml invalide"
+## "⚠ invalid config.toml"
 
 The message gives the line and the problem. Most common causes:
 
@@ -25,7 +25,7 @@ Fix it and save: the island goes back to normal right away.
 
 ## Claude Code: nothing shows up
 
-1. Did you install the hooks (right-click › **Claude Code : installer les
+1. Did you install the hooks (right-click › **Claude Code: install
    hooks…**) **and restart** your Claude Code sessions since?
 2. Run the diagnostic, with BoringWindows running, in another terminal:
 

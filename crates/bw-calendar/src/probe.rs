@@ -1,5 +1,6 @@
 //! Test d'un lien avant de l'enregistrer (assistant « Ajouter un calendrier »).
 
+use bw_i18n::{Lang, tr};
 use chrono::{Duration, Local, Utc};
 
 use crate::fetch::fetch;
@@ -19,7 +20,10 @@ pub fn probe(url: &str) -> anyhow::Result<Probe> {
     let text = fetch(url)?;
     anyhow::ensure!(
         text.contains("BEGIN:VCALENDAR"),
-        "ce lien ne renvoie pas un calendrier ICS (page web ? lien HTML ?)"
+        tr!(
+            "this link doesn't return an ICS calendar (web page? HTML link?)",
+            "ce lien ne renvoie pas un calendrier ICS (page web ? lien HTML ?)"
+        )
     );
     let now = Utc::now();
     let events = events_between(&text, now, now + Duration::days(30));
@@ -28,11 +32,13 @@ pub fn probe(url: &str) -> anyhow::Result<Probe> {
         .find(|e| e.start >= now || e.end > now)
         .map(|e| {
             let when = e.start.with_timezone(&Local);
-            if e.all_day {
-                format!("{} · {}", e.title, when.format("%d/%m"))
-            } else {
-                format!("{} · {}", e.title, when.format("%d/%m %H:%M"))
-            }
+            let format = match (bw_i18n::lang(), e.all_day) {
+                (Lang::Fr, true) => "%d/%m",
+                (Lang::Fr, false) => "%d/%m %H:%M",
+                (Lang::En, true) => "%b %d",
+                (Lang::En, false) => "%b %d %H:%M",
+            };
+            format!("{} · {}", e.title, when.format(format))
         });
     Ok(Probe {
         upcoming: events.len(),

@@ -110,11 +110,13 @@ pub fn display_name(source_id: &str) -> String {
         ("opera", "Opera"),
         ("brave", "Brave"),
         ("vlc", "VLC"),
-        ("zunemusic", "Lecteur multimédia"),
-        ("microsoft.media.player", "Lecteur multimédia"),
         ("foobar2000", "foobar2000"),
         ("musicbee", "MusicBee"),
     ];
+    // Lecteur de Windows : seul nom à traduire.
+    if lower.contains("zunemusic") || lower.contains("microsoft.media.player") {
+        return bw_i18n::tr!("Media Player", "Lecteur multimédia");
+    }
     if let Some((_, name)) = known.iter().find(|(k, _)| lower.contains(k)) {
         return (*name).to_owned();
     }

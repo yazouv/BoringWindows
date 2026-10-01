@@ -11,6 +11,7 @@ name = "boringwindows"
 path = "src/main.rs"
 
 [dependencies]
+bw-i18n.workspace = true
 anyhow.workspace = true
 bw-calendar.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }

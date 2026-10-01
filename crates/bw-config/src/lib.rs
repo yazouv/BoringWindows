@@ -12,6 +12,8 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
+use bw_i18n::tr;
+
 pub use color::Color;
 pub use edit::{ConfigEditor, Value};
 pub use watch::{ConfigWatcher, watch};
@@ -22,14 +24,14 @@ pub const DEFAULT_TOML: &str = include_str!("default.toml");
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
-    #[error("impossible d'accéder à {path} : {source}")]
+    #[error("{}", tr!("cannot access {} : {}", "impossible d'accéder à {} : {}", path.display(), source))]
     Io {
         path: PathBuf,
         source: std::io::Error,
     },
-    #[error("config.toml invalide : {0}")]
+    #[error("{}", tr!("invalid config.toml: {}", "config.toml invalide : {}", .0))]
     Parse(#[from] toml::de::Error),
-    #[error("config.toml invalide :\n  - {}", .0.join("\n  - "))]
+    #[error("{}", tr!("invalid config.toml:\n  - {}", "config.toml invalide :\n  - {}", .0.join("\n  - ")))]
     Invalid(Vec<String>),
 }
 
@@ -50,6 +52,7 @@ pub struct General {
     pub hide_in_fullscreen: bool,
     pub open_on: OpenOn,
     pub collapse_delay_ms: u32,
+    pub language: Language,
 }
 
 impl Default for General {
@@ -59,6 +62,7 @@ impl Default for General {
             hide_in_fullscreen: true,
             open_on: OpenOn::Hover,
             collapse_delay_ms: 350,
+            language: Language::Auto,
         }
     }
 }
@@ -68,6 +72,15 @@ impl Default for General {
 pub enum MonitorChoice {
     Primary,
     Cursor,
+}
+
+/// Langue de l'interface ; `Auto` suit celle de Windows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Language {
+    Auto,
+    En,
+    Fr,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -187,30 +200,45 @@ impl Config {
                 || size.width > 4000.0
                 || size.height > 2000.0
             {
-                errors.push(format!(
+                errors.push(tr!(
+                    "{name}: size out of range ({}x{})",
                     "{name} : taille hors limites ({}x{})",
-                    size.width, size.height
+                    size.width,
+                    size.height
                 ));
             }
         }
         if t.expanded.width < t.attention.width.max(t.compact.width)
             || t.expanded.height < t.attention.height.max(t.compact.height)
         {
-            errors.push(
-                "theme.expanded doit être au moins aussi grand que compact et attention".into(),
-            );
+            errors.push(tr!(
+                "theme.expanded must be at least as large as compact and attention",
+                "theme.expanded doit être au moins aussi grand que compact et attention"
+            ));
         }
         if !(0.0..=500.0).contains(&t.corner_radius) {
-            errors.push("theme.corner_radius doit être entre 0 et 500".into());
+            errors.push(tr!(
+                "theme.corner_radius must be between 0 and 500",
+                "theme.corner_radius doit être entre 0 et 500"
+            ));
         }
         if t.animation_ms > 2000 {
-            errors.push("theme.animation_ms doit être ≤ 2000".into());
+            errors.push(tr!(
+                "theme.animation_ms must be ≤ 2000",
+                "theme.animation_ms doit être ≤ 2000"
+            ));
         }
         if !(0.0..=500.0).contains(&t.top_offset) {
-            errors.push("theme.top_offset doit être entre 0 et 500".into());
+            errors.push(tr!(
+                "theme.top_offset must be between 0 and 500",
+                "theme.top_offset doit être entre 0 et 500"
+            ));
         }
         if self.general.collapse_delay_ms > 10_000 {
-            errors.push("general.collapse_delay_ms doit être ≤ 10000".into());
+            errors.push(tr!(
+                "general.collapse_delay_ms must be ≤ 10000",
+                "general.collapse_delay_ms doit être ≤ 10000"
+            ));
         }
 
         if errors.is_empty() {

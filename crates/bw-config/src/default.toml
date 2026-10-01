@@ -2,6 +2,8 @@
 # Sauvegarde ce fichier : l'île se met à jour instantanément.
 
 [general]
+# Langue de l'interface : "auto" (celle de Windows), "fr" ou "en".
+language = "auto"
 # Écran de l'île : "primary" (écran principal) ou "cursor" (écran sous la souris au lancement).
 monitor = "primary"
 # Cache l'île quand une appli est en plein écran (jeu, vidéo, présentation).

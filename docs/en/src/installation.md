@@ -46,13 +46,13 @@ Code and the calendar, follow their pages.
 
 ## Start with Windows
 
-Right-click the icon › **Lancer au démarrage** (start with Windows).
+Right-click the icon › **Start with Windows**.
 
 ## Uninstall
 
-1. If you connected Claude Code: right-click the icon › **Claude Code :
-   retirer les hooks…** (remove hooks).
-2. Untick **Lancer au démarrage**, then **Quitter** (quit).
+1. If you connected Claude Code: right-click the icon › **Claude Code:
+   remove hooks…**.
+2. Untick **Start with Windows**, then **Quit**.
 3. Delete `boringwindows.exe` and, if you want, the folders
    `%APPDATA%\BoringWindows` (configuration) and `%LOCALAPPDATA%\BoringWindows`
    (Claude relay, logs).

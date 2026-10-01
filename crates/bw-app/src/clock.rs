@@ -7,6 +7,29 @@ use chrono::{DateTime, Datelike, Local, TimeZone, Timelike};
 const DAYS: [&str; 7] = [
     "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche",
 ];
+const DAYS_EN: [&str; 7] = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+];
+const MONTHS_EN: [&str; 12] = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+];
 const MONTHS: [&str; 12] = [
     "janvier",
     "février",
@@ -33,11 +56,17 @@ pub fn now() -> (ClockText, Duration) {
 }
 
 pub fn format<Tz: TimeZone>(t: &DateTime<Tz>) -> ClockText {
-    let day = DAYS[t.weekday().num_days_from_monday() as usize];
-    let month = MONTHS[t.month0() as usize];
+    let (weekday, month) = (
+        t.weekday().num_days_from_monday() as usize,
+        t.month0() as usize,
+    );
+    let date = match bw_i18n::lang() {
+        bw_i18n::Lang::Fr => format!("{} {} {}", DAYS[weekday], t.day(), MONTHS[month]),
+        bw_i18n::Lang::En => format!("{}, {} {}", DAYS_EN[weekday], MONTHS_EN[month], t.day()),
+    };
     ClockText {
         time: format!("{:02}:{:02}", t.hour(), t.minute()),
-        date: format!("{day} {} {month}", t.day()),
+        date,
     }
 }
 
@@ -55,6 +84,7 @@ mod tests {
 
     #[test]
     fn formats_in_french() {
+        bw_i18n::set(bw_i18n::Lang::Fr);
         let t = FixedOffset::east_opt(0)
             .unwrap()
             .with_ymd_and_hms(2026, 10, 1, 9, 5, 42)

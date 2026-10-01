@@ -35,6 +35,7 @@ name = "Pro"
 |---|---|---|---|
 | `monitor` | `"primary"` | `"primary"`, `"cursor"` | écran de l'île : principal, ou celui où se trouve la souris au lancement |
 | `hide_in_fullscreen` | `true` | `true`, `false` | cacher l'île quand une application est en plein écran |
+| `language` | `"auto"` | `"auto"`, `"fr"`, `"en"` | langue de l'interface (`auto` : celle de Windows) |
 | `open_on` | `"hover"` | `"hover"`, `"click"` | ouvrir l'île au survol ou au clic |
 | `collapse_delay_ms` | `350` | 0 à 10000 | délai avant de refermer quand la souris s'en va (ms) |
 

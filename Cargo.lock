@@ -463,6 +463,7 @@ dependencies = [
  "bw-claude",
  "bw-config",
  "bw-core",
+ "bw-i18n",
  "bw-media",
  "chrono",
  "env_logger",
@@ -481,6 +482,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "bw-core",
+ "bw-i18n",
  "chrono",
  "chrono-tz",
  "log",
@@ -497,6 +499,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "bw-core",
+ "bw-i18n",
  "dirs 7.0.0",
  "log",
  "serde",
@@ -511,6 +514,7 @@ dependencies = [
 name = "bw-config"
 version = "0.0.1"
 dependencies = [
+ "bw-i18n",
  "dirs 7.0.0",
  "log",
  "notify-debouncer-mini",
@@ -531,11 +535,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "bw-i18n"
+version = "0.0.1"
+dependencies = [
+ "sys-locale",
+]
+
+[[package]]
 name = "bw-media"
 version = "0.0.1"
 dependencies = [
  "anyhow",
  "bw-core",
+ "bw-i18n",
  "image",
  "log",
  "serde",

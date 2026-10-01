@@ -29,6 +29,8 @@ Sources dans [`docs/`](docs/).
 - **Phase 3.5** (réglages) : fenêtre de réglages (clic droit sur l'icône ›
   **Réglages…**) : plus besoin d'éditer `config.toml`, assistant d'ajout de
   calendrier avec bouton **Tester**, hooks et diagnostic Claude Code.
+- **Langues** : l'app est en français ou en anglais (celle de Windows par
+  défaut, `general.language` pour forcer), changement à chaud.
 
 ## Musique
 
@@ -150,11 +152,14 @@ démarrage, masquer l'île, quitter.
 | `bw-claude` | relais de hooks, protocole IPC, suivi des sessions, installation dans `settings.json` |
 | `bw-media` | musique : contrôles média de Windows (GSMTC), pochette, couleur d'accent |
 | `bw-calendar` | agenda : lecture ICS, récurrences, rappels, liens de visio |
+| `bw-i18n` | langue courante et macro `tr!("anglais", "français")` pour les textes côté Rust |
 | `bw-app` | binaire : île Slint (`ui/island.slint`), intégration Win32, icône de notification |
 
 Le code Win32 est isolé dans `crates/bw-app/src/platform/win32.rs`. Sur macOS et
 Linux, l'île s'ouvre comme une fenêtre flottante (macOS : icône de barre de menus,
 pas d'icône dans le Dock) ; le port macOS complet est décrit dans le plan.
 
-La CI construit un `.exe` Windows et un binaire macOS (Apple Silicon) à chaque
-push : onglet *Actions* → run → *Artifacts*.
+Pas de CI de build/tests (elle consommait trop de minutes GitHub Actions) :
+avant de pousser, lance `cargo clippy --workspace --all-targets -- -D warnings`
+et `cargo test --workspace`. Seule la doc est publiée automatiquement depuis
+`main`.

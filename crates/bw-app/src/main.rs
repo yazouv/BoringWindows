@@ -6,6 +6,8 @@ mod controller;
 mod demo;
 mod geometry;
 mod platform;
+#[cfg(test)]
+mod translations;
 
 slint::include_modules!();
 

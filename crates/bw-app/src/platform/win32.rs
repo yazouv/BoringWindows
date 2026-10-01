@@ -531,9 +531,12 @@ pub fn pick_ics_file() -> Option<std::path::PathBuf> {
     };
     use windows::core::PWSTR;
 
-    let filter: Vec<u16> = "Calendriers (*.ics)\0*.ics\0Tous les fichiers\0*.*\0\0"
-        .encode_utf16()
-        .collect();
+    let filter: Vec<u16> = bw_i18n::tr!(
+        "Calendars (*.ics)\0*.ics\0All files\0*.*\0\0",
+        "Calendriers (*.ics)\0*.ics\0Tous les fichiers\0*.*\0\0"
+    )
+    .encode_utf16()
+    .collect();
     let mut buffer = vec![0u16; 1024];
     let mut ofn = OPENFILENAMEW {
         lStructSize: size_of::<OPENFILENAMEW>() as u32,

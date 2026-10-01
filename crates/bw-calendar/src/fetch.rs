@@ -14,7 +14,10 @@ pub fn fetch(url: &str) -> anyhow::Result<String> {
         return Ok(std::fs::read_to_string(path)?);
     }
     if !url.starts_with("https://") && !url.starts_with("http://") {
-        anyhow::ensure!(Path::new(&url).is_file(), "fichier introuvable : {url}");
+        anyhow::ensure!(
+            Path::new(&url).is_file(),
+            bw_i18n::tr!("file not found: {url}", "fichier introuvable : {url}")
+        );
         return Ok(std::fs::read_to_string(&url)?);
     }
     http_get(&url)

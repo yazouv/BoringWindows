@@ -1,0 +1,13 @@
+[package]
+name = "bw-i18n"
+description = "Langue de l'interface de BoringWindows (anglais / français)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+sys-locale = "0.3"
+
+[lints]
+workspace = true

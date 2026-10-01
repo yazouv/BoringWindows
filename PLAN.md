@@ -214,7 +214,7 @@ Modules tiers en **WASM** (via `extism` ou `wasmtime`), sandboxés, qui publient
 ## 5. Roadmap
 
 ### Phase 0 — Fondations ✅
-- [x] Workspace Cargo + CI GitHub Actions Windows / macOS / Linux (clippy, fmt, tests, binaires release, cache)
+- [x] Workspace Cargo (la CI GitHub Actions a été retirée : trop de minutes consommées ; vérifs en local)
 - [x] Fenêtre île : sans bordure, transparente, topmost, no-activate, centrée en haut
 - [x] États compact / attention / ouvert + animations (morph de taille)
 - [x] Zone cliquable limitée à la pilule (`SetWindowRgn`), le reste laisse passer les clics
@@ -308,7 +308,15 @@ de vérité (versionnable, partageable), mais une interface l'édite pour nous.
 - Plus tard : connexion Google / Microsoft (OAuth) directement depuis
   l'assistant, pour les agendas pro dont la publication ICS est interdite.
 
-**Langues de l'app**
+**Langues de l'app** ✅ français + anglais
+- [x] `general.language = "auto" | "fr" | "en"`, réglable dans la fenêtre (onglet Général), appliqué à chaud
+- [x] Slint : textes source en anglais `@tr(...)`, français dans `crates/bw-app/lang/fr/LC_MESSAGES/bw-app.po`
+      (embarqué), test qui refuse un texte sans traduction
+- [x] Rust : crate `bw-i18n`, macro `tr!("anglais", "français")` (agenda, Claude, diagnostic, menu, erreurs de config)
+- [ ] Commentaires du `config.toml` par défaut (restent en français)
+- [ ] Journal du relais et logs (volontairement en français : destinés au débogage)
+
+Prévu à l'origine :
 - Réglage `general.language = "auto" | "fr" | "en"` (auto = langue de Windows).
 - Textes de l'UI Slint marqués `@tr(...)`, traductions embarquées dans le
   binaire (`slint-build` + fichiers `.po`) : changement de langue à chaud.

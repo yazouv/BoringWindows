@@ -9,8 +9,8 @@ and lets you **allow or deny a command without going back to the terminal**.
 ## Connect Claude Code
 
 1. Start BoringWindows.
-2. Right-click its icon › **Claude Code : installer les hooks…** (install
-   hooks), or **Réglages…** › **Claude Code** tab › **Installer les hooks**.
+2. Right-click its icon › **Claude Code: install hooks…**, or **Settings…** ›
+   **Claude Code** tab › **Install hooks**.
 3. The dialog lists exactly what will be added to `~/.claude/settings.json`.
    Answer **Yes**.
 4. **Restart your Claude Code sessions**: they only read their hooks at start
@@ -23,20 +23,18 @@ What happens:
   hooks are left untouched;
 - the relay is copied to `%LOCALAPPDATA%\BoringWindows\bin\bw-hook.exe`; it is
   refreshed automatically when BoringWindows is updated;
-- the same menu ("retirer les hooks…") removes everything cleanly.
+- the same menu ("remove hooks…") removes everything cleanly.
 
 ## What the island shows
-
-The texts are in French for now:
 
 | Pill | Meaning |
 |---|---|
 | ● grey · `project · Bash` | Claude is working (tool running) |
-| ● grey · `project · réfléchit…` | Claude is writing its answer |
-| ● orange · `project · autoriser Bash ?` | **permission request**, to handle in the island |
-| ● orange · `project · te pose une question` | a question or a plan to approve: **answer in the terminal** |
-| ● orange · `project · attend ta réponse` | Claude is done and waits for your next message |
-| `project · terminé` | end of turn (a few seconds) |
+| ● grey · `project · thinking…` | Claude is writing its answer |
+| ● orange · `project · allow Bash?` | **permission request**, to handle in the island |
+| ● orange · `project · is asking you a question` | a question or a plan to approve: **answer in the terminal** |
+| ● orange · `project · waiting for you` | Claude is done and waits for your next message |
+| `project · done` | end of turn (a few seconds) |
 
 With several sessions, the most urgent one takes the pill (`(+2)` counts the
 others) and the open island lists them all. **Click a session** to bring its
@@ -49,8 +47,8 @@ A **system sound** plays every time Claude starts waiting for you.
 When Claude wants to run a command that needs your approval, hover the island:
 it shows the tool and the command, with three buttons.
 
-- **Autoriser** (allow): Claude runs the command.
-- **Refuser** (deny): Claude doesn't run it and carries on another way.
+- **Allow**: Claude runs the command.
+- **Deny**: Claude doesn't run it and carries on another way.
 - **Terminal**: the question goes back to the terminal, which comes to the
   front (to pick "always allow", for example).
 
@@ -60,7 +58,7 @@ the island.
 
 Claude's **questions** (multiple choice, approving a plan) don't use these
 buttons: they show up normally in the terminal, the island just tells you
-"te pose une question".
+"is asking you a question".
 
 ## Settings
 

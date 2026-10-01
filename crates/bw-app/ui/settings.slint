@@ -42,13 +42,14 @@ component Swatch inherits Rectangle {
 }
 
 export component SettingsWindow inherits Window {
-    title: "BoringWindows · Réglages";
+    title: @tr("BoringWindows · Settings");
     preferred-width: 760px;
     preferred-height: 580px;
     min-width: 640px;
     min-height: 480px;
 
     // --- Général ---
+    in-out property <int> language-index;
     in-out property <int> open-on-index;
     in-out property <int> monitor-index;
     in-out property <bool> hide-fullscreen;
@@ -106,36 +107,46 @@ export component SettingsWindow inherits Window {
 
         TabWidget {
             Tab {
-                title: "Général";
+                title: @tr("General");
                 VerticalBox {
                     alignment: start;
 
                     Row {
-                        label: "Ouvrir l'île";
+                        label: @tr("Language");
                         ComboBox {
-                            model: ["au survol", "au clic"];
+                            // Noms des langues dans leur propre langue : non traduits.
+                            model: [@tr("Automatic (Windows)"), "English", "Français"];
+                            current-index <=> root.language-index;
+                            selected => { root.changed("general.language"); }
+                        }
+                    }
+
+                    Row {
+                        label: @tr("Open the island");
+                        ComboBox {
+                            model: [@tr("on hover"), @tr("on click")];
                             current-index <=> root.open-on-index;
                             selected => { root.changed("general.open_on"); }
                         }
                     }
 
                     Row {
-                        label: "Écran";
+                        label: @tr("Screen");
                         ComboBox {
-                            model: ["écran principal", "écran de la souris (au lancement)"];
+                            model: [@tr("main screen"), @tr("screen under the mouse (at startup)")];
                             current-index <=> root.monitor-index;
                             selected => { root.changed("general.monitor"); }
                         }
                     }
 
                     CheckBox {
-                        text: "Cacher l'île quand une application est en plein écran";
+                        text: @tr("Hide the island when an app is full screen");
                         checked <=> root.hide-fullscreen;
                         toggled => { root.changed("general.hide_in_fullscreen"); }
                     }
 
                     CheckBox {
-                        text: "Lancer BoringWindows au démarrage de Windows";
+                        text: @tr("Start BoringWindows with Windows");
                         checked <=> root.autostart;
                         toggled => { root.changed("autostart"); }
                     }
@@ -143,12 +154,12 @@ export component SettingsWindow inherits Window {
             }
 
             Tab {
-                title: "Apparence";
+                title: @tr("Appearance");
                 VerticalBox {
                     alignment: start;
 
                     Row {
-                        label: "Couleur d'accent";
+                        label: @tr("Accent color");
                         LineEdit {
                             text <=> root.accent;
                             placeholder-text: "#FF8A3D";
@@ -175,7 +186,7 @@ export component SettingsWindow inherits Window {
                     }
 
                     Row {
-                        label: "Couleur de fond";
+                        label: @tr("Background color");
                         LineEdit {
                             text <=> root.background-color;
                             placeholder-text: "#000000";
@@ -184,7 +195,7 @@ export component SettingsWindow inherits Window {
                     }
 
                     Row {
-                        label: "Durée des animations (ms)";
+                        label: @tr("Animation duration (ms)");
                         SpinBox {
                             minimum: 0;
                             maximum: 2000;
@@ -195,7 +206,7 @@ export component SettingsWindow inherits Window {
                     }
 
                     Row {
-                        label: "Arrondi de l'île ouverte";
+                        label: @tr("Corner radius of the open island");
                         SpinBox {
                             minimum: 0;
                             maximum: 100;
@@ -205,31 +216,31 @@ export component SettingsWindow inherits Window {
                     }
 
                     Hint {
-                        text: "Les changements s'appliquent tout de suite sur l'île. La couleur d'accent est remplacée par celle de la pochette quand la musique joue (onglet Musique).";
+                        text: @tr("Changes apply to the island right away. The accent color is replaced by the album art color while music plays (Music tab).");
                     }
                 }
             }
 
             Tab {
-                title: "Agenda";
+                title: @tr("Calendar");
                 ScrollView {
                     VerticalBox {
                         alignment: start;
 
                         GroupBox {
-                            title: "Mes calendriers";
+                            title: @tr("My calendars");
                             VerticalLayout {
                                 spacing: 6px;
 
                                 if root.sources.length == 0: Hint {
-                                    text: "Aucun calendrier pour l'instant : ajoute-en un ci-dessous.";
+                                    text: @tr("No calendar yet: add one below.");
                                 }
 
                                 for source[i] in root.sources: HorizontalLayout {
                                     spacing: 8px;
 
                                     Text {
-                                        text: source.name != "" ? source.name : "(sans nom)";
+                                        text: source.name != "" ? source.name : @tr("(no name)");
                                         font-weight: 600;
                                         min-width: 120px;
                                         vertical-alignment: center;
@@ -244,7 +255,7 @@ export component SettingsWindow inherits Window {
                                     }
 
                                     Button {
-                                        text: "Supprimer";
+                                        text: @tr("Remove");
                                         clicked => { root.remove-source(i); }
                                     }
                                 }
@@ -252,19 +263,19 @@ export component SettingsWindow inherits Window {
                         }
 
                         GroupBox {
-                            title: "Ajouter un calendrier";
+                            title: @tr("Add a calendar");
                             VerticalLayout {
                                 spacing: 8px;
 
                                 Row {
-                                    label: "Service";
+                                    label: @tr("Service");
                                     ComboBox {
                                         model: root.providers;
                                         current-index <=> root.provider-index;
                                         selected => { root.provider-changed(self.current-index); }
                                     }
                                     Button {
-                                        text: "Guide détaillé";
+                                        text: @tr("Step-by-step guide");
                                         clicked => { root.open-guide(); }
                                     }
                                 }
@@ -274,21 +285,21 @@ export component SettingsWindow inherits Window {
                                 }
 
                                 Row {
-                                    label: "Nom (facultatif)";
+                                    label: @tr("Name (optional)");
                                     LineEdit {
                                         text <=> root.new-name;
-                                        placeholder-text: "Pro, Cours, Perso…";
+                                        placeholder-text: @tr("Work, School, Personal…");
                                     }
                                 }
 
                                 Row {
-                                    label: root.provider-is-file ? "Fichier .ics" : "Lien ICS";
+                                    label: root.provider-is-file ? @tr(".ics file") : @tr("ICS link");
                                     LineEdit {
                                         text <=> root.new-url;
-                                        placeholder-text: root.provider-is-file ? "C:/Users/…/agenda.ics" : "https://…  ou  webcal://…";
+                                        placeholder-text: root.provider-is-file ? "C:/Users/…/agenda.ics" : @tr("https://…  or  webcal://…");
                                     }
                                     if root.provider-is-file: Button {
-                                        text: "Parcourir…";
+                                        text: @tr("Browse…");
                                         clicked => { root.browse-file(); }
                                     }
                                 }
@@ -306,13 +317,13 @@ export component SettingsWindow inherits Window {
                                     }
 
                                     Button {
-                                        text: root.testing ? "Test…" : "Tester";
+                                        text: root.testing ? @tr("Testing…") : @tr("Test");
                                         enabled: !root.testing && root.new-url != "";
                                         clicked => { root.test-source(); }
                                     }
 
                                     Button {
-                                        text: "Ajouter";
+                                        text: @tr("Add");
                                         primary: true;
                                         enabled: root.new-url != "";
                                         clicked => { root.add-source(); }
@@ -322,12 +333,12 @@ export component SettingsWindow inherits Window {
                         }
 
                         GroupBox {
-                            title: "Affichage";
+                            title: @tr("Display");
                             VerticalLayout {
                                 spacing: 6px;
 
                                 Row {
-                                    label: "Rappel avant le début (min)";
+                                    label: @tr("Reminder before start (min)");
                                     SpinBox {
                                         minimum: 0;
                                         maximum: 120;
@@ -337,7 +348,7 @@ export component SettingsWindow inherits Window {
                                 }
 
                                 Row {
-                                    label: "Horizon affiché (heures)";
+                                    label: @tr("Time span shown (hours)");
                                     SpinBox {
                                         minimum: 1;
                                         maximum: 168;
@@ -347,7 +358,7 @@ export component SettingsWindow inherits Window {
                                 }
 
                                 Row {
-                                    label: "Mise à jour toutes les (min)";
+                                    label: @tr("Refresh every (min)");
                                     SpinBox {
                                         minimum: 2;
                                         maximum: 1440;
@@ -357,7 +368,7 @@ export component SettingsWindow inherits Window {
                                 }
 
                                 CheckBox {
-                                    text: "Afficher les événements « toute la journée »";
+                                    text: @tr("Show all-day events");
                                     checked <=> root.show-all-day;
                                     toggled => { root.changed("modules.calendar.show_all_day"); }
                                 }
@@ -371,32 +382,32 @@ export component SettingsWindow inherits Window {
                 title: "Claude Code";
                 VerticalBox {
                     Row {
-                        label: root.hooks-installed ? "Hooks installés ✓" : "Hooks non installés";
+                        label: root.hooks-installed ? @tr("Hooks installed ✓") : @tr("Hooks not installed");
                         Button {
-                            text: root.hooks-installed ? "Retirer les hooks" : "Installer les hooks";
+                            text: root.hooks-installed ? @tr("Remove hooks") : @tr("Install hooks");
                             primary: !root.hooks-installed;
                             clicked => { root.toggle-hooks(); }
                         }
                     }
 
                     Hint {
-                        text: "Après une installation, relance tes sessions Claude Code : elles ne lisent leurs hooks qu'au démarrage.";
+                        text: @tr("After installing, restart your Claude Code sessions: they only read their hooks at startup.");
                     }
 
                     CheckBox {
-                        text: "Répondre aux demandes de permission depuis l'île";
+                        text: @tr("Answer permission requests from the island");
                         checked <=> root.claude-permissions;
                         toggled => { root.changed("modules.claude.permissions"); }
                     }
 
                     CheckBox {
-                        text: "Son quand Claude t'attend (question, plan, permission)";
+                        text: @tr("Sound when Claude is waiting for you (question, plan, permission)");
                         checked <=> root.claude-sound;
                         toggled => { root.changed("modules.claude.sound"); }
                     }
 
                     Row {
-                        label: "Délai de réponse dans l'île (s)";
+                        label: @tr("Time to answer in the island (s)");
                         SpinBox {
                             minimum: 5;
                             maximum: 280;
@@ -408,7 +419,7 @@ export component SettingsWindow inherits Window {
                     HorizontalLayout {
                         alignment: start;
                         Button {
-                            text: root.doctor-running ? "Diagnostic en cours…" : "Lancer le diagnostic";
+                            text: root.doctor-running ? @tr("Running diagnostic…") : @tr("Run diagnostic");
                             enabled: !root.doctor-running;
                             clicked => { root.run-doctor(); }
                         }
@@ -428,18 +439,18 @@ export component SettingsWindow inherits Window {
             }
 
             Tab {
-                title: "Musique";
+                title: @tr("Music");
                 VerticalBox {
                     alignment: start;
 
                     CheckBox {
-                        text: "Teinter l'île avec la couleur de la pochette";
+                        text: @tr("Tint the island with the album art color");
                         checked <=> root.media-accent;
                         toggled => { root.changed("modules.media.accent_from_artwork"); }
                     }
 
                     Row {
-                        label: "Lecteurs à ignorer";
+                        label: @tr("Players to ignore");
                         LineEdit {
                             text <=> root.media-ignore;
                             placeholder-text: "msedge, chrome";
@@ -448,7 +459,7 @@ export component SettingsWindow inherits Window {
                     }
 
                     Hint {
-                        text: "Sépare les noms par des virgules ; un morceau du nom suffit. Spotify, Apple Music, navigateurs, VLC… sont détectés automatiquement.";
+                        text: @tr("Separate names with commas; part of the name is enough. Spotify, Apple Music, browsers, VLC… are detected automatically.");
                     }
                 }
             }
@@ -466,12 +477,12 @@ export component SettingsWindow inherits Window {
             }
 
             Button {
-                text: "Documentation";
+                text: @tr("Documentation");
                 clicked => { root.open-docs(); }
             }
 
             Button {
-                text: "Ouvrir config.toml";
+                text: @tr("Open config.toml");
                 clicked => { root.open-config-file(); }
             }
         }

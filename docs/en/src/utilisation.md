@@ -31,18 +31,17 @@ The order between items of equal importance is set with
 
 ## The tray menu
 
-Right-click the BoringWindows icon in the notification area (the menu is in
-French for now):
+Right-click the BoringWindows icon in the notification area:
 
 | Entry | Effect |
 |---|---|
-| Réglages… | opens the settings window (see below) |
-| Ouvrir la configuration | opens `config.toml` in your editor |
-| Recharger la configuration | re-reads the file (only needed if automatic reload failed) |
-| Claude Code : installer / retirer les hooks… | connects Claude Code (see [Claude Code](claude-code.md)) |
-| Lancer au démarrage | starts BoringWindows with Windows |
-| Masquer l'île | hides the island without quitting |
-| Quitter | quits BoringWindows |
+| Settings… | opens the settings window (see below) |
+| Open configuration file | opens `config.toml` in your editor |
+| Reload configuration | re-reads the file (only needed if automatic reload failed) |
+| Claude Code: install / remove hooks… | connects Claude Code (see [Claude Code](claude-code.md)) |
+| Start with Windows | starts BoringWindows with Windows |
+| Hide the island | hides the island without quitting |
+| Quit | quits BoringWindows |
 
 ## Full screen
 
@@ -52,13 +51,15 @@ off with `hide_in_fullscreen = false`.
 
 ## Changing the configuration
 
-The easiest way: right-click the icon › **Réglages…** (settings). A tabbed
-window (Général, Apparence, Agenda, Claude Code, Musique — general, appearance,
-calendar, Claude Code, music) edits the common settings; **every change is
+The easiest way: right-click the icon › **Settings…**. A tabbed window
+(General, Appearance, Calendar, Claude Code, Music) edits the common settings; **every change is
 saved and applied immediately**, there is no "OK" button. That's also where you
-add a calendar (per-service assistant, **Tester** button), install the Claude
+add a calendar (per-service assistant, **Test** button), install the Claude
 Code hooks and run the diagnostic. The window can also open at startup:
-`boringwindows.exe --settings`. Like the menu, it is in French for now.
+`boringwindows.exe --settings`.
+
+The app's language (English or French) follows the one of Windows; change it
+in **Settings… › General › Language**, no restart needed.
 
 The window writes to `config.toml` and keeps your comments and the order of
 the file. For everything else (island sizes, module order…), edit the file
@@ -66,7 +67,7 @@ directly.
 
 Everything is set in `%APPDATA%\BoringWindows\config.toml`. **Save the file: the
 island updates immediately**, no restart needed. If the file contains an error,
-the island shows it ("⚠ config.toml invalide…") and keeps the previous
+the island shows it ("⚠ invalid config.toml…") and keeps the previous
 settings.
 
 Every option is described in the [reference](configuration.md).

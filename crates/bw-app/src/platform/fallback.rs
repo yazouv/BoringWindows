@@ -82,6 +82,8 @@ impl Tray {
     pub fn set_autostart_checked(&self, _checked: bool) {}
 
     pub fn set_claude_hooks_installed(&self, _installed: bool) {}
+
+    pub fn retranslate(&self) {}
 }
 
 pub fn autostart_enabled() -> bool {
@@ -89,7 +91,10 @@ pub fn autostart_enabled() -> bool {
 }
 
 pub fn set_autostart(_enabled: bool) -> anyhow::Result<()> {
-    anyhow::bail!("démarrage automatique pas encore disponible sur ce système")
+    anyhow::bail!(bw_i18n::tr!(
+        "starting with the system isn't available on this platform yet",
+        "démarrage automatique pas encore disponible sur ce système"
+    ))
 }
 
 /// Pas de boîte de dialogue native ici : on accepte et on journalise.

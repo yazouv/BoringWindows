@@ -23,11 +23,11 @@ pub struct ParseColorError(String);
 
 impl fmt::Display for ParseColorError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
+        f.write_str(&bw_i18n::tr!(
+            "invalid color {:?} (expected \"#RRGGBB\" or \"#RRGGBBAA\")",
             "couleur invalide {:?} (attendu \"#RRGGBB\" ou \"#RRGGBBAA\")",
             self.0
-        )
+        ))
     }
 }
 

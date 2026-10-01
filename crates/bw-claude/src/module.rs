@@ -55,8 +55,13 @@ impl Module for ClaudeModule {
     }
 
     fn start(&mut self, ctx: ModuleCtx) -> anyhow::Result<()> {
-        let listener = Listener::bind(&self.endpoint)
-            .map_err(|e| anyhow::anyhow!("impossible d'écouter sur {} : {e}", self.endpoint))?;
+        let listener = Listener::bind(&self.endpoint).map_err(|e| {
+            anyhow::anyhow!(bw_i18n::tr!(
+                "cannot listen on {}: {e}",
+                "impossible d'écouter sur {} : {e}",
+                self.endpoint
+            ))
+        })?;
         log::info!("claude : en écoute sur {}", self.endpoint);
 
         let (tx, rx) = unbounded_channel();

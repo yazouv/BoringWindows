@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use bw_i18n::tr;
 use serde::Deserialize;
 
 /// Section `[modules.calendar]` de config.toml.
@@ -50,20 +51,32 @@ impl CalendarConfig {
         };
         anyhow::ensure!(
             (2..=1440).contains(&config.refresh_minutes),
-            "modules.calendar.refresh_minutes doit être entre 2 et 1440"
+            tr!(
+                "modules.calendar.refresh_minutes must be between 2 and 1440",
+                "modules.calendar.refresh_minutes doit être entre 2 et 1440"
+            )
         );
         anyhow::ensure!(
             config.remind_minutes <= 120,
-            "modules.calendar.remind_minutes doit être ≤ 120"
+            tr!(
+                "modules.calendar.remind_minutes must be ≤ 120",
+                "modules.calendar.remind_minutes doit être ≤ 120"
+            )
         );
         anyhow::ensure!(
             (1..=168).contains(&config.lookahead_hours),
-            "modules.calendar.lookahead_hours doit être entre 1 et 168"
+            tr!(
+                "modules.calendar.lookahead_hours must be between 1 and 168",
+                "modules.calendar.lookahead_hours doit être entre 1 et 168"
+            )
         );
         for s in &config.sources {
             anyhow::ensure!(
                 !s.url.trim().is_empty(),
-                "modules.calendar.sources : url vide"
+                tr!(
+                    "modules.calendar.sources: empty url",
+                    "modules.calendar.sources : url vide"
+                )
             );
         }
         Ok(config)

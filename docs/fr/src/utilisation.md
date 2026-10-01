@@ -58,6 +58,9 @@ service, bouton **Tester**), qu'on installe les hooks Claude Code et qu'on
 lance le diagnostic. La fenêtre peut aussi s'ouvrir au lancement :
 `boringwindows.exe --settings`.
 
+La langue de l'app (français ou anglais) suit celle de Windows ; elle se
+change dans **Réglages… › Général › Langue**, sans redémarrer.
+
 La fenêtre écrit dans `config.toml` en gardant tes commentaires et l'ordre du
 fichier. Pour le reste (tailles de l'île, ordre des modules…), édite le
 fichier directement.

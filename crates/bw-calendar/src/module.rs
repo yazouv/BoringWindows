@@ -109,7 +109,7 @@ async fn refresh_all(config: &CalendarConfig, sources: &mut [Vec<Event>]) -> Opt
     for (i, source) in config.sources.iter().enumerate() {
         let url = source.url.clone();
         let label = if source.name.is_empty() {
-            format!("calendrier {}", i + 1)
+            bw_i18n::tr!("calendar {}", "calendrier {}", i + 1)
         } else {
             source.name.clone()
         };
@@ -126,11 +126,17 @@ async fn refresh_all(config: &CalendarConfig, sources: &mut [Vec<Event>]) -> Opt
             }
             Ok(Ok(Err(e))) => {
                 log::warn!("agenda : {label} : {e:#}");
-                error = Some(format!("{label} : téléchargement impossible"));
+                error = Some(bw_i18n::tr!(
+                    "{label}: download failed",
+                    "{label} : téléchargement impossible"
+                ));
             }
             Ok(Err(_)) | Err(_) => {
                 log::warn!("agenda : {label} : délai dépassé");
-                error = Some(format!("{label} : délai dépassé"));
+                error = Some(bw_i18n::tr!(
+                    "{label}: timed out",
+                    "{label} : délai dépassé"
+                ));
             }
         }
     }

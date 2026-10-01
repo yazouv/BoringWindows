@@ -10,6 +10,7 @@ use std::time::Duration;
 use bw_calendar::CalendarConfig;
 use bw_claude::ClaudeConfig;
 use bw_config::{Config, ConfigEditor, Value};
+use bw_i18n::{Lang, tr};
 use bw_media::MediaConfig;
 use slint::{ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel};
 
@@ -17,47 +18,77 @@ use super::{Controller, build_modules, post};
 use crate::platform;
 use crate::{CalendarSourceRow, SettingsWindow};
 
-const DOCS: &str = "https://yazouv.github.io/BoringWindows/";
+/// Services proposés par l'assistant, dans l'ordre de la liste.
+const PROVIDERS: usize = 6;
+/// Le dernier service est un fichier local.
+const FILE_PROVIDER: i32 = 5;
 
-/// Services proposés par l'assistant : (nom, page de la doc, aide courte, fichier ?).
-const PROVIDERS: [(&str, &str, &str, bool); 6] = [
-    (
-        "Google Agenda",
-        "agenda/google.html",
-        "Sur calendar.google.com : ⚙️ Paramètres › ton agenda (à gauche) › « Intégrer l'agenda » › copie l'« Adresse secrète au format iCal » (elle finit par basic.ics).",
-        false,
-    ),
-    (
-        "Outlook / Microsoft 365",
-        "agenda/outlook.html",
-        "Sur Outlook web : ⚙️ Paramètres › Calendrier › Calendriers partagés › « Publier un calendrier » › choisis « Peut afficher tous les détails » › Publier › copie le lien ICS.",
-        false,
-    ),
-    (
-        "iCloud",
-        "agenda/icloud.html",
-        "Dans Calendrier (iPhone, Mac ou iCloud.com) : partage du calendrier › active « Calendrier public » › copie le lien (webcal://…).",
-        false,
-    ),
-    (
-        "Proton Calendar",
-        "agenda/proton.html",
-        "Sur calendar.proton.me : ⚙️ Paramètres › Calendriers › ton calendrier › « Partager avec n'importe qui » › Créer un lien (tous les détails) › copie-le.",
-        false,
-    ),
-    (
-        "Emploi du temps, autre lien ICS",
-        "agenda/autres.html",
-        "Cherche « iCal », « ICS », « Exporter » ou « S'abonner » sur la page de ton emploi du temps ou de ton service : colle le lien (souvent en .ics ou webcal://).",
-        false,
-    ),
-    (
-        "Fichier .ics sur le disque",
-        "agenda/autres.html#fichier-ics-sur-ton-disque",
-        "Choisis un fichier .ics exporté ou reçu par mail. Il est relu régulièrement : remplace-le pour le mettre à jour.",
-        true,
-    ),
-];
+/// Adresse de la doc dans la langue courante.
+fn docs() -> &'static str {
+    match bw_i18n::lang() {
+        Lang::Fr => "https://yazouv.github.io/BoringWindows/",
+        Lang::En => "https://yazouv.github.io/BoringWindows/en/",
+    }
+}
+
+fn provider_name(index: i32) -> String {
+    match index {
+        0 => tr!("Google Calendar", "Google Agenda"),
+        1 => "Outlook / Microsoft 365".into(),
+        2 => "iCloud".into(),
+        3 => "Proton Calendar".into(),
+        4 => tr!(
+            "School timetable, other ICS link",
+            "Emploi du temps, autre lien ICS"
+        ),
+        _ => tr!(".ics file on disk", "Fichier .ics sur le disque"),
+    }
+}
+
+/// Page de la doc qui détaille le service.
+fn provider_page(index: i32) -> String {
+    match index {
+        0 => "agenda/google.html".into(),
+        1 => "agenda/outlook.html".into(),
+        2 => "agenda/icloud.html".into(),
+        3 => "agenda/proton.html".into(),
+        4 => "agenda/autres.html".into(),
+        _ => tr!(
+            "agenda/autres.html#ics-file-on-your-disk",
+            "agenda/autres.html#fichier-ics-sur-ton-disque"
+        ),
+    }
+}
+
+/// Aide courte : où trouver le lien.
+fn provider_help(index: i32) -> String {
+    match index {
+        0 => tr!(
+            "On calendar.google.com: ⚙️ Settings › your calendar (left) › \"Integrate calendar\" › copy the \"Secret address in iCal format\" (it ends with basic.ics).",
+            "Sur calendar.google.com : ⚙️ Paramètres › ton agenda (à gauche) › « Intégrer l'agenda » › copie l'« Adresse secrète au format iCal » (elle finit par basic.ics)."
+        ),
+        1 => tr!(
+            "On Outlook on the web: ⚙️ Settings › Calendar › Shared calendars › \"Publish a calendar\" › choose \"Can view all details\" › Publish › copy the ICS link.",
+            "Sur Outlook web : ⚙️ Paramètres › Calendrier › Calendriers partagés › « Publier un calendrier » › choisis « Peut afficher tous les détails » › Publier › copie le lien ICS."
+        ),
+        2 => tr!(
+            "In Calendar (iPhone, Mac or iCloud.com): share the calendar › turn on \"Public Calendar\" › copy the link (webcal://…).",
+            "Dans Calendrier (iPhone, Mac ou iCloud.com) : partage du calendrier › active « Calendrier public » › copie le lien (webcal://…)."
+        ),
+        3 => tr!(
+            "On calendar.proton.me: ⚙️ Settings › Calendars › your calendar › \"Share with anyone\" › Create link (full details) › copy it.",
+            "Sur calendar.proton.me : ⚙️ Paramètres › Calendriers › ton calendrier › « Partager avec n'importe qui » › Créer un lien (tous les détails) › copie-le."
+        ),
+        4 => tr!(
+            "Look for \"iCal\", \"ICS\", \"Export\" or \"Subscribe\" on your timetable or service page, and paste the link (often ending in .ics, or webcal://).",
+            "Cherche « iCal », « ICS », « Exporter » ou « S'abonner » sur la page de ton emploi du temps ou de ton service : colle le lien (souvent en .ics ou webcal://)."
+        ),
+        _ => tr!(
+            "Pick an .ics file you exported or received by email. It is re-read regularly: replace it to update it.",
+            "Choisis un fichier .ics exporté ou reçu par mail. Il est relu régulièrement : remplace-le pour le mettre à jour."
+        ),
+    }
+}
 
 /// État de la fenêtre ouverte.
 pub(super) struct SettingsState {
@@ -96,6 +127,7 @@ impl Controller {
         ui.set_open_on_index(i32::from(g.open_on == bw_config::OpenOn::Click));
         ui.set_monitor_index(i32::from(g.monitor == bw_config::MonitorChoice::Cursor));
         ui.set_hide_fullscreen(g.hide_in_fullscreen);
+        ui.set_language_index(language_index(g.language));
         ui.set_autostart(platform::autostart_enabled());
 
         let t = &config.theme;
@@ -111,12 +143,7 @@ impl Controller {
         ui.set_lookahead_hours(cal.lookahead_hours as i32);
         ui.set_refresh_minutes(cal.refresh_minutes as i32);
         ui.set_show_all_day(cal.show_all_day);
-        ui.set_providers(ModelRc::new(VecModel::from(
-            PROVIDERS
-                .iter()
-                .map(|p| SharedString::from(p.0))
-                .collect::<Vec<_>>(),
-        )));
+        fill_providers(ui);
         set_provider(ui, 0);
 
         let claude =
@@ -176,10 +203,8 @@ impl Controller {
             }
         });
         ui.on_open_guide(with(|_, ui| {
-            let page = PROVIDERS
-                .get(ui.get_provider_index() as usize)
-                .map_or("agenda/index.html", |p| p.1);
-            platform::open_path(std::path::Path::new(&format!("{DOCS}{page}")));
+            let page = provider_page(ui.get_provider_index());
+            platform::open_path(std::path::Path::new(&format!("{}{page}", docs())));
         }));
         ui.on_browse_file(with(|_, ui| {
             if let Some(path) = platform::pick_ics_file() {
@@ -221,7 +246,10 @@ impl Controller {
                     c.refresh_sources(ui);
                     status(
                         ui,
-                        "Calendrier ajouté ✓ (il apparaît dans l'île d'ici quelques secondes)",
+                        &tr!(
+                            "Calendar added ✓ (it shows up in the island within a few seconds)",
+                            "Calendrier ajouté ✓ (il apparaît dans l'île d'ici quelques secondes)"
+                        ),
                         false,
                     );
                 }
@@ -236,7 +264,11 @@ impl Controller {
                 match c.edit_now(|e| e.remove_calendar_source(i as usize)) {
                     Ok(()) => {
                         c.refresh_sources(&s.ui);
-                        status(&s.ui, "Calendrier retiré ✓", false);
+                        status(
+                            &s.ui,
+                            &tr!("Calendar removed ✓", "Calendrier retiré ✓"),
+                            false,
+                        );
                     }
                     Err(e) => status(&s.ui, &e, true),
                 }
@@ -262,7 +294,9 @@ impl Controller {
             });
         }));
         ui.on_open_config_file(with(|c, _| platform::open_path(&c.path)));
-        ui.on_open_docs(with(|_, _| platform::open_path(std::path::Path::new(DOCS))));
+        ui.on_open_docs(with(|_, _| {
+            platform::open_path(std::path::Path::new(docs()))
+        }));
 
         let weak = Rc::downgrade(self);
         ui.window().on_close_requested(move || {
@@ -277,6 +311,18 @@ impl Controller {
         });
     }
 
+    /// Langue changée : textes fournis par Rust (les `@tr` suivent seuls).
+    pub(super) fn retranslate_settings(&self) {
+        if let Some(s) = self.settings.borrow().as_ref() {
+            let index = s.ui.get_provider_index();
+            fill_providers(&s.ui);
+            set_provider(&s.ui, index);
+            s.ui.set_test_status("".into());
+            s.ui.set_doctor_report("".into());
+            s.ui.set_language_index(language_index(self.config.borrow().general.language));
+        }
+    }
+
     /// Une valeur a changé dans la fenêtre : on la met en attente d'écriture.
     fn settings_changed(self: &Rc<Self>, key: &str) {
         let settings = self.settings.borrow();
@@ -284,6 +330,17 @@ impl Controller {
         let ui = &s.ui;
 
         let change: Option<(Vec<&'static str>, Value)> = match key {
+            "general.language" => Some((
+                vec!["general", "language"],
+                Value::Str(
+                    match ui.get_language_index() {
+                        1 => "en",
+                        2 => "fr",
+                        _ => "auto",
+                    }
+                    .into(),
+                ),
+            )),
             "general.open_on" => Some((
                 vec!["general", "open_on"],
                 Value::Str(
@@ -317,11 +374,15 @@ impl Controller {
                         if let Some(tray) = self.tray.borrow().as_ref() {
                             tray.set_autostart_checked(enabled);
                         }
-                        status(ui, "Enregistré ✓", false);
+                        status(ui, &saved(), false);
                     }
                     Err(e) => {
                         ui.set_autostart(!enabled);
-                        status(ui, &format!("Démarrage automatique : {e}"), true);
+                        status(
+                            ui,
+                            &tr!("Start with Windows: {e}", "Démarrage automatique : {e}"),
+                            true,
+                        );
                     }
                 }
                 None
@@ -345,7 +406,14 @@ impl Controller {
                         Some((vec!["theme", field], Value::Str(text.trim().to_owned())))
                     }
                     Err(_) => {
-                        status(ui, "Couleur au format #RRGGBB (ex. #FF8A3D)", true);
+                        status(
+                            ui,
+                            &tr!(
+                                "Color as #RRGGBB (e.g. #FF8A3D)",
+                                "Couleur au format #RRGGBB (ex. #FF8A3D)"
+                            ),
+                            true,
+                        );
                         None
                     }
                 }
@@ -435,7 +503,7 @@ impl Controller {
         });
         if let Some(s) = self.settings.borrow().as_ref() {
             match result {
-                Ok(()) => status(&s.ui, "Enregistré ✓", false),
+                Ok(()) => status(&s.ui, &saved(), false),
                 Err(e) => status(&s.ui, &e, true),
             }
         }
@@ -456,11 +524,30 @@ impl Controller {
     }
 }
 
+fn language_index(language: bw_config::Language) -> i32 {
+    match language {
+        bw_config::Language::Auto => 0,
+        bw_config::Language::En => 1,
+        bw_config::Language::Fr => 2,
+    }
+}
+
+fn fill_providers(ui: &SettingsWindow) {
+    ui.set_providers(ModelRc::new(VecModel::from(
+        (0..PROVIDERS as i32)
+            .map(|i| SharedString::from(provider_name(i)))
+            .collect::<Vec<_>>(),
+    )));
+}
+
 fn set_provider(ui: &SettingsWindow, index: i32) {
-    let p = PROVIDERS.get(index as usize).unwrap_or(&PROVIDERS[0]);
     ui.set_provider_index(index);
-    ui.set_provider_help(p.2.into());
-    ui.set_provider_is_file(p.3);
+    ui.set_provider_help(provider_help(index).into());
+    ui.set_provider_is_file(index == FILE_PROVIDER);
+}
+
+fn saved() -> String {
+    tr!("Saved ✓", "Enregistré ✓")
 }
 
 /// Nom proposé quand l'utilisateur n'en donne pas : le service, ou le nom du
@@ -483,7 +570,7 @@ fn default_name(provider: i32, url: &str) -> String {
                 .or_else(|| stem.strip_suffix(".ICS"))
                 .unwrap_or(stem);
             if stem.is_empty() || stem.contains(':') {
-                "Agenda".into()
+                tr!("Calendar", "Agenda")
             } else {
                 stem.into()
             }
@@ -495,18 +582,25 @@ fn probe_text(result: anyhow::Result<bw_calendar::Probe>) -> (bool, String) {
     match result {
         Ok(p) if p.upcoming == 0 => (
             true,
-            "✓ Calendrier lu, mais aucun événement dans les 30 prochains jours".into(),
-        ),
-        Ok(p) => (
-            true,
-            format!(
-                "✓ {} événement(s) dans les 30 jours{}",
-                p.upcoming,
-                p.next
-                    .map(|n| format!(" · prochain : {n}"))
-                    .unwrap_or_default()
+            tr!(
+                "✓ Calendar read, but no event in the next 30 days",
+                "✓ Calendrier lu, mais aucun événement dans les 30 prochains jours"
             ),
         ),
+        Ok(p) => {
+            let next = p
+                .next
+                .map(|n| tr!(" · next: {n}", " · prochain : {n}"))
+                .unwrap_or_default();
+            (
+                true,
+                tr!(
+                    "✓ {} event(s) in the next 30 days{next}",
+                    "✓ {} événement(s) dans les 30 jours{next}",
+                    p.upcoming
+                ),
+            )
+        }
         Err(e) => (false, format!("✗ {e:#}")),
     }
 }
@@ -530,6 +624,7 @@ mod tests {
 
     #[test]
     fn default_names() {
+        bw_i18n::set(bw_i18n::Lang::Fr);
         assert_eq!(
             default_name(0, "https://calendar.google.com/x/basic.ics"),
             "Google"

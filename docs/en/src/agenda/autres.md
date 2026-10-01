@@ -25,9 +25,9 @@ lookahead_hours = 48
 
 ## .ics file on your disk
 
-An exported file, or one received by email, works too. Easiest: **Réglages…**
-› **Agenda** › service « Fichier .ics sur le disque » (.ics file on disk) ›
-**Parcourir…** (browse), then **Tester** and **Ajouter**.
+An exported file, or one received by email, works too. Easiest: **Settings…**
+› **Calendar** › service ".ics file on disk" › **Browse…**, then **Test** and
+**Add**.
 
 By hand, give its path:
 

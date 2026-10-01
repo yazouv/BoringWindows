@@ -1,9 +1,9 @@
 # All options (config.toml)
 
 The file lives in `%APPDATA%\BoringWindows\config.toml` (right-click the icon ›
-**Ouvrir la configuration**). It is created on first launch with every option
+**Open configuration file**). It is created on first launch with every option
 commented. The common settings can also be changed without touching the
-file: right-click › **Réglages…** (settings).
+file: right-click › **Settings…**.
 
 - **Save: it applies immediately**, no restart.
 - A missing option takes its default value: you can keep only what you change.
@@ -34,6 +34,7 @@ name = "Work"
 |---|---|---|---|
 | `monitor` | `"primary"` | `"primary"`, `"cursor"` | screen of the island: main one, or the one under the mouse at start up |
 | `hide_in_fullscreen` | `true` | `true`, `false` | hide the island when an app is full screen |
+| `language` | `"auto"` | `"auto"`, `"fr"`, `"en"` | interface language (`auto`: the one of Windows) |
 | `open_on` | `"hover"` | `"hover"`, `"click"` | open the island on hover or on click |
 | `collapse_delay_ms` | `350` | 0 to 10000 | delay before closing when the mouse leaves (ms) |
 
@@ -73,7 +74,7 @@ See [Claude Code](claude-code.md).
 | `enabled` | `true` | | enable the module |
 | `permissions` | `true` | | answer permission requests from the island |
 | `permission_wait_secs` | `60` | 5 to 280 | time to answer in the island before handing back to the terminal (s) |
-| `done_secs` | `8` | 0 to 600 | how long "terminé" (done) stays (s) |
+| `done_secs` | `8` | 0 to 600 | how long "done" stays (s) |
 | `sound` | `true` | | system sound when Claude starts waiting for you |
 
 ## `[modules.media]`

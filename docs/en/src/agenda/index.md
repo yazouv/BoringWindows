@@ -25,23 +25,21 @@ Pick your service to find that link:
 
 ### With the settings window (easiest)
 
-1. Right-click the BoringWindows icon › **Réglages…** (settings) › **Agenda**
-   tab.
-2. Pick your **service** (*Service*): the window reminds you where to find the
-   link, and **Guide détaillé** opens the matching page of this guide.
-3. Paste the **ICS link** (*Lien ICS*) — or **Parcourir…** to pick an `.ics`
-   file — optionally give it a name, then **Tester** (test): the window
+1. Right-click the BoringWindows icon › **Settings…** › **Calendar** tab.
+2. Pick your **service**: the window reminds you where to find the link, and
+   **Step-by-step guide** opens the matching page of this guide.
+3. Paste the **ICS link** — or **Browse…** to pick an `.ics` file — optionally
+   give it a name, then **Test**: the window
    downloads the calendar and shows how many events it found and the next one.
-4. **Ajouter** (add). The calendar shows up in the island within a few seconds.
+4. **Add**. The calendar shows up in the island within a few seconds.
 
 ![Agenda tab of the settings window](../images/reglages.png)
 
-To remove a calendar: the **Supprimer** (remove) button next to its name.
+To remove a calendar: the **Remove** button next to its name.
 
 ### By hand, in config.toml
 
-1. Right-click the BoringWindows icon › **Ouvrir la configuration** (open the
-   configuration).
+1. Right-click the BoringWindows icon › **Open configuration file**.
 2. Paste at **the end of the file** one block per calendar:
 
    ```toml
@@ -71,16 +69,14 @@ To remove a calendar: the **Supprimer** (remove) button next to its name.
 
 ## What you see
 
-The texts are in French for now:
-
 | When | Pill |
 |---|---|
-| within the hour before | `À 14:30 · R52 · Team meeting` |
-| 5 minutes before (configurable) | `Dans 4 min · R52 · Team meeting` |
-| during the first 10 minutes | `Commencé · R52 · Team meeting` |
+| within the hour before | `At 14:30 · R52 · Team meeting` |
+| 5 minutes before (configurable) | `In 4 min · R52 · Team meeting` |
+| during the first 10 minutes | `Started · R52 · Team meeting` |
 
 In the open island: events of the next 24 hours, with the time, the room, a
-countdown within the coming hour and the **Join** button ("Rejoindre").
+countdown within the coming hour and the **Join** button.
 
 Handled: recurring meetings, deleted, moved or cancelled occurrences, all-day
 events, time zones (including Outlook's). If the network drops, the last
@@ -88,7 +84,7 @@ downloaded version stays on screen.
 
 ## Settings
 
-In **Réglages… › Agenda › Affichage** (display), or in `config.toml`:
+In **Settings… › Calendar › Display**, or in `config.toml`:
 
 ```toml
 [modules.calendar]
