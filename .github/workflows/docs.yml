@@ -1,10 +1,11 @@
 name: Docs
 
+# Seulement sur main (publication) : les pushs de branches ne consomment
+# pas de minutes Actions.
 on:
   push:
+    branches: [main]
     paths: ["docs/**", ".github/workflows/docs.yml"]
-  pull_request:
-    paths: ["docs/**"]
   workflow_dispatch:
 
 permissions:
