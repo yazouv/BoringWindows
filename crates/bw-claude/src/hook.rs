@@ -82,8 +82,12 @@ pub fn run() -> i32 {
     };
 
     let endpoint = ipc::endpoint();
+    let doctor = message.event.session_id == crate::doctor::SESSION;
     let outcome = relay(&endpoint, &message);
-    journal(&kind, &outcome.to_string());
+    // Les tests du diagnostic ne polluent pas le journal qu'il relit.
+    if !doctor {
+        journal(&kind, &outcome.to_string());
+    }
     if let Some(decision) = outcome.decision() {
         print_decision(decision);
     }
