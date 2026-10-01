@@ -16,10 +16,42 @@ use slint::{ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel};
 
 use super::{Controller, build_modules, post};
 use crate::platform;
-use crate::{CalendarSourceRow, SettingsWindow};
+use crate::{CalendarSourceRow, PlayerRow, SettingsWindow};
+
+/// « 1:01 » ou « 01:01 » (heure locale) → prochain instant correspondant, en UTC.
+/// Sert à caler la fenêtre de consommation sur l'heure de reset lue dans `/usage`.
+fn next_local_time(
+    text: &str,
+    now: chrono::DateTime<chrono::Local>,
+) -> Option<chrono::DateTime<chrono::Utc>> {
+    use chrono::{Duration, NaiveTime, TimeZone};
+    let time = NaiveTime::parse_from_str(text.trim(), "%H:%M").ok()?;
+    let mut day = now.date_naive();
+    for _ in 0..3 {
+        if let Some(at) = chrono::Local
+            .from_local_datetime(&day.and_time(time))
+            .earliest()
+            && at > now
+        {
+            return Some(at.with_timezone(&chrono::Utc));
+        }
+        day += Duration::days(1);
+    }
+    None
+}
+
+fn ignored_list(text: &str) -> Vec<String> {
+    text.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
 
 /// Services proposés par l'assistant, dans l'ordre de la liste.
-const PROVIDERS: usize = 6;
+const PROVIDERS: usize = 7;
+/// CalDAV : serveur + identifiant + mot de passe d'application.
+const CALDAV_PROVIDER: i32 = 6;
 /// Le dernier service est un fichier local.
 const FILE_PROVIDER: i32 = 5;
 
@@ -41,6 +73,7 @@ fn provider_name(index: i32) -> String {
             "School timetable, other ICS link",
             "Emploi du temps, autre lien ICS"
         ),
+        CALDAV_PROVIDER => "CalDAV (iCloud, Fastmail, Nextcloud…)".into(),
         _ => tr!(".ics file on disk", "Fichier .ics sur le disque"),
     }
 }
@@ -53,6 +86,7 @@ fn provider_page(index: i32) -> String {
         2 => "agenda/icloud.html".into(),
         3 => "agenda/proton.html".into(),
         4 => "agenda/autres.html".into(),
+        CALDAV_PROVIDER => "agenda/caldav.html".into(),
         _ => tr!(
             "agenda/autres.html#ics-file-on-your-disk",
             "agenda/autres.html#fichier-ics-sur-ton-disque"
@@ -82,6 +116,10 @@ fn provider_help(index: i32) -> String {
         4 => tr!(
             "Look for \"iCal\", \"ICS\", \"Export\" or \"Subscribe\" on your timetable or service page, and paste the link (often ending in .ics, or webcal://).",
             "Cherche « iCal », « ICS », « Exporter » ou « S'abonner » sur la page de ton emploi du temps ou de ton service : colle le lien (souvent en .ics ou webcal://)."
+        ),
+        CALDAV_PROVIDER => tr!(
+            "Server address of your account (iCloud: https://caldav.icloud.com, Fastmail: https://caldav.fastmail.com, Nextcloud: https://your-server/remote.php/dav) + your login + an app password. All your calendars are read; the password goes to the Windows Credential Manager.",
+            "Adresse du serveur de ton compte (iCloud : https://caldav.icloud.com, Fastmail : https://caldav.fastmail.com, Nextcloud : https://ton-serveur/remote.php/dav) + ton identifiant + un mot de passe d'application. Tous tes agendas sont lus ; le mot de passe va dans le Gestionnaire d'identifiants Windows."
         ),
         _ => tr!(
             "Pick an .ics file you exported or received by email. It is re-read regularly: replace it to update it.",
@@ -135,6 +173,29 @@ impl Controller {
 
         self.fill_themes(ui, &config.theme.name);
         fill_appearance(ui, &config.theme);
+        fill_layout(ui, &config.layout.compact);
+        ui.set_view_name(config.layout.view.as_str().into());
+        ui.set_volume_enabled(config.module_enabled(bw_volume::MODULE_ID, false));
+        ui.set_viz_enabled(config.module_enabled(bw_viz::MODULE_ID, false));
+        ui.set_plugins_enabled(config.module_enabled(bw_plugins::MODULE_ID, false));
+        let activity =
+            bw_claude::ActivityConfig::from_table(config.modules.get(bw_claude::ACTIVITY_ID))
+                .unwrap_or_default();
+        ui.set_activity_enabled(config.module_enabled(bw_claude::ACTIVITY_ID, true));
+        ui.set_activity_limit_millions((activity.limit_tokens / 1_000_000) as i32);
+        // Reset connu et encore à venir : affiché en heure locale ; passé, le champ se vide.
+        ui.set_activity_reset(
+            activity
+                .reset_at_utc()
+                .filter(|at| *at > chrono::Utc::now())
+                .map(|at| at.with_timezone(&chrono::Local).format("%H:%M").to_string())
+                .unwrap_or_default()
+                .into(),
+        );
+        let shelf =
+            crate::shelf::ShelfConfig::from_table(config.modules.get("shelf")).unwrap_or_default();
+        ui.set_shelf_enabled(shelf.enabled);
+        ui.set_shelf_max(shelf.max as i32);
 
         let cal = CalendarConfig::from_table(config.modules.get(bw_calendar::MODULE_ID))
             .unwrap_or_default();
@@ -156,9 +217,81 @@ impl Controller {
             MediaConfig::from_table(config.modules.get(bw_media::MODULE_ID)).unwrap_or_default();
         ui.set_media_accent(media.accent_from_artwork);
         ui.set_media_ignore(media.ignore.join(", ").into());
+
+        let timer = bw_timer::TimerConfig::from_table(config.modules.get(bw_timer::MODULE_ID))
+            .unwrap_or_default();
+        ui.set_timer_enabled(config.module_enabled(bw_timer::MODULE_ID, false));
+        ui.set_timer_sound(timer.sound);
+        ui.set_timer_presets(
+            timer
+                .presets
+                .iter()
+                .map(u32::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
+                .into(),
+        );
         drop(config);
 
         self.refresh_sources(ui);
+        self.refresh_players(ui);
+    }
+
+    /// Lecteurs vus depuis le lancement, plus ceux déjà ignorés (qui ne
+    /// remontent plus), avec leur état coché.
+    fn refresh_players(&self, ui: &SettingsWindow) {
+        let ignored = ignored_list(&ui.get_media_ignore());
+        let mut tokens: Vec<String> = self.media_seen.borrow().iter().cloned().collect();
+        for i in &ignored {
+            if !tokens.iter().any(|t| t.eq_ignore_ascii_case(i)) {
+                tokens.push(i.to_ascii_lowercase());
+            }
+        }
+        let rows: Vec<PlayerRow> = tokens
+            .into_iter()
+            .map(|t| PlayerRow {
+                name: bw_media::display_name(&t).into(),
+                ignored: ignored.iter().any(|i| i.eq_ignore_ascii_case(&t)),
+                token: t.into(),
+            })
+            .collect();
+        ui.set_players(ModelRc::new(VecModel::from(rows)));
+    }
+
+    fn move_layout(self: &Rc<Self>, index: usize, delta: i32) {
+        self.flush_settings();
+        let mut order = self.config.borrow().layout.compact.clone();
+        let Some(target) = index.checked_add_signed(delta as isize) else {
+            return;
+        };
+        if index >= order.len() || target >= order.len() {
+            return;
+        }
+        order.swap(index, target);
+        let result = self.edit_now(|e| e.set(&["layout", "compact"], Value::StrList(order)));
+        let settings = self.settings.borrow();
+        let Some(s) = settings.as_ref() else { return };
+        match result {
+            Ok(config) => {
+                fill_layout(&s.ui, &config.layout.compact);
+                status(&s.ui, &saved(), false);
+            }
+            Err(e) => status(&s.ui, &e, true),
+        }
+    }
+
+    fn toggle_player(self: &Rc<Self>, token: &str, ignored: bool) {
+        {
+            let settings = self.settings.borrow();
+            let Some(s) = settings.as_ref() else { return };
+            let mut list = ignored_list(&s.ui.get_media_ignore());
+            list.retain(|i| !i.eq_ignore_ascii_case(token));
+            if ignored {
+                list.push(token.to_owned());
+            }
+            s.ui.set_media_ignore(list.join(", ").into());
+        }
+        self.settings_changed("modules.media.ignore");
     }
 
     fn refresh_sources(&self, ui: &SettingsWindow) {
@@ -168,7 +301,11 @@ impl Controller {
             .into_iter()
             .map(|(name, url)| CalendarSourceRow {
                 name: name.into(),
-                url: url.into(),
+                url: if bw_secrets::is_reference(&url) {
+                    tr!("🔒 Credential Manager", "🔒 Gestionnaire d'identifiants").into()
+                } else {
+                    url.into()
+                },
             })
             .collect();
         ui.set_sources(ModelRc::new(VecModel::from(rows)));
@@ -187,6 +324,18 @@ impl Controller {
             }
         };
 
+        let weak = Rc::downgrade(self);
+        ui.on_module_moved(move |index, delta| {
+            if let Some(c) = weak.upgrade() {
+                c.move_layout(index as usize, delta);
+            }
+        });
+        let weak = Rc::downgrade(self);
+        ui.on_player_toggled(move |token, ignored| {
+            if let Some(c) = weak.upgrade() {
+                c.toggle_player(&token, ignored);
+            }
+        });
         let weak = Rc::downgrade(self);
         ui.on_changed(move |key| {
             if let Some(c) = weak.upgrade() {
@@ -217,10 +366,21 @@ impl Controller {
         }));
         ui.on_test_source(with(|_, ui| {
             let url = ui.get_new_url().trim().to_owned();
+            let source = bw_calendar::Source {
+                name: String::new(),
+                kind: if ui.get_provider_is_caldav() {
+                    bw_calendar::SourceKind::Caldav
+                } else {
+                    bw_calendar::SourceKind::Ics
+                },
+                url,
+                username: ui.get_new_username().trim().to_owned(),
+                password: ui.get_new_password().to_string(),
+            };
             ui.set_testing(true);
             ui.set_test_status("".into());
             std::thread::spawn(move || {
-                let result = bw_calendar::probe(&url);
+                let result = bw_calendar::probe_source(&source);
                 post(move |c| {
                     if let Some(s) = c.settings.borrow().as_ref() {
                         s.ui.set_testing(false);
@@ -237,10 +397,36 @@ impl Controller {
                 "" => default_name(ui.get_provider_index(), &url),
                 n => n.to_owned(),
             };
-            match c.edit_now(|e| e.add_calendar_source(&name, &url)) {
+            let caldav = ui.get_provider_is_caldav();
+            let username = ui.get_new_username().trim().to_owned();
+            // Liens privés et mots de passe : dans le coffre, pas dans config.toml.
+            let stored_url = if caldav || !is_remote(&url) {
+                url.trim().to_owned()
+            } else {
+                protect("ics", url.trim())
+            };
+            let stored_password = if caldav {
+                protect("caldav", &ui.get_new_password())
+            } else {
+                String::new()
+            };
+            let result = c.edit_now(|e| {
+                let account = caldav.then_some((username.as_str(), stored_password.as_str()));
+                e.add_calendar_account(&name, &stored_url, account);
+            });
+            if result.is_err() {
+                for value in [&stored_url, &stored_password] {
+                    if let Some(id) = bw_secrets::reference_id(value) {
+                        let _ = bw_secrets::delete(id);
+                    }
+                }
+            }
+            match result {
                 Ok(_) => {
                     ui.set_new_name("".into());
                     ui.set_new_url("".into());
+                    ui.set_new_username("".into());
+                    ui.set_new_password("".into());
                     ui.set_test_status("".into());
                     c.refresh_sources(ui);
                     status(
@@ -260,8 +446,16 @@ impl Controller {
             if let Some(c) = weak.upgrade()
                 && let Some(s) = c.settings.borrow().as_ref()
             {
+                let secrets = ConfigEditor::open(&c.path)
+                    .map(|e| e.calendar_source_secrets(i as usize))
+                    .unwrap_or_default();
                 match c.edit_now(|e| e.remove_calendar_source(i as usize)) {
                     Ok(_) => {
+                        for value in secrets {
+                            if let Some(id) = bw_secrets::reference_id(&value) {
+                                let _ = bw_secrets::delete(id);
+                            }
+                        }
                         c.refresh_sources(&s.ui);
                         status(
                             &s.ui,
@@ -300,6 +494,25 @@ impl Controller {
             let dir = bw_config::themes_dir(c.path.parent().unwrap_or(std::path::Path::new(".")));
             if let Err(e) = std::fs::create_dir_all(&dir) {
                 log::warn!("dossier des thèmes : {e}");
+            }
+            platform::open_path(&dir);
+        }));
+        ui.on_open_plugins_folder(with(|_, _| {
+            let dir = bw_plugins::plugins_dir(&bw_config::config_dir());
+            if let Err(e) = std::fs::create_dir_all(&dir) {
+                log::warn!("dossier des plugins : {e}");
+            }
+            platform::open_path(&dir);
+        }));
+        ui.on_shelf_clear(with(|c, _| {
+            c.shelf.borrow_mut().clear();
+            c.shelf.borrow().save(&c.shelf_file);
+            c.update_shelf_ui();
+        }));
+        ui.on_open_layouts_folder(with(|c, _| {
+            let dir = bw_config::layouts_dir(c.path.parent().unwrap_or(std::path::Path::new(".")));
+            if let Err(e) = std::fs::create_dir_all(&dir) {
+                log::warn!("dossier des vues : {e}");
             }
             platform::open_path(&dir);
         }));
@@ -454,6 +667,18 @@ impl Controller {
                 vec!["theme", "corner_radius"],
                 Value::Float(ui.get_corner_radius().into()),
             )),
+            "theme.compact" | "theme.expanded" => {
+                let (table, w, h) = if key == "theme.compact" {
+                    ("compact", ui.get_compact_w(), ui.get_compact_h())
+                } else {
+                    ("expanded", ui.get_expanded_w(), ui.get_expanded_h())
+                };
+                let mut pending = s.pending.borrow_mut();
+                let width_path = vec!["theme", table, "width"];
+                pending.retain(|(k, _)| *k != width_path);
+                pending.push((width_path, Value::Int(w.into())));
+                Some((vec!["theme", table, "height"], Value::Int(h.into())))
+            }
             "modules.calendar.remind_minutes" => Some((
                 vec!["modules", "calendar", "remind_minutes"],
                 Value::Int(ui.get_remind_minutes().into()),
@@ -486,6 +711,73 @@ impl Controller {
                 vec!["modules", "media", "accent_from_artwork"],
                 Value::Bool(ui.get_media_accent()),
             )),
+            "modules.claude_activity.enabled" => Some((
+                vec!["modules", "claude_activity", "enabled"],
+                Value::Bool(ui.get_activity_enabled()),
+            )),
+            "modules.claude_activity.reset_at" => {
+                let text = ui.get_activity_reset();
+                if text.trim().is_empty() {
+                    Some((
+                        vec!["modules", "claude_activity", "reset_at"],
+                        Value::Str(String::new()),
+                    ))
+                } else {
+                    // Saisie en cours (« 1 », « 01: ») : on attend une heure complète.
+                    next_local_time(&text, chrono::Local::now()).map(|at| {
+                        (
+                            vec!["modules", "claude_activity", "reset_at"],
+                            Value::Str(at.to_rfc3339()),
+                        )
+                    })
+                }
+            }
+            "modules.claude_activity.limit_millions" => Some((
+                vec!["modules", "claude_activity", "limit_tokens"],
+                Value::Int(i64::from(ui.get_activity_limit_millions()) * 1_000_000),
+            )),
+            "modules.plugins.enabled" => Some((
+                vec!["modules", "plugins", "enabled"],
+                Value::Bool(ui.get_plugins_enabled()),
+            )),
+            "modules.visualizer.enabled" => Some((
+                vec!["modules", "visualizer", "enabled"],
+                Value::Bool(ui.get_viz_enabled()),
+            )),
+            "modules.volume.enabled" => Some((
+                vec!["modules", "volume", "enabled"],
+                Value::Bool(ui.get_volume_enabled()),
+            )),
+            "modules.shelf.enabled" => Some((
+                vec!["modules", "shelf", "enabled"],
+                Value::Bool(ui.get_shelf_enabled()),
+            )),
+            "modules.shelf.max" => Some((
+                vec!["modules", "shelf", "max"],
+                Value::Int(ui.get_shelf_max().into()),
+            )),
+            "layout.view" => Some((
+                vec!["layout", "view"],
+                Value::Str(ui.get_view_name().trim().to_owned()),
+            )),
+            "modules.timer.enabled" => Some((
+                vec!["modules", "timer", "enabled"],
+                Value::Bool(ui.get_timer_enabled()),
+            )),
+            "modules.timer.sound" => Some((
+                vec!["modules", "timer", "sound"],
+                Value::Bool(ui.get_timer_sound()),
+            )),
+            "modules.timer.presets" => {
+                let minutes: Vec<i64> = ui
+                    .get_timer_presets()
+                    .split(',')
+                    .filter_map(|s| s.trim().parse().ok())
+                    .collect();
+                // Saisie incomplète (« 5, » ou vide) : on attend la suite.
+                (!minutes.is_empty())
+                    .then(|| (vec!["modules", "timer", "presets"], Value::IntList(minutes)))
+            }
             "modules.media.ignore" => Some((
                 vec!["modules", "media", "ignore"],
                 Value::StrList(
@@ -610,6 +902,28 @@ fn fill_appearance(ui: &SettingsWindow, t: &bw_config::Theme) {
     ui.set_background_color(hex(t.background).into());
     ui.set_animation_ms(t.animation_ms as i32);
     ui.set_corner_radius(t.corner_radius.round() as i32);
+    ui.set_compact_w(t.compact.width.round() as i32);
+    ui.set_compact_h(t.compact.height.round() as i32);
+    ui.set_expanded_w(t.expanded.width.round() as i32);
+    ui.set_expanded_h(t.expanded.height.round() as i32);
+}
+
+fn module_label(id: &str) -> String {
+    match id {
+        "claude" => "Claude Code".into(),
+        "media" => tr!("Music", "Musique"),
+        "calendar" => tr!("Calendar", "Agenda"),
+        other => other.to_owned(),
+    }
+}
+
+fn fill_layout(ui: &SettingsWindow, order: &[String]) {
+    ui.set_module_order(ModelRc::new(VecModel::from(
+        order
+            .iter()
+            .map(|id| SharedString::from(module_label(id)))
+            .collect::<Vec<_>>(),
+    )));
 }
 
 fn language_index(language: bw_config::Language) -> i32 {
@@ -632,6 +946,36 @@ fn set_provider(ui: &SettingsWindow, index: i32) {
     ui.set_provider_index(index);
     ui.set_provider_help(provider_help(index).into());
     ui.set_provider_is_file(index == FILE_PROVIDER);
+    ui.set_provider_is_caldav(index == CALDAV_PROVIDER);
+}
+
+fn is_remote(url: &str) -> bool {
+    let u = url.trim().to_ascii_lowercase();
+    u.starts_with("https://") || u.starts_with("http://") || u.starts_with("webcal://")
+}
+
+/// Identifiant de secret unique : `<préfixe>-<horodatage>`.
+fn new_secret_id(prefix: &str) -> String {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos());
+    format!("{prefix}-{nanos:x}")
+}
+
+/// Met `value` dans le coffre et renvoie la référence `secret:<id>` à écrire
+/// dans la config ; sans coffre (ou en cas d'échec), la valeur elle-même.
+fn protect(prefix: &str, value: &str) -> String {
+    if !bw_secrets::available() {
+        return value.to_owned();
+    }
+    let id = new_secret_id(prefix);
+    match bw_secrets::set(&id, value) {
+        Ok(()) => bw_secrets::reference(&id),
+        Err(e) => {
+            log::warn!("coffre à secrets indisponible : {e:#}");
+            value.to_owned()
+        }
+    }
 }
 
 fn saved() -> String {
@@ -646,6 +990,7 @@ fn default_name(provider: i32, url: &str) -> String {
         1 => "Outlook".into(),
         2 => "iCloud".into(),
         3 => "Proton".into(),
+        CALDAV_PROVIDER => "CalDAV".into(),
         _ => {
             let path = url.split(['?', '#']).next().unwrap_or_default();
             let last = path
@@ -708,7 +1053,32 @@ fn hex(c: bw_config::Color) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::default_name;
+    use super::{default_name, next_local_time};
+
+    #[test]
+    fn reset_time_is_the_next_occurrence() {
+        use chrono::{Local, TimeZone};
+        let now = Local.with_ymd_and_hms(2026, 10, 1, 22, 15, 0).unwrap();
+        let local = |at: chrono::DateTime<chrono::Utc>| at.with_timezone(&Local);
+        // 01:01 est demain ; 23:30 est ce soir ; 22:00 est déjà passé : demain.
+        let t = |s: &str| local(next_local_time(s, now).unwrap());
+        assert_eq!(
+            t("01:01"),
+            Local.with_ymd_and_hms(2026, 10, 2, 1, 1, 0).unwrap()
+        );
+        assert_eq!(t("1:01"), t("01:01"));
+        assert_eq!(
+            t("23:30"),
+            Local.with_ymd_and_hms(2026, 10, 1, 23, 30, 0).unwrap()
+        );
+        assert_eq!(
+            t("22:00"),
+            Local.with_ymd_and_hms(2026, 10, 2, 22, 0, 0).unwrap()
+        );
+        for bad in ["", "1", "01:", "25:00", "demain"] {
+            assert!(next_local_time(bad, now).is_none(), "{bad}");
+        }
+    }
 
     #[test]
     fn default_names() {

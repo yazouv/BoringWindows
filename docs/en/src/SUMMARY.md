@@ -11,13 +11,19 @@
 
 - [Claude Code](claude-code.md)
 - [Music](musique.md)
+- [Timer](minuteur.md)
+- [Shelf](etagere.md)
+- [Volume](volume.md)
+- [Plugins (WASM)](plugins.md)
 - [Calendar](agenda/index.md)
   - [Google Calendar](agenda/google.md)
   - [Outlook and Microsoft 365](agenda/outlook.md)
   - [iCloud](agenda/icloud.md)
   - [Proton Calendar](agenda/proton.md)
+  - [CalDAV (iCloud, Fastmail, Nextcloud)](agenda/caldav.md)
   - [Other calendars and .ics files](agenda/autres.md)
 - [Themes](themes.md)
+- [Custom views (.slint)](layouts.md)
 
 # Reference
 

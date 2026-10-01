@@ -9,6 +9,12 @@ export struct CalendarSourceRow {
     url: string,
 }
 
+export struct PlayerRow {
+    token: string,
+    name: string,
+    ignored: bool,
+}
+
 component Hint inherits Text {
     font-size: 12px;
     opacity: 0.7;
@@ -58,6 +64,13 @@ export component SettingsWindow inherits Window {
     in-out property <int> monitor-index;
     in-out property <bool> hide-fullscreen;
     in-out property <bool> autostart;
+    in-out property <bool> volume-enabled;
+    in-out property <bool> viz-enabled;
+    in-out property <bool> activity-enabled;
+    in-out property <int> activity-limit-millions;
+    in-out property <string> activity-reset;
+    in-out property <bool> plugins-enabled;
+    callback open-plugins-folder();
     // --- Apparence ---
     in property <[string]> themes;
     in-out property <int> theme-index;
@@ -66,6 +79,12 @@ export component SettingsWindow inherits Window {
     in-out property <string> background-color;
     in-out property <int> animation-ms;
     in-out property <int> corner-radius;
+    in-out property <int> compact-w;
+    in-out property <int> compact-h;
+    in-out property <int> expanded-w;
+    in-out property <int> expanded-h;
+    in property <[string]> module-order;
+    callback module-moved(int, int);
     // --- Agenda ---
     in property <[CalendarSourceRow]> sources;
     in-out property <int> remind-minutes;
@@ -76,6 +95,9 @@ export component SettingsWindow inherits Window {
     in property <[string]> providers;
     in property <string> provider-help;
     in property <bool> provider-is-file;
+    in property <bool> provider-is-caldav;
+    in-out property <string> new-username;
+    in-out property <string> new-password;
     in-out property <string> new-name;
     in-out property <string> new-url;
     in property <string> test-status;
@@ -91,14 +113,24 @@ export component SettingsWindow inherits Window {
     // --- Musique ---
     in-out property <bool> media-accent;
     in-out property <string> media-ignore;
+    in-out property <bool> shelf-enabled;
+    in-out property <int> shelf-max;
+    callback shelf-clear();
+    in-out property <bool> timer-enabled;
+    in-out property <bool> timer-sound;
+    in-out property <string> timer-presets;
     // --- Pied de page ---
     in property <string> status;
     in property <bool> status-error;
 
+    in property <[PlayerRow]> players;
+    callback player-toggled(string, bool);
     callback changed(string);
     callback theme-picked(int);
     callback update-clicked();
     callback open-themes-folder();
+    callback open-layouts-folder();
+    in-out property <string> view-name;
     callback provider-changed(int);
     callback open-guide();
     callback browse-file();
@@ -161,6 +193,25 @@ export component SettingsWindow inherits Window {
                     }
 
                     CheckBox {
+                        text: @tr("Show volume changes in the island");
+                        checked <=> root.volume-enabled;
+                        toggled => { root.changed("modules.volume.enabled"); }
+                    }
+
+                    Row {
+                        label: "";
+                        CheckBox {
+                            text: @tr("Run WASM plugins (third-party code, sandboxed)");
+                            checked <=> root.plugins-enabled;
+                            toggled => { root.changed("modules.plugins.enabled"); }
+                        }
+                        Button {
+                            text: @tr("Plugins folder");
+                            clicked => { root.open-plugins-folder(); }
+                        }
+                    }
+
+                    CheckBox {
                         text: @tr("Install updates automatically");
                         checked <=> root.auto-update;
                         toggled => { root.changed("general.auto_update"); }
@@ -195,6 +246,23 @@ export component SettingsWindow inherits Window {
                             text: @tr("Themes folder");
                             clicked => { root.open-themes-folder(); }
                         }
+                    }
+
+                    Row {
+                        label: @tr("Custom view of the open island");
+                        LineEdit {
+                            text <=> root.view-name;
+                            placeholder-text: "my-view";
+                            edited => { root.changed("layout.view"); }
+                        }
+                        Button {
+                            text: @tr("Layouts folder");
+                            clicked => { root.open-layouts-folder(); }
+                        }
+                    }
+
+                    Hint {
+                        text: @tr("Name of a file in the layouts folder, without .slint. Leave empty for the built-in view; see the documentation for the data you can use.");
                     }
 
                     Row {
@@ -251,6 +319,60 @@ export component SettingsWindow inherits Window {
                             maximum: 100;
                             value <=> root.corner-radius;
                             edited => { root.changed("theme.corner_radius"); }
+                        }
+                    }
+
+                    Row {
+                        label: @tr("Compact island size (px)");
+                        SpinBox {
+                            minimum: 16;
+                            maximum: 4000;
+                            value <=> root.compact-w;
+                            edited => { root.changed("theme.compact"); }
+                        }
+                        SpinBox {
+                            minimum: 8;
+                            maximum: 2000;
+                            value <=> root.compact-h;
+                            edited => { root.changed("theme.compact"); }
+                        }
+                    }
+
+                    Row {
+                        label: @tr("Open island size (px)");
+                        SpinBox {
+                            minimum: 16;
+                            maximum: 4000;
+                            value <=> root.expanded-w;
+                            edited => { root.changed("theme.expanded"); }
+                        }
+                        SpinBox {
+                            minimum: 8;
+                            maximum: 2000;
+                            value <=> root.expanded-h;
+                            edited => { root.changed("theme.expanded"); }
+                        }
+                    }
+
+                    Text {
+                        text: @tr("Priority in the compact island (first wins)");
+                    }
+                    for name[i] in root.module-order: HorizontalLayout {
+                        spacing: 8px;
+                        Text {
+                            text: name;
+                            min-width: 220px;
+                            vertical-alignment: center;
+                        }
+                        Button {
+                            text: "↑";
+                            enabled: i > 0;
+                            clicked => { root.module-moved(i, -1); }
+                        }
+                        Button {
+                            text: "↓";
+                            enabled: i < root.module-order.length - 1;
+                            clicked => { root.module-moved(i, 1); }
                         }
                     }
 
@@ -332,14 +454,30 @@ export component SettingsWindow inherits Window {
                                 }
 
                                 Row {
-                                    label: root.provider-is-file ? @tr(".ics file") : @tr("ICS link");
+                                    label: root.provider-is-file ? @tr(".ics file") : root.provider-is-caldav ? @tr("Server address") : @tr("ICS link");
                                     LineEdit {
                                         text <=> root.new-url;
-                                        placeholder-text: root.provider-is-file ? "C:/Users/…/agenda.ics" : @tr("https://…  or  webcal://…");
+                                        placeholder-text: root.provider-is-file ? "C:/Users/…/agenda.ics" : root.provider-is-caldav ? "https://caldav.icloud.com" : @tr("https://…  or  webcal://…");
                                     }
                                     if root.provider-is-file: Button {
                                         text: @tr("Browse…");
                                         clicked => { root.browse-file(); }
+                                    }
+                                }
+
+                                if root.provider-is-caldav: Row {
+                                    label: @tr("Login");
+                                    LineEdit {
+                                        text <=> root.new-username;
+                                        placeholder-text: "name@icloud.com";
+                                    }
+                                }
+
+                                if root.provider-is-caldav: Row {
+                                    label: @tr("App password");
+                                    LineEdit {
+                                        text <=> root.new-password;
+                                        input-type: password;
                                     }
                                 }
 
@@ -357,14 +495,14 @@ export component SettingsWindow inherits Window {
 
                                     Button {
                                         text: root.testing ? @tr("Testing…") : @tr("Test");
-                                        enabled: !root.testing && root.new-url != "";
+                                        enabled: !root.testing && root.new-url != "" && (!root.provider-is-caldav || (root.new-username != "" && root.new-password != ""));
                                         clicked => { root.test-source(); }
                                     }
 
                                     Button {
                                         text: @tr("Add");
                                         primary: true;
-                                        enabled: root.new-url != "";
+                                        enabled: root.new-url != "" && (!root.provider-is-caldav || (root.new-username != "" && root.new-password != ""));
                                         clicked => { root.add-source(); }
                                     }
                                 }
@@ -434,6 +572,35 @@ export component SettingsWindow inherits Window {
                     }
 
                     CheckBox {
+                        text: @tr("Recent conversations and usage (Claude Code)");
+                        checked <=> root.activity-enabled;
+                        toggled => { root.changed("modules.claude_activity.enabled"); }
+                    }
+
+                    Row {
+                        label: @tr("Estimated limit, millions of tokens (0 = no gauge)");
+                        SpinBox {
+                            minimum: 0;
+                            maximum: 100000;
+                            value <=> root.activity-limit-millions;
+                            edited => { root.changed("modules.claude_activity.limit_millions"); }
+                        }
+                    }
+
+                    Row {
+                        label: @tr("Window reset time (optional)");
+                        LineEdit {
+                            text <=> root.activity-reset;
+                            placeholder-text: "01:00";
+                            edited => { root.changed("modules.claude_activity.reset_at"); }
+                        }
+                    }
+
+                    Hint {
+                        text: @tr("Usage is an estimate from Claude Code only; your plan's window also counts claude.ai and the app. Type the reset time that /usage shows (HH:MM) to align the countdown.");
+                    }
+
+                    CheckBox {
                         text: @tr("Answer permission requests from the island");
                         checked <=> root.claude-permissions;
                         toggled => { root.changed("modules.claude.permissions"); }
@@ -488,6 +655,21 @@ export component SettingsWindow inherits Window {
                         toggled => { root.changed("modules.media.accent_from_artwork"); }
                     }
 
+                    if root.players.length > 0: Text {
+                        text: @tr("Players seen recently (tick to ignore)");
+                    }
+                    for player in root.players: CheckBox {
+                        text: player.name;
+                        checked: player.ignored;
+                        toggled => { root.player-toggled(player.token, self.checked); }
+                    }
+
+                    CheckBox {
+                        text: @tr("Audio visualizer (uses some CPU while the island is open and music plays)");
+                        checked <=> root.viz-enabled;
+                        toggled => { root.changed("modules.visualizer.enabled"); }
+                    }
+
                     Row {
                         label: @tr("Players to ignore");
                         LineEdit {
@@ -499,6 +681,73 @@ export component SettingsWindow inherits Window {
 
                     Hint {
                         text: @tr("Separate names with commas; part of the name is enough. Spotify, Apple Music, browsers, VLC… are detected automatically.");
+                    }
+                }
+            }
+
+            Tab {
+                title: @tr("Shelf");
+                VerticalBox {
+                    alignment: start;
+
+                    CheckBox {
+                        text: @tr("Keep files dropped on the island");
+                        checked <=> root.shelf-enabled;
+                        toggled => { root.changed("modules.shelf.enabled"); }
+                    }
+
+                    Row {
+                        label: @tr("Files kept (max)");
+                        SpinBox {
+                            minimum: 1;
+                            maximum: 30;
+                            value <=> root.shelf-max;
+                            edited => { root.changed("modules.shelf.max"); }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        alignment: start;
+                        Button {
+                            text: @tr("Empty the shelf");
+                            clicked => { root.shelf-clear(); }
+                        }
+                    }
+
+                    Hint {
+                        text: @tr("Drag files onto the island to keep them at hand; click one to open it, × to remove it. Only the path is kept, never a copy.");
+                    }
+                }
+            }
+
+            Tab {
+                title: @tr("Timer");
+                VerticalBox {
+                    alignment: start;
+
+                    CheckBox {
+                        text: @tr("Show the timer in the open island");
+                        checked <=> root.timer-enabled;
+                        toggled => { root.changed("modules.timer.enabled"); }
+                    }
+
+                    CheckBox {
+                        text: @tr("Play a sound when it ends");
+                        checked <=> root.timer-sound;
+                        toggled => { root.changed("modules.timer.sound"); }
+                    }
+
+                    Row {
+                        label: @tr("Durations (minutes)");
+                        LineEdit {
+                            text <=> root.timer-presets;
+                            placeholder-text: "5, 15, 25";
+                            edited => { root.changed("modules.timer.presets"); }
+                        }
+                    }
+
+                    Hint {
+                        text: @tr("Up to 5 durations, separated by commas (1 to 600). Open the island and pick one to start; 25 is the classic Pomodoro.");
                     }
                 }
             }

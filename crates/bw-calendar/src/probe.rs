@@ -3,7 +3,8 @@
 use bw_i18n::{Lang, tr};
 use chrono::{Duration, Local, Utc};
 
-use crate::fetch::fetch;
+use crate::config::{Source, SourceKind};
+use crate::fetch::fetch_source;
 use crate::ics::events_between;
 
 /// Résultat lisible du test d'une source.
@@ -15,9 +16,21 @@ pub struct Probe {
     pub next: Option<String>,
 }
 
-/// Télécharge et lit la source (bloquant : à appeler hors du thread UI).
+/// Teste un lien ICS ou un fichier.
 pub fn probe(url: &str) -> anyhow::Result<Probe> {
-    let text = fetch(url)?;
+    probe_source(&Source {
+        name: String::new(),
+        kind: SourceKind::Ics,
+        url: url.to_owned(),
+        username: String::new(),
+        password: String::new(),
+    })
+}
+
+/// Télécharge et lit la source (bloquant : à appeler hors du thread UI).
+pub fn probe_source(source: &Source) -> anyhow::Result<Probe> {
+    let now = Utc::now();
+    let text = fetch_source(source, now - Duration::days(1), now + Duration::days(31))?;
     anyhow::ensure!(
         text.contains("BEGIN:VCALENDAR"),
         tr!(

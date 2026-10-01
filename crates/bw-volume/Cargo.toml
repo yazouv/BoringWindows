@@ -1,0 +1,30 @@
+[package]
+name = "bw-volume"
+description = "Volume du système dans l'île de BoringWindows (changements en direct)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+bw-i18n.workspace = true
+anyhow.workspace = true
+bw-core.workspace = true
+log.workspace = true
+serde.workspace = true
+tokio.workspace = true
+toml.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-core = "0.62"
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Media_Audio",
+    "Win32_Media_Audio_Endpoints",
+    "Win32_System_Com",
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Variant",
+] }
+
+[lints]
+workspace = true

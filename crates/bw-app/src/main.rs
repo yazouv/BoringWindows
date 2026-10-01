@@ -6,6 +6,7 @@ mod controller;
 mod demo;
 mod geometry;
 mod platform;
+mod shelf;
 #[cfg(test)]
 mod translations;
 

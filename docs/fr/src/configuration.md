@@ -69,6 +69,7 @@ Largeur entre 16 et 4000, hauteur entre 8 et 2000.
 | Option | Défaut | Rôle |
 |---|---|---|
 | `compact` | `["claude", "media", "calendar"]` | ordre de priorité des modules **à importance égale** (une urgence passe toujours devant) |
+| `view` | `""` | nom d'un fichier de `layouts/` (sans `.slint`) : [vue personnelle](layouts.md) de l'île ouverte |
 
 ## `[modules.claude]`
 
@@ -109,7 +110,60 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 | Option | Obligatoire | Rôle |
 |---|---|---|
 | `name` | non | nom affiché dans les messages |
-| `url` | oui | lien `https://` ou `webcal://`, ou chemin d'un fichier `.ics` |
+| `url` | oui | lien `https://` ou `webcal://`, chemin d'un fichier `.ics`, ou `secret:<id>` (valeur gardée dans le Gestionnaire d'identifiants) ; pour CalDAV, adresse du serveur |
+| `kind` | non | `"ics"` (défaut) ou `"caldav"` — voir [CalDAV](agenda/caldav.md) |
+| `username` | CalDAV | identifiant de connexion |
+| `password` | CalDAV | mot de passe d'application, de préférence `secret:<id>` |
+
+## `[modules.timer]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `false` | | activer le [minuteur](minuteur.md) |
+| `presets` | `[5, 15, 25]` | 1 à 5 durées, 1 à 600 | durées proposées (min) |
+| `sound` | `true` | | son à la fin |
+| `done_secs` | `20` | 1 à 600 | durée de l'alerte « terminé » (s) |
+
+## `[modules.shelf]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `true` | | garder les fichiers déposés sur l'[étagère](etagere.md) |
+| `max` | `8` | 1 à 30 | nombre de fichiers gardés |
+
+## `[modules.volume]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `false` | | afficher les changements de [volume](volume.md) dans l'île (Windows) |
+| `show_secs` | `2` | 1 à 10 | durée d'affichage (s) |
+
+## `[modules.visualizer]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `false` | | [visualiseur audio](musique.md#visualiseur-audio-optionnel) (Windows) |
+| `bands` | `12` | 4 à 32 | nombre de barres |
+| `fps` | `30` | 10 à 60 | images par seconde |
+
+## `[modules.claude_activity]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `true` | | [conversations récentes et consommation estimée](claude-code.md#conversations-récentes-et-consommation) |
+| `recent` | `4` | 0 à 4 | conversations proposées |
+| `window_hours` | `5` | 1 à 24 | durée de la fenêtre de consommation (h) |
+| `limit_tokens` | `0` | | limite estimée pour la jauge (0 : pas de jauge) |
+| `reset_at` | `""` | | fin d'une fenêtre connue, `2026-10-02T01:01:00Z` (réglable en `HH:MM` dans les réglages) |
+| `count_cache_reads` | `false` | | compter aussi les lectures de cache |
+| `projects_dir` | `""` | | dossier des transcripts (vide : `~/.claude/projects`) |
+
+## `[modules.plugins]`
+
+| Option | Défaut | Rôle |
+|---|---|---|
+| `enabled` | `false` | lancer les [plugins WASM](plugins.md) du dossier `plugins/` |
+| `only` | `[]` | ne lancer que ces dossiers (vide = tous) |
 
 ## `[modules.demo]`
 

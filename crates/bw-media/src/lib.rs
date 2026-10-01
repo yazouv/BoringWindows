@@ -14,4 +14,4 @@ mod snapshot;
 pub use artwork::Artwork;
 pub use config::MediaConfig;
 pub use module::{MODULE_ID, MediaModule};
-pub use snapshot::{MediaSnapshot, NowPlaying, display_name};
+pub use snapshot::{MediaSnapshot, NowPlaying, display_name, ignore_token};

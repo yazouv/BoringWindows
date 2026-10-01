@@ -234,7 +234,7 @@ masquage en plein écran. Reste à relever les chiffres RAM/CPU sur un vrai GPU.
 - [x] Répondre à `PermissionRequest` depuis l'île (Autoriser / Refuser / Terminal), repli sur le terminal après délai
 - [x] Clic sur une session → focus du terminal (console du relais, sinon processus parents)
 - [ ] Test WSL (Claude Code dans WSL qui appelle `bw-hook.exe` par l'interop)
-- [ ] Son / rappel si Claude attend depuis longtemps
+- [x] Son / rappel si Claude attend depuis longtemps (`modules.claude.remind_secs`, 30 s par défaut, 0 = désactivé)
 
 Vérifié sous Linux (Xvfb) de bout en bout : événements reçus, clic sur
 « Autoriser » → le relais renvoie `behavior: allow` à Claude ; ~6 ms par
@@ -247,7 +247,7 @@ Vérifié sous Linux (Xvfb) de bout en bout : événements reçus, clic sur
 - [x] Accent couleur depuis la pochette (teinte dominante, éclaircie pour le fond noir)
 - [x] Sélection de la source : celle qui joue d'abord, `⇄` pour changer, liste `ignore`
 - [x] 100 % événementiel ; la progression ne tourne (1 Hz) que quand l'île est ouverte et que ça joue
-- [ ] (opt.) visualiseur WASAPI
+- [x] (opt.) visualiseur WASAPI (`bw-viz`, loopback, seulement île ouverte + musique en cours)
 
 Vérifié sous Linux avec le lecteur du module `demo` (mêmes données que GSMTC) :
 pause, suivant, seek, changement de pochette et d'accent, pilule avec pochette.
@@ -260,8 +260,8 @@ pause, suivant, seek, changement de pochette et d'accent, pilule avec pochette.
 - [x] Prochain événement, compte à rebours, rappel avant réunion, bouton « Rejoindre » (Teams, Meet, Zoom, Webex…)
 - [x] Téléchargement via le client HTTP de Windows (proxy et certificats système), réveils calés sur les échéances
 - [ ] OAuth Google + Microsoft Graph, tokens dans le Credential Manager (demande d'enregistrer une app chez chacun)
-- [ ] CalDAV (iCloud avec mot de passe d'application, Fastmail, Nextcloud)
-- [ ] Liens ICS stockés dans le Credential Manager plutôt qu'en clair dans config.toml
+- [x] CalDAV (iCloud avec mot de passe d'application, Fastmail, Nextcloud) : découverte des agendas, REPORT sur la période, assistant dans les réglages, doc FR + EN
+- [x] Liens ICS et mots de passe CalDAV dans le Credential Manager (`secret:<id>` dans config.toml, crate `bw-secrets`)
 
 Vérifié sous Linux : calendrier servi en HTTP, réunion dans 3 min avec lien
 Teams replié sur deux lignes, récurrence Outlook, journée entière, clic sur
@@ -281,9 +281,9 @@ de vérité (versionnable, partageable), mais une interface l'édite pour nous.
 - [x] Général, Apparence (accent avec pastilles, fond, arrondi, animations),
       Agenda (assistant 6 services, guide détaillé, Parcourir…, Tester, nom par défaut),
       Claude Code (hooks, son, délai, diagnostic dans la fenêtre), Musique
-- [ ] Musique : lecteurs vus récemment à cocher (pour l'instant, liste séparée par des virgules)
+- [x] Musique : lecteurs vus récemment à cocher (liste des lecteurs lus depuis le lancement, plus ceux déjà ignorés)
 - [ ] Captures d'écran par service dans l'assistant
-- [ ] Tailles de l'île (compacte / ouverte) et ordre des modules
+- [x] Tailles de l'île (compacte / ouverte) et ordre des modules (priorité en mode compact)
 
 - Fenêtre Slint séparée, créée à l'ouverture et détruite à la fermeture : coût
   nul en RAM le reste du temps.
@@ -340,12 +340,16 @@ de texte aux écrans de l'assistant), puis la fenêtre de réglages.
 - [x] Thèmes : `theme.name`, 4 fournis (default, light, midnight, glass), thèmes perso
       `themes/<nom>.toml` rechargés à chaud, clés de `[theme]` prioritaires, contour et police,
       choix dans Réglages › Apparence, page de doc FR + EN
-- [ ] Layouts `.slint` au runtime + doc de l'API de données
+- [x] Layouts `.slint` au runtime (`layout.view`, slint-interpreter + ComponentContainer, rechargement à chaud) + doc de l'API de données, FR + EN
 
 ### Phase 5 — Extensions
+- [x] Claude : conversations récentes (reprise `claude --resume`) et consommation estimée de la fenêtre de 5 h, depuis les transcripts locaux (`[modules.claude_activity]`, doc FR + EN)
 - [ ] Spotify Web API (like, queue, Connect)
-- [ ] Shelf de fichiers, volume/luminosité, minuteur
-- [ ] Plugins WASM
+- [x] Minuteur (module `bw-timer`, durées prédéfinies, doc FR + EN)
+- [x] Étagère de fichiers (glisser-déposer sur l'île, `[modules.shelf]`, doc FR + EN)
+- [x] Volume (module `bw-volume`, callback WASAPI sans polling, doc FR + EN)
+- [ ] Luminosité (WMI, écrans intégrés seulement : non testable sur un PC fixe)
+- [x] Plugins WASM (`bw-plugins`, wasmi : bac à sable, budget de calcul, mémoire plafonnée ; texte + attention ; doc FR + EN)
 
 ### Port macOS (en parallèle, sans bloquer Windows)
 
@@ -367,7 +371,7 @@ Note : sur Mac, boring.notch existe déjà ; l'intérêt est surtout d'avoir la 
 - [x] Binaires Windows / macOS / Linux + `.sha256` attachés à chaque release (`release.yml`)
 - [x] CI des PR sur un seul runner Linux (clippy des 3 OS, tests)
 - [x] Mise à jour automatique (GitHub Releases, empreinte vérifiée, jeton facultatif pour un dépôt privé)
-- [ ] Installeur (MSI via `cargo-wix` ou Inno Setup) + package **winget**
+- [x] Installeur Inno Setup (job `installer` de la release, par utilisateur) + manifestes **winget** (première soumission à la main, puis `wingetcreate` avec `WINGET_TOKEN`) : voir `packaging/README.md`
 - [ ] Signature de code (ex. SignPath, gratuit pour l'open source) pour éviter SmartScreen
 - [ ] macOS : bundle `.app` signé + binaire Intel / universel
 - [ ] (opt.) MSIX pour débloquer les API à identité de package (notifications)

@@ -1,9 +1,11 @@
 //! Orchestration sur le thread UI : config, modules, forme de l'île, système.
 
+mod custom_view;
 mod settings;
 mod update;
 
 use std::cell::{Cell, OnceCell, RefCell};
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
 use std::sync::Arc;
@@ -16,6 +18,7 @@ use bw_config::{Config, ConfigError, ConfigWatcher, OpenOn};
 use bw_core::{Action, Arbiter, Attention, Module, ModuleEvent, ModuleEventKind, ModuleHost};
 use bw_i18n::tr;
 use bw_media::{MediaConfig, MediaModule, MediaSnapshot};
+use bw_timer::{Phase as TimerPhase, TimerConfig, TimerModule, TimerSnapshot};
 use slint::winit_030::WinitWindowAccessor;
 use slint::{
     ComponentHandle, Image, ModelRc, Rgba8Pixel, SharedPixelBuffer, Timer, TimerMode, VecModel,
@@ -23,7 +26,11 @@ use slint::{
 
 use crate::geometry::{self, Shape};
 use crate::platform::{self, Platform, PlatformEvent, Tray, TrayCommand};
-use crate::{AgendaRow, ClaudePrompt, ClaudeRow, Island, MediaInfo, clock, demo};
+use crate::shelf::{Shelf, ShelfConfig};
+use crate::{
+    AgendaRow, ClaudePrompt, ClaudeRow, Island, MediaInfo, PluginRow, RecentRow, ShelfRow,
+    TimerInfo, clock, demo,
+};
 
 /// Pseudo-module utilisé pour signaler une config invalide dans l'île.
 const CONFIG_ERROR: &str = "config";
@@ -57,6 +64,7 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         Err(e) => (Config::default(), Some(e)),
     };
     bw_i18n::set(language(config.general.language));
+    let shelf_file = path.with_file_name("shelf.txt");
 
     let controller = Rc::new(Controller {
         // Seule l'île reçoit les attributs de fenêtre spéciaux (pas de focus,
@@ -88,6 +96,15 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         update_timer: Timer::default(),
         artwork: RefCell::new(None),
         progress_timer: Timer::default(),
+        remind_timer: Timer::default(),
+        timer: RefCell::new(None),
+        custom_view: RefCell::new(None),
+        shelf: RefCell::new(Shelf::load(&shelf_file)),
+        shelf_file,
+        viz_active: Cell::new(false),
+        activity: RefCell::new(None),
+        timer_tick: Timer::default(),
+        media_seen: RefCell::new(BTreeSet::new()),
     });
     CONTROLLER.with(|c| {
         let _ = c.set(controller.clone());
@@ -125,6 +142,17 @@ pub struct Controller {
     /// Pochette convertie pour Slint, gardée tant que le morceau ne change pas.
     artwork: RefCell<Option<(Arc<Vec<u8>>, Image)>>,
     progress_timer: Timer,
+    remind_timer: Timer,
+    /// Dernier état du minuteur (absent si le module est désactivé).
+    timer: RefCell<Option<Arc<TimerSnapshot>>>,
+    custom_view: RefCell<Option<custom_view::CustomView>>,
+    shelf: RefCell<Shelf>,
+    shelf_file: PathBuf,
+    viz_active: Cell<bool>,
+    activity: RefCell<Option<Arc<bw_claude::ActivitySnapshot>>>,
+    timer_tick: Timer,
+    /// Lecteurs vus depuis le lancement (jetons `ignore`), pour les réglages.
+    media_seen: RefCell<BTreeSet<String>>,
     calendar: RefCell<Option<Arc<CalendarSnapshot>>>,
     settings: RefCell<Option<settings::SettingsState>>,
     open_settings_at_start: Cell<bool>,
@@ -136,6 +164,8 @@ impl Controller {
     fn start(self: &Rc<Self>, config_error: Option<ConfigError>) -> anyhow::Result<()> {
         select_ui_language();
         self.apply_theme();
+        self.reload_custom_view();
+        self.update_shelf_ui();
         let (choice, size) = self.placement();
         if let Some(pos) = platform::initial_position(choice, size) {
             self.ui.window().set_position(pos);
@@ -184,6 +214,38 @@ impl Controller {
             }));
         self.ui
             .on_media_seek(with(&weak, |c, fraction: f32| c.media_seek(fraction)));
+        self.ui
+            .on_recent_open(with(&weak, |c, id: slint::SharedString| c.open_recent(&id)));
+        self.ui
+            .on_shelf_open(with(&weak, |c, i: i32| c.shelf_open(i as usize)));
+        self.ui
+            .on_shelf_remove(with(&weak, |c, i: i32| c.shelf_remove(i as usize)));
+        self.ui.window().on_winit_window_event(|_, event| {
+            use slint::winit_030::winit::event::WindowEvent;
+            match event {
+                WindowEvent::DroppedFile(path) => {
+                    log::info!("étagère : fichier déposé {}", path.display());
+                    let path = path.clone();
+                    post(move |c| c.shelf_dropped(vec![path]));
+                }
+                WindowEvent::HoveredFile(path) => {
+                    log::info!("étagère : survol de {}", path.display());
+                    post(|c| {
+                        if c.shelf_config().enabled {
+                            c.collapse_timer.stop();
+                            c.set_expanded(true);
+                        }
+                    });
+                }
+                WindowEvent::HoveredFileCancelled => post(|c| c.on_hover(false)),
+                _ => {}
+            }
+            slint::winit_030::EventResult::Propagate
+        });
+        self.ui
+            .on_timer_action(with(&weak, |c, action: slint::SharedString| {
+                c.timer_action(action.to_string());
+            }));
         self.ui.on_open_url(|url| {
             // Uniquement des liens web : jamais de chemin ou de commande venus d'un ICS.
             if url.starts_with("https://") {
@@ -279,7 +341,13 @@ impl Controller {
         self.collapse_timer.stop();
         if self.expanded.replace(expanded) != expanded {
             self.refresh_shape();
+            if expanded {
+                self.refresh_activity();
+            }
             self.update_progress();
+            self.update_viz_activity();
+            self.update_timer_ui();
+            self.sync_custom_view();
         }
     }
 
@@ -398,6 +466,7 @@ impl Controller {
         let (text, next) = clock::now();
         self.ui.set_time_text(text.time.into());
         self.ui.set_date_text(text.date.into());
+        self.sync_custom_view();
         self.clock_timer
             .start(TimerMode::SingleShot, next, || post(|c| c.update_clock()));
     }
@@ -446,6 +515,15 @@ impl Controller {
         drop(config);
 
         self.apply_theme();
+        let view_changed = {
+            let config = self.config.borrow();
+            old.layout.view != config.layout.view
+                || old.layout.view_stamp != config.layout.view_stamp
+        };
+        if view_changed {
+            self.reload_custom_view();
+        }
+        self.update_shelf_ui();
         if moved {
             self.place();
         }
@@ -499,6 +577,15 @@ impl Controller {
         }
 
         *self.calendar.borrow_mut() = None;
+        *self.timer.borrow_mut() = None;
+        self.viz_active.set(false);
+        *self.activity.borrow_mut() = None;
+        self.ui.set_has_claude_tab(false);
+        self.ui.set_recent_rows(ModelRc::default());
+        self.ui.set_plugin_rows(ModelRc::default());
+        self.ui.set_viz_bars(ModelRc::default());
+        self.timer_tick.stop();
+        self.ui.set_has_timer(false);
         self.apply_claude(None);
         *self.media.borrow_mut() = None;
         *self.artwork.borrow_mut() = None;
@@ -539,6 +626,15 @@ impl Controller {
             ModuleEventKind::State(state) => {
                 if let Some(snapshot) = state.downcast_ref::<MediaSnapshot>() {
                     self.apply_media(event.module, Arc::new(snapshot.clone()));
+                } else if let Ok(snapshot) = state.clone().downcast::<bw_claude::ActivitySnapshot>()
+                {
+                    self.apply_activity(snapshot);
+                } else if let Some(snapshot) = state.downcast_ref::<bw_plugins::PluginsSnapshot>() {
+                    self.apply_plugins(snapshot);
+                } else if let Some(snapshot) = state.downcast_ref::<bw_viz::VizSnapshot>() {
+                    self.apply_viz(snapshot);
+                } else if let Some(snapshot) = state.downcast_ref::<TimerSnapshot>() {
+                    self.apply_timer(snapshot.clone());
                 } else if let Ok(snapshot) = state.clone().downcast::<CalendarSnapshot>() {
                     *self.calendar.borrow_mut() = Some(snapshot);
                     self.layout_rows();
@@ -551,6 +647,300 @@ impl Controller {
         }
     }
 
+    // --- Activité Claude : conversations récentes et consommation ------------
+
+    fn apply_activity(&self, snapshot: Arc<bw_claude::ActivitySnapshot>) {
+        let config = bw_claude::ActivityConfig::from_table(
+            self.config.borrow().modules.get(bw_claude::ACTIVITY_ID),
+        )
+        .unwrap_or_default();
+        let now = chrono::Utc::now();
+
+        let rows: Vec<RecentRow> = snapshot
+            .recent
+            .iter()
+            .map(|r| RecentRow {
+                id: r.id.as_str().into(),
+                title: if r.title.is_empty() {
+                    tr!("(untitled)", "(sans titre)").into()
+                } else {
+                    r.title.as_str().into()
+                },
+                meta: format!("{} · {}", r.project, ago(r.last_at, now)).into(),
+            })
+            .collect();
+        self.ui.set_recent_rows(ModelRc::new(VecModel::from(rows)));
+
+        let usage = &snapshot.usage;
+        let limit = snapshot.limit_tokens;
+        self.ui.set_usage_text(match usage.window_end {
+            Some(end) => {
+                let h = config.window_hours;
+                let used = compact_tokens(usage.tokens);
+                let of = if limit > 0 {
+                    format!(" / {}", compact_tokens(limit))
+                } else {
+                    String::new()
+                };
+                let reset = duration_text((end - now).to_std().unwrap_or_default());
+                tr!(
+                    "≈ {used}{of} tokens in the {h} h window · resets in {reset}",
+                    "≈ {used}{of} tokens sur la fenêtre de {h} h · reset dans {reset}"
+                )
+            }
+            None => tr!(
+                "No active usage window (estimate from local transcripts)",
+                "Aucune fenêtre de consommation active (estimation d'après les transcripts locaux)"
+            ),
+        }
+        .into());
+        self.ui
+            .set_usage_has_limit(limit > 0 && usage.window_end.is_some());
+        self.ui.set_usage_ratio(if limit > 0 {
+            (usage.tokens as f64 / limit as f64) as f32
+        } else {
+            0.0
+        });
+        self.ui.set_has_claude_tab(true);
+        *self.activity.borrow_mut() = Some(snapshot);
+        self.sync_custom_view();
+    }
+
+    /// Rouvre la conversation `id` dans un terminal.
+    fn open_recent(&self, id: &str) {
+        let session = self
+            .activity
+            .borrow()
+            .as_ref()
+            .and_then(|a| a.recent.iter().find(|r| r.id == id).cloned());
+        if let Some(session) = session
+            && !platform::resume_claude_session(&session.cwd, &session.id)
+        {
+            self.settings_status(
+                &tr!(
+                    "Could not reopen the conversation (is `claude` installed?)",
+                    "Impossible de rouvrir la conversation (`claude` est-il installé ?)"
+                ),
+                true,
+            );
+        }
+    }
+
+    fn refresh_activity(&self) {
+        if let Some(host) = self.host.borrow().as_ref() {
+            host.send_action(Action {
+                module: bw_claude::ACTIVITY_ID.into(),
+                name: "refresh".into(),
+            });
+        }
+    }
+
+    // --- Plugins WASM -------------------------------------------------------
+
+    fn apply_plugins(&self, snapshot: &bw_plugins::PluginsSnapshot) {
+        // Deux lignes au plus : la place est comptée.
+        let rows: Vec<PluginRow> = snapshot
+            .items
+            .iter()
+            .take(2)
+            .map(|i| PluginRow {
+                name: i.name.as_str().into(),
+                text: i.text.as_str().into(),
+                attention: i32::from(i.attention),
+            })
+            .collect();
+        self.ui.set_plugin_rows(ModelRc::new(VecModel::from(rows)));
+        self.layout_rows();
+    }
+
+    // --- Visualiseur --------------------------------------------------------
+
+    /// La capture audio ne tourne que si l'île est ouverte et qu'une musique joue.
+    fn update_viz_activity(&self) {
+        let enabled = self.module_ids.borrow().contains(&bw_viz::MODULE_ID);
+        let playing = self
+            .media
+            .borrow()
+            .as_ref()
+            .is_some_and(|(_, s)| s.now_playing.as_ref().is_some_and(|n| n.playing));
+        let active = enabled && self.expanded.get() && playing;
+        if active == self.viz_active.replace(active) {
+            return;
+        }
+        if let Some(host) = self.host.borrow().as_ref() {
+            host.send_action(Action {
+                module: bw_viz::MODULE_ID.into(),
+                name: if active { "start" } else { "stop" }.into(),
+            });
+        }
+        if !active {
+            self.ui.set_viz_bars(ModelRc::default());
+            self.sync_custom_view();
+        }
+    }
+
+    fn apply_viz(&self, snapshot: &bw_viz::VizSnapshot) {
+        // Barres à zéro : elles disparaissent au lieu de rester à plat.
+        let flat = snapshot.bands.iter().all(|b| *b <= 0.001);
+        let bars = if flat || !self.viz_active.get() {
+            ModelRc::default()
+        } else {
+            ModelRc::new(VecModel::from(snapshot.bands.clone()))
+        };
+        self.ui.set_viz_bars(bars);
+        self.sync_custom_view();
+    }
+
+    // --- Étagère ------------------------------------------------------------
+
+    fn shelf_config(&self) -> ShelfConfig {
+        ShelfConfig::from_table(self.config.borrow().modules.get("shelf")).unwrap_or_default()
+    }
+
+    /// Fichiers déposés sur l'île : on les garde et on montre l'étagère.
+    fn shelf_dropped(self: &Rc<Self>, paths: Vec<PathBuf>) {
+        let config = self.shelf_config();
+        if !config.enabled {
+            return;
+        }
+        {
+            let mut shelf = self.shelf.borrow_mut();
+            shelf.add(paths, config.max);
+            shelf.save(&self.shelf_file);
+        }
+        self.update_shelf_ui();
+        self.collapse_timer.stop();
+        self.set_expanded(true);
+        self.on_hover(false);
+    }
+
+    fn update_shelf_ui(&self) {
+        const SHOWN: usize = 4;
+        let config = self.shelf_config();
+        let items: Vec<PathBuf> = if config.enabled {
+            let mut shelf = self.shelf.borrow_mut();
+            shelf.truncate(config.max);
+            if shelf.prune() {
+                shelf.save(&self.shelf_file);
+            }
+            shelf.items().to_vec()
+        } else {
+            Vec::new()
+        };
+        let rows: Vec<ShelfRow> = items
+            .iter()
+            .take(SHOWN)
+            .map(|p| ShelfRow {
+                name: crate::shelf::display_name(p).into(),
+                path: p.display().to_string().into(),
+            })
+            .collect();
+        self.ui.set_shelf_rows(ModelRc::new(VecModel::from(rows)));
+        self.ui.set_shelf_more(
+            if items.len() > SHOWN {
+                format!("+{}", items.len() - SHOWN)
+            } else {
+                String::new()
+            }
+            .into(),
+        );
+        self.layout_rows();
+    }
+
+    fn shelf_open(&self, index: usize) {
+        let path = self.shelf.borrow().items().get(index).cloned();
+        if let Some(path) = path {
+            if path.exists() {
+                platform::open_path(&path);
+            } else {
+                self.update_shelf_ui();
+            }
+        }
+    }
+
+    fn shelf_remove(&self, index: usize) {
+        let removed = {
+            let mut shelf = self.shelf.borrow_mut();
+            let removed = shelf.remove(index).is_some();
+            if removed {
+                shelf.save(&self.shelf_file);
+            }
+            removed
+        };
+        if removed {
+            self.update_shelf_ui();
+        }
+    }
+
+    // --- Minuteur -----------------------------------------------------------
+
+    fn apply_timer(&self, snapshot: TimerSnapshot) {
+        let finished = snapshot.phase == TimerPhase::Done
+            && self
+                .timer
+                .borrow()
+                .as_ref()
+                .is_none_or(|t| t.phase != TimerPhase::Done);
+        if finished && self.timer_config().sound {
+            platform::alert_sound();
+        }
+        *self.timer.borrow_mut() = Some(Arc::new(snapshot));
+        self.ui.set_has_timer(true);
+        self.update_timer_ui();
+        self.layout_rows();
+    }
+
+    fn timer_config(&self) -> TimerConfig {
+        TimerConfig::from_table(self.config.borrow().modules.get(bw_timer::MODULE_ID))
+            .unwrap_or_default()
+    }
+
+    /// Affiche le minuteur ; les secondes ne défilent que si l'île est ouverte.
+    fn update_timer_ui(&self) {
+        let timer = self.timer.borrow();
+        let Some(t) = timer.as_ref() else {
+            self.timer_tick.stop();
+            return;
+        };
+        let now = std::time::Instant::now();
+        self.ui.set_timer(TimerInfo {
+            phase: match t.phase {
+                TimerPhase::Idle => 0,
+                TimerPhase::Running => 1,
+                TimerPhase::Paused => 2,
+                TimerPhase::Done => 3,
+            },
+            time: format_time(t.remaining_now(now) + Duration::from_millis(999)).into(),
+            progress: t.progress_now(now),
+            presets: ModelRc::new(VecModel::from(
+                t.presets
+                    .iter()
+                    .map(|m| slint::SharedString::from(m.to_string()))
+                    .collect::<Vec<_>>(),
+            )),
+        });
+        let ticking = self.expanded.get() && t.phase == TimerPhase::Running;
+        if ticking && !self.timer_tick.running() {
+            self.timer_tick
+                .start(TimerMode::Repeated, Duration::from_secs(1), || {
+                    post(|c| c.update_timer_ui())
+                });
+        } else if !ticking {
+            self.timer_tick.stop();
+        }
+        drop(timer);
+        self.sync_custom_view();
+    }
+
+    fn timer_action(&self, action: String) {
+        if let Some(host) = self.host.borrow().as_ref() {
+            host.send_action(Action {
+                module: bw_timer::MODULE_ID.into(),
+                name: action,
+            });
+        }
+    }
+
     // --- Lignes : agenda et sessions Claude ---------------------------------
 
     /// Répartit les lignes disponibles entre l'agenda et les sessions Claude.
@@ -560,6 +950,12 @@ impl Controller {
         } else {
             MAX_ROWS
         };
+        // Les lignes du minuteur et de l'étagère prennent une place chacune,
+        // sans jamais vider le reste.
+        let extra = usize::from(self.ui.get_has_timer())
+            + usize::from(slint::Model::row_count(&self.ui.get_shelf_rows()) > 0)
+            + slint::Model::row_count(&self.ui.get_plugin_rows());
+        let budget = budget.saturating_sub(extra).max(1);
 
         let mut agenda: Vec<AgendaRow> = Vec::new();
         if let Some(cal) = self.calendar.borrow().as_ref() {
@@ -608,12 +1004,18 @@ impl Controller {
             .set_agenda_rows(ModelRc::new(VecModel::from(agenda)));
         self.ui
             .set_claude_rows(ModelRc::new(VecModel::from(claude)));
+        self.sync_custom_view();
     }
 
     // --- Musique ------------------------------------------------------------
 
     fn apply_media(&self, owner: &'static str, snapshot: Arc<MediaSnapshot>) {
         let np = snapshot.now_playing.as_ref();
+        if let Some(n) = np {
+            self.media_seen
+                .borrow_mut()
+                .insert(bw_media::ignore_token(&n.source_id));
+        }
 
         // Pochette : conversion seulement quand elle change.
         let art = np.and_then(|n| n.artwork.as_ref());
@@ -660,6 +1062,7 @@ impl Controller {
         self.layout_rows();
         self.apply_accent();
         self.update_progress();
+        self.update_viz_activity();
         self.refresh_shape();
     }
 
@@ -676,6 +1079,7 @@ impl Controller {
             |[r, g, b]| slint::Color::from_rgb_u8(r, g, b),
         );
         self.ui.set_accent(accent);
+        self.sync_custom_view();
     }
 
     fn media_config(&self) -> MediaConfig {
@@ -708,6 +1112,7 @@ impl Controller {
         } else if !ticking {
             self.progress_timer.stop();
         }
+        self.sync_custom_view();
     }
 
     fn media_action(&self, action: String) {
@@ -750,8 +1155,18 @@ impl Controller {
         };
         let before = waiting(self.claude.borrow().as_deref());
         let now_waiting = waiting(snapshot.as_deref());
-        if now_waiting.iter().any(|w| !before.contains(w)) && self.claude_config().sound {
+        let config = self.claude_config();
+        if now_waiting.iter().any(|w| !before.contains(w)) && config.sound {
             platform::alert_sound();
+        }
+        if now_waiting.is_empty() || !config.sound || config.remind_secs == 0 {
+            self.remind_timer.stop();
+        } else if !self.remind_timer.running() {
+            self.remind_timer.start(
+                TimerMode::Repeated,
+                Duration::from_secs(config.remind_secs.into()),
+                || post(|c| c.remind_claude()),
+            );
         }
         self.ui.set_has_prompt(prompt.is_some());
         if let Some(p) = prompt {
@@ -764,6 +1179,19 @@ impl Controller {
         }
         *self.claude.borrow_mut() = snapshot;
         self.layout_rows();
+    }
+
+    fn remind_claude(&self) {
+        let still_waiting = self.claude.borrow().as_ref().is_some_and(|s| {
+            s.sessions
+                .iter()
+                .any(|v| matches!(v.kind, SessionKind::Permission | SessionKind::NeedsYou))
+        });
+        if still_waiting && self.claude_config().sound {
+            platform::alert_sound();
+        } else {
+            self.remind_timer.stop();
+        }
     }
 
     fn claude_config(&self) -> ClaudeConfig {
@@ -947,6 +1375,40 @@ fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
             Err(e) => errors.push(format!("modules.calendar : {e:#}")),
         }
     }
+    if config.module_enabled(bw_timer::MODULE_ID, false) {
+        match TimerConfig::from_table(config.modules.get(bw_timer::MODULE_ID)) {
+            Ok(c) => modules.push(Box::new(TimerModule::new(c))),
+            Err(e) => errors.push(format!("modules.timer : {e:#}")),
+        }
+    }
+    if bw_volume::VolumeModule::is_supported() && config.module_enabled(bw_volume::MODULE_ID, false)
+    {
+        match bw_volume::VolumeConfig::from_table(config.modules.get(bw_volume::MODULE_ID)) {
+            Ok(c) => modules.push(Box::new(bw_volume::VolumeModule::new(c))),
+            Err(e) => errors.push(format!("modules.volume : {e:#}")),
+        }
+    }
+    if bw_viz::VizModule::is_supported() && config.module_enabled(bw_viz::MODULE_ID, false) {
+        match bw_viz::VizConfig::from_table(config.modules.get(bw_viz::MODULE_ID)) {
+            Ok(c) => modules.push(Box::new(bw_viz::VizModule::new(c))),
+            Err(e) => errors.push(format!("modules.visualizer : {e:#}")),
+        }
+    }
+    if config.module_enabled(bw_claude::ACTIVITY_ID, true) {
+        match bw_claude::ActivityConfig::from_table(config.modules.get(bw_claude::ACTIVITY_ID)) {
+            Ok(c) => modules.push(Box::new(bw_claude::ActivityModule::new(c))),
+            Err(e) => errors.push(format!("modules.claude_activity : {e:#}")),
+        }
+    }
+    if config.module_enabled(bw_plugins::MODULE_ID, false) {
+        match bw_plugins::PluginsConfig::from_table(config.modules.get(bw_plugins::MODULE_ID)) {
+            Ok(c) => modules.push(Box::new(bw_plugins::PluginsModule::new(
+                c,
+                bw_plugins::plugins_dir(&bw_config::config_dir()),
+            ))),
+            Err(e) => errors.push(format!("modules.plugins : {e:#}")),
+        }
+    }
     if config.module_enabled("demo", false) {
         modules.push(Box::new(demo::Demo::default()));
     }
@@ -967,6 +1429,42 @@ fn split_rows(agenda: usize, claude: usize, budget: usize) -> (usize, usize) {
 }
 
 /// « 3:07 », « 1:02:45 ».
+/// « 950 », « 123k », « 1.2M » : lisible dans une ligne étroite.
+fn compact_tokens(n: u64) -> String {
+    match n {
+        0..=999 => n.to_string(),
+        1_000..=999_999 => format!("{}k", n / 1_000),
+        _ => format!("{:.1}M", n as f64 / 1_000_000.0),
+    }
+}
+
+/// « 2 h 10 » ou « 45 min ».
+fn duration_text(d: Duration) -> String {
+    let minutes = d.as_secs().div_ceil(60);
+    if minutes >= 60 {
+        format!("{} h {:02}", minutes / 60, minutes % 60)
+    } else {
+        format!("{minutes} min")
+    }
+}
+
+/// « à l'instant », « il y a 12 min », « il y a 3 h », « il y a 2 j ».
+fn ago(then: chrono::DateTime<chrono::Utc>, now: chrono::DateTime<chrono::Utc>) -> String {
+    let minutes = (now - then).num_minutes().max(0);
+    match minutes {
+        0 => tr!("just now", "à l'instant"),
+        1..=59 => tr!("{minutes} min ago", "il y a {minutes} min"),
+        60..=1439 => {
+            let hours = minutes / 60;
+            tr!("{hours} h ago", "il y a {hours} h")
+        }
+        _ => {
+            let days = minutes / 1440;
+            tr!("{days} d ago", "il y a {days} j")
+        }
+    }
+}
+
 fn format_time(d: Duration) -> String {
     let s = d.as_secs();
     if s >= 3600 {
@@ -1016,7 +1514,29 @@ fn select_ui_language() {
 
 #[cfg(test)]
 mod tests {
-    use super::split_rows;
+    use super::{ago, compact_tokens, duration_text, split_rows};
+
+    #[test]
+    fn activity_formats() {
+        use chrono::{Duration as D, TimeZone, Utc};
+        bw_i18n::set(bw_i18n::Lang::Fr);
+        assert_eq!(compact_tokens(950), "950");
+        assert_eq!(compact_tokens(123_456), "123k");
+        assert_eq!(compact_tokens(1_250_000), "1.2M");
+        assert_eq!(
+            duration_text(std::time::Duration::from_secs(45 * 60)),
+            "45 min"
+        );
+        assert_eq!(
+            duration_text(std::time::Duration::from_secs(130 * 60)),
+            "2 h 10"
+        );
+        let now = Utc.with_ymd_and_hms(2026, 10, 1, 12, 0, 0).unwrap();
+        assert_eq!(ago(now - D::seconds(20), now), "à l'instant");
+        assert_eq!(ago(now - D::minutes(12), now), "il y a 12 min");
+        assert_eq!(ago(now - D::hours(3), now), "il y a 3 h");
+        assert_eq!(ago(now - D::days(2), now), "il y a 2 j");
+    }
 
     #[test]
     fn rows_are_shared() {

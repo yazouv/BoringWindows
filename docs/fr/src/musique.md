@@ -44,3 +44,23 @@ enabled = true               # false pour désactiver complètement
 accent_from_artwork = true   # teinter l'île avec la pochette
 ignore = []
 ```
+
+## Visualiseur audio (optionnel)
+
+De petites barres d'équaliseur animées dans l'en-tête de l'île, d'après le son
+réellement joué par le système. C'est la **seule fonction qui travaille en
+continu**, donc elle est éteinte par défaut ; la capture ne tourne que lorsque
+l'île est ouverte **et** qu'une musique joue, et s'arrête dès que l'une des deux
+conditions tombe.
+
+Active-la dans Réglages › **Musique**, ou dans `config.toml` :
+
+```toml
+[modules.visualizer]
+enabled = true
+bands = 12   # nombre de barres (4 à 32)
+fps = 30     # images par seconde (10 à 60)
+```
+
+Windows seulement (capture « loopback » du périphérique de sortie par défaut).
+Elle capte tout ce que le système joue, pas seulement le lecteur affiché.

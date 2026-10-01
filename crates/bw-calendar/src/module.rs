@@ -9,7 +9,7 @@ use tokio::sync::mpsc::{UnboundedSender, unbounded_channel};
 
 use crate::agenda::{CalendarSnapshot, agenda};
 use crate::config::CalendarConfig;
-use crate::fetch::fetch;
+use crate::fetch::fetch_source;
 use crate::ics::{Event, events_between};
 
 pub const MODULE_ID: &str = "calendar";
@@ -107,7 +107,7 @@ async fn refresh_all(config: &CalendarConfig, sources: &mut [Vec<Event>]) -> Opt
     let mut error = None;
 
     for (i, source) in config.sources.iter().enumerate() {
-        let url = source.url.clone();
+        let source_copy = source.clone();
         let label = if source.name.is_empty() {
             bw_i18n::tr!("calendar {}", "calendrier {}", i + 1)
         } else {
@@ -115,7 +115,7 @@ async fn refresh_all(config: &CalendarConfig, sources: &mut [Vec<Event>]) -> Opt
         };
         let result = tokio::time::timeout(
             FETCH_TIMEOUT,
-            tokio::task::spawn_blocking(move || fetch(&url)),
+            tokio::task::spawn_blocking(move || fetch_source(&source_copy, from, to)),
         )
         .await;
         match result {

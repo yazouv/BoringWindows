@@ -212,3 +212,111 @@ msgstr "Recherche…"
 
 msgid "Check for updates"
 msgstr "Rechercher une mise à jour"
+
+msgid "Players seen recently (tick to ignore)"
+msgstr "Lecteurs vus récemment (cocher pour ignorer)"
+
+msgid "Compact island size (px)"
+msgstr "Taille de l'île compacte (px)"
+
+msgid "Open island size (px)"
+msgstr "Taille de l'île ouverte (px)"
+
+msgid "Priority in the compact island (first wins)"
+msgstr "Priorité dans l'île compacte (le premier gagne)"
+
+msgid "Server address"
+msgstr "Adresse du serveur"
+
+msgid "Login"
+msgstr "Identifiant"
+
+msgid "App password"
+msgstr "Mot de passe d'application"
+
+msgid "Timer"
+msgstr "Minuteur"
+
+msgid "Time's up!"
+msgstr "C'est fini !"
+
+msgid "{} min"
+msgstr "{} min"
+
+msgid "Pause"
+msgstr "Pause"
+
+msgid "Resume"
+msgstr "Reprendre"
+
+msgid "Reset"
+msgstr "Arrêter"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "Show the timer in the open island"
+msgstr "Afficher le minuteur dans l'île ouverte"
+
+msgid "Play a sound when it ends"
+msgstr "Jouer un son à la fin"
+
+msgid "Durations (minutes)"
+msgstr "Durées (minutes)"
+
+msgid "Up to 5 durations, separated by commas (1 to 600). Open the island and pick one to start; 25 is the classic Pomodoro."
+msgstr "Jusqu'à 5 durées séparées par des virgules (1 à 600). Ouvre l'île et choisis-en une pour démarrer ; 25 est le Pomodoro classique."
+
+msgid "Custom view of the open island"
+msgstr "Vue personnelle de l'île ouverte"
+
+msgid "Layouts folder"
+msgstr "Dossier des vues"
+
+msgid "Name of a file in the layouts folder, without .slint. Leave empty for the built-in view; see the documentation for the data you can use."
+msgstr "Nom d'un fichier du dossier des vues, sans .slint. Laisse vide pour la vue fournie ; la documentation liste les données utilisables."
+
+msgid "Shelf"
+msgstr "Étagère"
+
+msgid "Keep files dropped on the island"
+msgstr "Garder les fichiers déposés sur l'île"
+
+msgid "Files kept (max)"
+msgstr "Fichiers gardés (max)"
+
+msgid "Empty the shelf"
+msgstr "Vider l'étagère"
+
+msgid "Drag files onto the island to keep them at hand; click one to open it, × to remove it. Only the path is kept, never a copy."
+msgstr "Glisse des fichiers sur l'île pour les garder sous la main ; un clic les ouvre, × les retire. Seul le chemin est gardé, jamais une copie."
+
+msgid "Show volume changes in the island"
+msgstr "Afficher les changements de volume dans l'île"
+
+msgid "Audio visualizer (uses some CPU while the island is open and music plays)"
+msgstr "Visualiseur audio (consomme un peu de CPU tant que l'île est ouverte et que la musique joue)"
+
+msgid "Run WASM plugins (third-party code, sandboxed)"
+msgstr "Lancer les plugins WASM (code tiers, dans un bac à sable)"
+
+msgid "Plugins folder"
+msgstr "Dossier des plugins"
+
+msgid "Back"
+msgstr "Retour"
+
+msgid "No conversation found"
+msgstr "Aucune conversation trouvée"
+
+msgid "Recent conversations and usage (Claude Code)"
+msgstr "Conversations récentes et consommation (Claude Code)"
+
+msgid "Estimated limit, millions of tokens (0 = no gauge)"
+msgstr "Limite estimée, millions de tokens (0 = pas de jauge)"
+
+msgid "Window reset time (optional)"
+msgstr "Heure de reset de la fenêtre (facultatif)"
+
+msgid "Usage is an estimate from Claude Code only; your plan's window also counts claude.ai and the app. Type the reset time that /usage shows (HH:MM) to align the countdown."
+msgstr "La consommation est une estimation faite à partir de Claude Code seul ; la fenêtre de ton abonnement compte aussi claude.ai et l'application. Saisis l'heure de reset affichée par /usage (HH:MM) pour caler le compte à rebours."

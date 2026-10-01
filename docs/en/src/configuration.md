@@ -68,6 +68,7 @@ Width between 16 and 4000, height between 8 and 2000.
 | Option | Default | Role |
 |---|---|---|
 | `compact` | `["claude", "media", "calendar"]` | priority order of modules **at equal importance** (something urgent always wins) |
+| `view` | `""` | name of a file in `layouts/` (without `.slint`): [custom view](layouts.md) of the open island |
 
 ## `[modules.claude]`
 
@@ -108,7 +109,60 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 | Option | Required | Role |
 |---|---|---|
 | `name` | no | name used in messages |
-| `url` | yes | `https://` or `webcal://` link, or path to an `.ics` file |
+| `url` | yes | `https://` or `webcal://` link, path to an `.ics` file, or `secret:<id>` (value kept in the Credential Manager); for CalDAV, the server address |
+| `kind` | no | `"ics"` (default) or `"caldav"` — see [CalDAV](agenda/caldav.md) |
+| `username` | CalDAV | login |
+| `password` | CalDAV | app password, preferably `secret:<id>` |
+
+## `[modules.timer]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `false` | | turn on the [timer](minuteur.md) |
+| `presets` | `[5, 15, 25]` | 1 to 5 durations, 1 to 600 | offered durations (min) |
+| `sound` | `true` | | sound when it ends |
+| `done_secs` | `20` | 1 to 600 | how long the "done" alert stays (s) |
+
+## `[modules.shelf]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `true` | | keep files dropped on the [shelf](etagere.md) |
+| `max` | `8` | 1 to 30 | number of files kept |
+
+## `[modules.volume]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `false` | | show [volume](volume.md) changes in the island (Windows) |
+| `show_secs` | `2` | 1 to 10 | how long it shows (s) |
+
+## `[modules.visualizer]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `false` | | [audio visualizer](musique.md#audio-visualizer-optional) (Windows) |
+| `bands` | `12` | 4 to 32 | number of bars |
+| `fps` | `30` | 10 to 60 | frames per second |
+
+## `[modules.claude_activity]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `true` | | [recent conversations and estimated usage](claude-code.md#recent-conversations-and-usage) |
+| `recent` | `4` | 0 to 4 | conversations offered |
+| `window_hours` | `5` | 1 to 24 | usage window length (h) |
+| `limit_tokens` | `0` | | estimated limit for the gauge (0: no gauge) |
+| `reset_at` | `""` | | end of a known window, `2026-10-02T01:01:00Z` (settable as `HH:MM` in the settings) |
+| `count_cache_reads` | `false` | | also count cache reads |
+| `projects_dir` | `""` | | transcripts folder (empty: `~/.claude/projects`) |
+
+## `[modules.plugins]`
+
+| Option | Default | Purpose |
+|---|---|---|
+| `enabled` | `false` | run the [WASM plugins](plugins.md) in the `plugins/` folder |
+| `only` | `[]` | run only these folders (empty = all) |
 
 ## `[modules.demo]`
 

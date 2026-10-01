@@ -1,6 +1,36 @@
-//! Téléchargement d'un calendrier (voir `bw-net`) ou lecture d'un fichier local.
+//! Téléchargement d'un calendrier (voir `bw-net`), CalDAV, ou lecture d'un
+//! fichier local.
 
 use std::path::Path;
+
+use chrono::{DateTime, Utc};
+
+use crate::caldav;
+use crate::config::{Source, SourceKind};
+
+/// Texte ICS d'une source ; `from`/`to` bornent la requête CalDAV.
+pub fn fetch_source(
+    source: &Source,
+    from: DateTime<Utc>,
+    to: DateTime<Utc>,
+) -> anyhow::Result<String> {
+    let url = bw_secrets::resolve(&source.url)?;
+    match source.kind {
+        SourceKind::Ics => fetch(&url),
+        SourceKind::Caldav => {
+            let password = bw_secrets::resolve(&source.password)?;
+            caldav::fetch(
+                &caldav::Account {
+                    url: url.trim(),
+                    username: source.username.trim(),
+                    password: &password,
+                },
+                from,
+                to,
+            )
+        }
+    }
+}
 
 pub fn fetch(url: &str) -> anyhow::Result<String> {
     let url = url.trim();

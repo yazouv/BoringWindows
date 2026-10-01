@@ -19,7 +19,12 @@ bw-claude.workspace = true
 bw-config.workspace = true
 bw-core.workspace = true
 bw-media.workspace = true
+bw-timer.workspace = true
+bw-volume.workspace = true
+bw-viz.workspace = true
+bw-plugins.workspace = true
 bw-update.workspace = true
+bw-secrets.workspace = true
 env_logger = { version = "0.11", default-features = false, features = ["auto-color", "humantime"] }
 log.workspace = true
 slint = { version = "~1.18", default-features = false, features = [
@@ -29,7 +34,16 @@ slint = { version = "~1.18", default-features = false, features = [
     "renderer-femtovg",
     "unstable-winit-030",
 ] }
+slint-interpreter = { version = "~1.18", default-features = false, features = [
+    "std",
+    "compat-1-2",
+    "backend-winit",
+    "renderer-femtovg",
+    "internal",
+] }
+serde.workspace = true
 tokio.workspace = true
+toml.workspace = true
 
 [target.'cfg(any(windows, target_os = "macos"))'.dependencies]
 tray-icon = { version = "0.24", default-features = false }

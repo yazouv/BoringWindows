@@ -1,0 +1,3 @@
+# ComponentContainer (vues .slint personnelles, layout.view) est expérimental dans Slint 1.18.
+[env]
+SLINT_ENABLE_EXPERIMENTAL_FEATURES = "1"

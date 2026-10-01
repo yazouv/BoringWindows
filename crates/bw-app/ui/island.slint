@@ -30,6 +30,31 @@ export struct AgendaRow {
     soon: bool,
 }
 
+export struct RecentRow {
+    id: string,
+    title: string,
+    meta: string,
+}
+
+export struct PluginRow {
+    name: string,
+    text: string,
+    attention: int,
+}
+
+export struct ShelfRow {
+    name: string,
+    path: string,
+}
+
+export struct TimerInfo {
+    /// 0 prêt, 1 en cours, 2 en pause, 3 terminé.
+    phase: int,
+    time: string,
+    progress: float,
+    presets: [string],
+}
+
 export struct MediaInfo {
     title: string,
     artist: string,
@@ -152,6 +177,30 @@ export component Island inherits Window {
     in property <bool> has-media;
     in property <MediaInfo> media;
     in property <[AgendaRow]> agenda-rows;
+    // Onglet Claude : consommation estimée et conversations récentes.
+    in property <bool> has-claude-tab;
+    in-out property <int> tab;
+    in property <[RecentRow]> recent-rows;
+    in property <string> usage-text;
+    in property <float> usage-ratio;
+    in property <bool> usage-has-limit;
+    callback recent-open(string /* id de session */);
+    changed expanded => {
+        if !self.expanded {
+            self.tab = 0;
+        }
+    }
+    in property <[float]> viz-bars;
+    in property <[PluginRow]> plugin-rows;
+    in property <[ShelfRow]> shelf-rows;
+    in property <string> shelf-more;
+    callback shelf-open(int);
+    callback shelf-remove(int);
+    in property <bool> custom-view;
+    in property <component-factory> custom-view-factory;
+    in property <bool> has-timer;
+    in property <TimerInfo> timer;
+    callback timer-action(string /* start:<min> | pause | resume | reset */);
     in property <bool> compact-art-visible;
     in property <image> compact-art;
 
@@ -237,13 +286,123 @@ export component Island inherits Window {
                 }
             }
 
+            // Vue personnelle de l'île ouverte (layouts/<nom>.slint, voir la doc).
+            if root.custom-view: Rectangle {
+                opacity: root.expanded ? 1 : 0;
+                visible: self.opacity > 0;
+                animate opacity { duration: root.anim; }
+
+                ComponentContainer {
+                    x: 0;
+                    y: root.top-offset;
+                    width: parent.width;
+                    height: parent.height - root.top-offset;
+                    component-factory: root.custom-view-factory;
+                }
+            }
+
+            // Onglet Claude : remplace le contenu ouvert tant qu'il est choisi.
+            if !root.custom-view && root.has-claude-tab && root.tab == 1: VerticalLayout {
+                padding: 16px;
+                padding-top: 10px + root.top-offset / 2;
+                padding-bottom: 8px;
+                spacing: 3px;
+                opacity: root.expanded ? 1 : 0;
+                visible: self.opacity > 0;
+                animate opacity { duration: root.anim; }
+
+                HorizontalLayout {
+                    spacing: 10px;
+                    height: 22px;
+
+                    Text {
+                        text: "‹  " + @tr("Back");
+                        color: back-ta.has-hover ? root.accent : root.fg.with-alpha(0.7);
+                        font-size: 12px;
+                        vertical-alignment: center;
+
+                        back-ta := TouchArea {
+                            clicked => { root.tab = 0; }
+                        }
+                    }
+
+                    Text {
+                        text: "Claude Code";
+                        color: root.fg;
+                        font-size: 14px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                    }
+                }
+
+                Text {
+                    text: root.usage-text;
+                    color: root.fg.with-alpha(0.8);
+                    font-size: 12px;
+                    overflow: elide;
+                }
+
+                if root.usage-has-limit: Rectangle {
+                    height: 4px;
+                    border-radius: 2px;
+                    background: root.fg.with-alpha(0.15);
+
+                    Rectangle {
+                        x: 0;
+                        width: parent.width * clamp(root.usage-ratio, 0, 1);
+                        border-radius: 2px;
+                        background: root.usage-ratio > 0.85 ? #FF453A : root.accent;
+                    }
+                }
+
+                for item in root.recent-rows: Rectangle {
+                    height: 20px;
+                    border-radius: 6px;
+                    background: recent-ta.has-hover ? root.fg.with-alpha(0.12) : transparent;
+
+                    recent-ta := TouchArea {
+                        clicked => { root.recent-open(item.id); }
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        spacing: 10px;
+
+                        Text {
+                            text: item.title;
+                            color: root.fg;
+                            font-size: 12px;
+                            vertical-alignment: center;
+                            overflow: elide;
+                            horizontal-stretch: 1;
+                        }
+
+                        Text {
+                            text: item.meta;
+                            color: root.fg.with-alpha(0.5);
+                            font-size: 11px;
+                            vertical-alignment: center;
+                            horizontal-alignment: right;
+                        }
+                    }
+                }
+
+                if root.recent-rows.length == 0: Text {
+                    text: @tr("No conversation found");
+                    color: root.fg.with-alpha(0.5);
+                    font-size: 12px;
+                }
+            }
+
             // Contenu ouvert.
-            VerticalLayout {
+            if !root.custom-view: VerticalLayout {
                 padding: 16px;
                 padding-top: 10px + root.top-offset / 2;
                 spacing: 8px;
                 opacity: root.expanded ? 1 : 0;
-                visible: self.opacity > 0;
+                visible: self.opacity > 0 && root.tab == 0;
                 animate opacity { duration: root.anim; }
 
                 HorizontalLayout {
@@ -263,6 +422,34 @@ export component Island inherits Window {
                         font-size: 12px;
                         vertical-alignment: center;
                         horizontal-stretch: 1;
+                    }
+
+                    // Onglet Claude (consommation, conversations récentes).
+                    if root.has-claude-tab: Text {
+                        text: "Claude  ›";
+                        color: claude-tab-ta.has-hover ? root.accent : root.fg.with-alpha(0.55);
+                        font-size: 12px;
+                        vertical-alignment: center;
+
+                        claude-tab-ta := TouchArea {
+                            clicked => { root.tab = 1; }
+                        }
+                    }
+
+                    // Visualiseur audio (désactivé par défaut) : barres d'équaliseur.
+                    if root.viz-bars.length > 0 && root.has-media: HorizontalLayout {
+                        spacing: 2px;
+                        alignment: end;
+                        height: 14px;
+                        y: (parent.height - self.height) / 2;
+
+                        for level in root.viz-bars: Rectangle {
+                            width: 3px;
+                            y: parent.height - self.height;
+                            height: max(2px, 14px * clamp(level, 0, 1));
+                            border-radius: 1.5px;
+                            background: root.accent;
+                        }
                     }
 
                     // Source de la musique ; cliquable s'il y en a plusieurs.
@@ -441,6 +628,178 @@ export component Island inherits Window {
                             line: root.fg.with-alpha(0.25);
                             clicked => { root.claude-decide(root.prompt.id, "ask"); }
                         }
+                    }
+                }
+
+                // Minuteur : durées prédéfinies, compte à rebours, pause.
+                if !root.has-prompt && root.has-timer: HorizontalLayout {
+                    height: 30px;
+                    spacing: 6px;
+                    padding-left: 6px;
+
+                    Text {
+                        text: root.timer.phase == 0 ? @tr("Timer")
+                            : root.timer.phase == 3 ? @tr("Time's up!") : root.timer.time;
+                        color: root.timer.phase == 0 ? root.fg.with-alpha(0.7) : root.accent;
+                        font-size: root.timer.phase == 0 ? 12px : 16px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                        min-width: 64px;
+                    }
+
+                    if root.timer.phase == 0: HorizontalLayout {
+                        spacing: 6px;
+
+                        for minutes in root.timer.presets: PillButton {
+                            text: @tr("{} min", minutes);
+                            fill: root.fg.with-alpha(0.12);
+                            ink: root.fg;
+                            clicked => { root.timer-action("start:" + minutes); }
+                        }
+                    }
+
+                    if root.timer.phase == 1 || root.timer.phase == 2: Rectangle {
+                        horizontal-stretch: 1;
+                        height: 12px;
+
+                        Rectangle {
+                            y: (parent.height - self.height) / 2;
+                            height: 3px;
+                            border-radius: 1.5px;
+                            background: root.fg.with-alpha(0.15);
+                        }
+
+                        Rectangle {
+                            y: (parent.height - self.height) / 2;
+                            width: parent.width * clamp(root.timer.progress, 0, 1);
+                            height: 3px;
+                            border-radius: 1.5px;
+                            background: root.accent;
+                        }
+                    }
+
+                    if root.timer.phase == 1: PillButton {
+                        text: @tr("Pause");
+                        fill: root.fg.with-alpha(0.12);
+                        ink: root.fg;
+                        clicked => { root.timer-action("pause"); }
+                    }
+
+                    if root.timer.phase == 2: PillButton {
+                        text: @tr("Resume");
+                        fill: root.accent;
+                        ink: root.bg;
+                        clicked => { root.timer-action("resume"); }
+                    }
+
+                    if root.timer.phase == 1 || root.timer.phase == 2: PillButton {
+                        text: @tr("Reset");
+                        fill: transparent;
+                        ink: root.fg.with-alpha(0.8);
+                        line: root.fg.with-alpha(0.25);
+                        clicked => { root.timer-action("reset"); }
+                    }
+
+                    if root.timer.phase == 3: PillButton {
+                        text: @tr("OK");
+                        fill: root.accent;
+                        ink: root.bg;
+                        clicked => { root.timer-action("reset"); }
+                    }
+                }
+
+                // Plugins WASM : une ligne de texte par plugin.
+                if !root.has-prompt && root.plugin-rows.length > 0: VerticalLayout {
+                    spacing: 2px;
+
+                    for plugin in root.plugin-rows: Rectangle {
+                        height: 22px;
+
+                        HorizontalLayout {
+                            padding-left: 6px;
+                            spacing: 8px;
+
+                            Text {
+                                text: plugin.name;
+                                color: root.fg.with-alpha(0.55);
+                                font-size: 12px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                                min-width: 64px;
+                            }
+
+                            Text {
+                                text: plugin.text;
+                                color: plugin.attention > 0 ? root.accent : root.fg;
+                                font-size: 12px;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+                        }
+                    }
+                }
+
+                // Étagère : fichiers déposés sur l'île, un clic les ouvre.
+                if !root.has-prompt && root.shelf-rows.length > 0: HorizontalLayout {
+                    height: 28px;
+                    spacing: 6px;
+                    padding-left: 6px;
+
+                    Text {
+                        text: @tr("Shelf");
+                        color: root.fg.with-alpha(0.7);
+                        font-size: 12px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                        min-width: 64px;
+                    }
+
+                    for item[i] in root.shelf-rows: Rectangle {
+                        horizontal-stretch: 1;
+                        height: 24px;
+                        border-radius: 12px;
+                        background: chip-ta.has-hover ? root.fg.with-alpha(0.2) : root.fg.with-alpha(0.12);
+
+                        chip-ta := TouchArea {
+                            clicked => { root.shelf-open(i); }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 2px;
+                            spacing: 2px;
+
+                            Text {
+                                text: item.name;
+                                color: root.fg;
+                                font-size: 12px;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+
+                            Rectangle {
+                                width: 20px;
+                                Text {
+                                    text: "×";
+                                    color: root.fg.with-alpha(0.7);
+                                    font-size: 14px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                                TouchArea {
+                                    clicked => { root.shelf-remove(i); }
+                                }
+                            }
+                        }
+                    }
+
+                    if root.shelf-more != "": Text {
+                        text: root.shelf-more;
+                        color: root.fg.with-alpha(0.6);
+                        font-size: 12px;
+                        vertical-alignment: center;
                     }
                 }
 

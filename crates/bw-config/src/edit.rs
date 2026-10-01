@@ -15,6 +15,7 @@ pub enum Value {
     Int(i64),
     Float(f64),
     StrList(Vec<String>),
+    IntList(Vec<i64>),
 }
 
 pub struct ConfigEditor {
@@ -61,6 +62,7 @@ impl ConfigEditor {
             Value::Int(i) => value(i),
             Value::Float(f) => value(f),
             Value::StrList(list) => value(list.into_iter().collect::<Array>()),
+            Value::IntList(list) => value(list.into_iter().collect::<Array>()),
         };
         // Garder la décoration (commentaire en fin de ligne) d'une valeur existante.
         match table.get_mut(last) {
@@ -119,6 +121,11 @@ impl ConfigEditor {
     }
 
     pub fn add_calendar_source(&mut self, name: &str, url: &str) {
+        self.add_calendar_account(name, url, None);
+    }
+
+    /// Ajoute un calendrier ; `caldav` = (identifiant, mot de passe).
+    pub fn add_calendar_account(&mut self, name: &str, url: &str, caldav: Option<(&str, &str)>) {
         let calendar = self.table_mut(&["modules", "calendar"]);
         if !matches!(calendar.get("sources"), Some(Item::ArrayOfTables(_))) {
             calendar.insert("sources", Item::ArrayOfTables(ArrayOfTables::new()));
@@ -127,10 +134,32 @@ impl ConfigEditor {
         if !name.trim().is_empty() {
             entry.insert("name", value(name.trim()));
         }
+        if let Some((username, password)) = caldav {
+            entry.insert("kind", value("caldav"));
+            entry.insert("username", value(username.trim()));
+            entry.insert("password", value(password));
+        }
         entry.insert("url", value(url.trim()));
         if let Some(Item::ArrayOfTables(sources)) = calendar.get_mut("sources") {
             sources.push(entry);
         }
+    }
+
+    /// Valeurs du calendrier `index` (lien, mot de passe) qui sont des
+    /// `secret:<id>` : à supprimer du coffre avec le calendrier.
+    pub fn calendar_source_secrets(&self, index: usize) -> Vec<String> {
+        let Some(sources) = self.sources() else {
+            return Vec::new();
+        };
+        let Some(t) = sources.get(index) else {
+            return Vec::new();
+        };
+        ["url", "password"]
+            .iter()
+            .filter_map(|k| t.get(k).and_then(Item::as_str))
+            .filter(|v| v.trim().starts_with("secret:"))
+            .map(str::to_owned)
+            .collect()
     }
 
     pub fn remove_calendar_source(&mut self, index: usize) {
@@ -240,6 +269,31 @@ mod tests {
         let c = Config::from_toml_str(&e.text()).unwrap();
         assert_eq!(c.theme.animation_ms, 0);
         assert!(e.text().contains("[modules.claude]"), "{}", e.text());
+    }
+
+    #[test]
+    fn caldav_account_and_secrets() {
+        let mut e = editor(DEFAULT_TOML);
+        e.add_calendar_account(
+            "iCloud",
+            "https://caldav.icloud.com/",
+            Some(("moi@icloud.com", "secret:caldav-1")),
+        );
+        e.add_calendar_account("Lien", "secret:ics-2", None);
+        e.add_calendar_source("Pub", "https://x/y.ics");
+        assert_eq!(
+            e.calendar_source_secrets(0),
+            vec!["secret:caldav-1".to_owned()]
+        );
+        assert_eq!(
+            e.calendar_source_secrets(1),
+            vec!["secret:ics-2".to_owned()]
+        );
+        assert!(e.calendar_source_secrets(2).is_empty());
+        assert!(e.calendar_source_secrets(9).is_empty());
+        let text = e.text();
+        assert!(text.contains("kind = \"caldav\""), "{text}");
+        e.config().expect("config valide");
     }
 
     #[test]

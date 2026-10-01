@@ -90,3 +90,55 @@ nom de fichier. Jamais le contenu de tes fichiers ni tes messages à Claude. Le
 canal (un *named pipe*) est local et réservé à ton compte Windows. Si
 BoringWindows est fermé ou ne répond pas en 300 ms, le relais s'efface sans
 rien faire : **Claude n'est jamais bloqué**.
+
+## Conversations récentes et consommation
+
+Ouvre l'île et clique sur **Claude ›** (en haut à droite) : un onglet affiche
+
+- une **estimation de ta consommation** sur la fenêtre de 5 h en cours, avec le
+  temps avant son renouvellement (et une jauge si tu fixes une limite) ;
+- tes **4 dernières conversations** (titre, dossier, ancienneté). Un clic rouvre
+  la conversation : un terminal s'ouvre dans son dossier et lance
+  `claude --resume <id>`.
+
+C'est lu dans les transcripts que Claude Code garde en local
+(`~/.claude/projects`) : aucune connexion, rien n'est envoyé. Les transcripts ne
+sont relus qu'à l'ouverture de l'île (au plus toutes les 15 s), et seulement les
+fichiers qui ont changé.
+
+**La consommation est une estimation, pas ton quota réel.** Les limites de ton
+abonnement sont côté serveur et Claude Code ne les publie pas. BoringWindows
+additionne les tokens (entrée, sortie, création de cache) des messages de la
+fenêtre en cours, comme l'outil `ccusage` ; pour avoir une jauge, indique la
+limite que tu estimes avoir (millions de tokens) dans Réglages › Claude Code. Pour
+ton vrai reste, `/usage` dans Claude Code fait foi.
+
+Les conversations **distantes** (sessions SSH) ne sont pas listées : leur dossier
+n'existe pas sur ce PC. Elles comptent quand même dans la consommation.
+
+```toml
+[modules.claude_activity]
+enabled = true
+recent = 4                # conversations proposées (0 à 4)
+window_hours = 5          # durée de la fenêtre de consommation (1 à 24)
+limit_tokens = 0          # limite estimée pour la jauge (0 : pas de jauge)
+reset_at = ""             # fin d'une fenêtre connue (voir ci-dessous)
+count_cache_reads = false # compter aussi les lectures de cache
+```
+
+La reprise ouvre Windows Terminal (`wt`) s'il est installé, sinon une console, et
+suppose que la commande `claude` est dans le `PATH`. Windows seulement pour
+l'instant.
+
+### Caler le compte à rebours
+
+La fenêtre de 5 h de ton abonnement est **commune à tout le compte** : elle compte
+aussi claude.ai et l'application Claude, que BoringWindows ne voit pas. Résultat :
+sans calage, le début de fenêtre est déduit des seuls messages de Claude Code et
+le « reset dans… » peut être décalé (jusqu'à plusieurs heures).
+
+Pour l'aligner, tape l'heure de reset que Claude affiche (`/usage`, ou claude.ai)
+dans Réglages › Claude Code › **Heure de reset de la fenêtre**, au format
+`HH:MM` (heure locale, ex. `03:01`). BoringWindows retient cette fin de fenêtre ;
+une fois passée, il repart des messages suivants, début exact au premier message.
+Le champ ne sert donc qu'après une activité hors Claude Code.

@@ -4,7 +4,7 @@ use std::time::Duration;
 use notify_debouncer_mini::notify::{RecommendedWatcher, RecursiveMode};
 use notify_debouncer_mini::{DebounceEventResult, Debouncer, new_debouncer};
 
-use crate::{Config, ConfigError, themes_dir};
+use crate::{Config, ConfigError, layouts_dir, themes_dir};
 
 /// Garde la surveillance active tant qu'elle est en vie.
 pub struct ConfigWatcher {
@@ -23,6 +23,7 @@ where
 {
     let dir = path.parent().unwrap_or(Path::new(".")).to_owned();
     let themes = themes_dir(&dir);
+    let layouts = layouts_dir(&dir);
     let target: PathBuf = path.to_owned();
     // Certains systèmes (inotify) signalent aussi les lectures : on ne prévient
     // que si le résultat change, sinon chaque rechargement en déclencherait un autre.
@@ -41,6 +42,8 @@ where
                     e.path.file_name() == target.file_name()
                         || (e.path.starts_with(&themes)
                             && e.path.extension().is_some_and(|x| x == "toml"))
+                        || (e.path.starts_with(&layouts)
+                            && e.path.extension().is_some_and(|x| x == "slint"))
                 });
                 if !relevant {
                     return;

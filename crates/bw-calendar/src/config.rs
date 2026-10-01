@@ -20,14 +20,34 @@ pub struct CalendarConfig {
     pub lookahead_hours: u32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SourceKind {
+    /// Lien ICS ou fichier .ics.
+    #[default]
+    Ics,
+    /// Compte CalDAV (iCloud, Fastmail, Nextcloud…).
+    Caldav,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Source {
     /// Nom affiché (facultatif).
     #[serde(default)]
     pub name: String,
-    /// Lien ICS privé (https:// ou webcal://) ou chemin d'un fichier .ics.
+    #[serde(default)]
+    pub kind: SourceKind,
+    /// ICS : lien privé (https:// ou webcal://) ou fichier .ics. CalDAV :
+    /// adresse du serveur ou de l'agenda. `secret:<id>` renvoie au
+    /// Gestionnaire d'identifiants.
     pub url: String,
+    /// CalDAV : identifiant de connexion.
+    #[serde(default)]
+    pub username: String,
+    /// CalDAV : mot de passe (d'application), de préférence `secret:<id>`.
+    #[serde(default)]
+    pub password: String,
 }
 
 impl Default for CalendarConfig {
@@ -78,6 +98,15 @@ impl CalendarConfig {
                     "modules.calendar.sources : url vide"
                 )
             );
+            if s.kind == SourceKind::Caldav {
+                anyhow::ensure!(
+                    !s.username.trim().is_empty() && !s.password.is_empty(),
+                    tr!(
+                        "modules.calendar.sources: CalDAV needs username and password",
+                        "modules.calendar.sources : CalDAV demande username et password"
+                    )
+                );
+            }
         }
         Ok(config)
     }
@@ -108,6 +137,15 @@ mod tests {
 
         let bad: toml::Table = toml::from_str("refresh_minutes = 1").unwrap();
         assert!(CalendarConfig::from_table(Some(&bad)).is_err());
+        let dav: toml::Table = toml::from_str(
+            "[[sources]]\nkind = \"caldav\"\nurl = \"https://x/dav/\"\nusername = \"me\"\npassword = \"secret:cal\"",
+        )
+        .unwrap();
+        let c = CalendarConfig::from_table(Some(&dav)).unwrap();
+        assert_eq!(c.sources[0].kind, SourceKind::Caldav);
+        let no_pass: toml::Table =
+            toml::from_str("[[sources]]\nkind = \"caldav\"\nurl = \"https://x/\"").unwrap();
+        assert!(CalendarConfig::from_table(Some(&no_pass)).is_err());
         let empty: toml::Table = toml::from_str("[[sources]]\nurl = \" \"").unwrap();
         assert!(CalendarConfig::from_table(Some(&empty)).is_err());
     }
