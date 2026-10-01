@@ -6,6 +6,7 @@ use std::path::Path;
 
 use bw_config::MonitorChoice;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+use slint::BackendSelector;
 use slint::winit_030::winit::platform::windows::WindowAttributesExtWindows;
 use slint::winit_030::winit::window::{Window, WindowAttributes};
 use windows::Win32::Foundation::{
@@ -36,9 +37,6 @@ use windows::core::{HSTRING, PCWSTR, w};
 
 use super::PlatformEvent;
 use crate::geometry::PhysRect;
-
-mod tray;
-pub use tray::Tray;
 
 const RUN_KEY: PCWSTR = w!("Software\\Microsoft\\Windows\\CurrentVersion\\Run");
 const RUN_VALUE: PCWSTR = w!("BoringWindows");
@@ -79,9 +77,13 @@ pub fn single_instance() -> Option<SingleInstance> {
 // ---------------------------------------------------------------------------
 // Fenêtre de l'île
 
+pub fn configure_backend(selector: BackendSelector) -> BackendSelector {
+    selector.with_winit_window_attributes_hook(window_attributes)
+}
+
 /// Attributs appliqués dès la création : la fenêtre n'apparaît jamais dans la
 /// barre des tâches et ne prend pas le focus en s'affichant.
-pub fn window_attributes(attrs: WindowAttributes) -> WindowAttributes {
+fn window_attributes(attrs: WindowAttributes) -> WindowAttributes {
     attrs
         .with_skip_taskbar(true)
         .with_active(false)

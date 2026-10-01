@@ -121,13 +121,6 @@ impl Controller {
         self.ui.on_clicked(move || on_click(()));
         self.update_clock();
 
-        match Tray::new(platform::autostart_enabled(), |cmd| {
-            post(move |c| c.on_tray(cmd));
-        }) {
-            Ok(tray) => *self.tray.borrow_mut() = Some(tray),
-            Err(e) => log::error!("icône de notification indisponible : {e:#}"),
-        }
-
         match bw_config::watch(&self.path, |res| post(move |c| c.on_config(res))) {
             Ok(w) => *self.watcher.borrow_mut() = Some(w),
             Err(e) => log::warn!("rechargement à chaud désactivé : {e}"),
@@ -146,6 +139,14 @@ impl Controller {
         *self.platform.borrow_mut() = Some(platform);
         self.update_visibility();
         self.sync_region();
+
+        // Créée boucle d'événements lancée : exigé par macOS.
+        match Tray::new(platform::autostart_enabled(), |cmd| {
+            post(move |c| c.on_tray(cmd));
+        }) {
+            Ok(tray) => *self.tray.borrow_mut() = Some(tray),
+            Err(e) => log::error!("icône de notification indisponible : {e:#}"),
+        }
     }
 
     fn shutdown(&self) {

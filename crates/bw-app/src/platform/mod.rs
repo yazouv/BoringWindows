@@ -1,13 +1,17 @@
-//! Intégration système. L'implémentation réelle est Win32 ; ailleurs, des
-//! substituts sans effet permettent de travailler l'UI et la logique.
+//! Intégration système. L'implémentation complète est Win32 ; macOS a l'icône
+//! de barre de menus, et ailleurs des substituts permettent de travailler l'UI.
 
 #[cfg(not(windows))]
 mod fallback;
+#[cfg(any(windows, target_os = "macos"))]
+mod tray;
 #[cfg(windows)]
 mod win32;
 
 #[cfg(not(windows))]
 pub use fallback::*;
+#[cfg(any(windows, target_os = "macos"))]
+pub use tray::Tray;
 #[cfg(windows)]
 pub use win32::*;
 

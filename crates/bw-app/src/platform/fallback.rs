@@ -1,11 +1,16 @@
-//! Substituts hors Windows : la fenêtre s'affiche, sans intégration système.
+//! Hors Windows : la fenêtre s'affiche sans intégration système avancée
+//! (placement, zone cliquable, plein écran). macOS a en plus l'icône de barre
+//! de menus et pas d'icône dans le Dock.
 
 use std::path::Path;
 
 use bw_config::MonitorChoice;
-use slint::winit_030::winit::window::{Window, WindowAttributes};
+use slint::BackendSelector;
+use slint::winit_030::winit::window::Window;
 
-use super::{PlatformEvent, TrayCommand};
+use super::PlatformEvent;
+#[cfg(not(target_os = "macos"))]
+use super::TrayCommand;
 use crate::geometry::PhysRect;
 
 pub struct SingleInstance;
@@ -14,8 +19,21 @@ pub fn single_instance() -> Option<SingleInstance> {
     Some(SingleInstance)
 }
 
-pub fn window_attributes(attrs: WindowAttributes) -> WindowAttributes {
-    attrs
+#[cfg(not(target_os = "macos"))]
+pub fn configure_backend(selector: BackendSelector) -> BackendSelector {
+    selector
+}
+
+/// Application « accessoire » : pas d'icône dans le Dock ni dans Cmd+Tab.
+#[cfg(target_os = "macos")]
+pub fn configure_backend(selector: BackendSelector) -> BackendSelector {
+    use slint::winit_030::SlintEvent;
+    use slint::winit_030::winit::event_loop::EventLoop;
+    use slint::winit_030::winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
+
+    let mut builder = EventLoop::<SlintEvent>::with_user_event();
+    builder.with_activation_policy(ActivationPolicy::Accessory);
+    selector.with_winit_event_loop_builder(builder)
 }
 
 pub fn initial_position(_: MonitorChoice, _: (f32, f32)) -> Option<slint::PhysicalPosition> {
@@ -47,8 +65,11 @@ impl Platform {
     }
 }
 
+/// Linux : pas d'icône de notification (elle exigerait GTK).
+#[cfg(not(target_os = "macos"))]
 pub struct Tray;
 
+#[cfg(not(target_os = "macos"))]
 impl Tray {
     pub fn new(
         _autostart: bool,
@@ -65,9 +86,17 @@ pub fn autostart_enabled() -> bool {
 }
 
 pub fn set_autostart(_enabled: bool) -> anyhow::Result<()> {
-    anyhow::bail!("démarrage automatique disponible uniquement sous Windows")
+    anyhow::bail!("démarrage automatique pas encore disponible sur ce système")
 }
 
+/// Ouvre un fichier avec l'application associée.
 pub fn open_path(path: &Path) {
-    log::info!("ouvrir {}", path.display());
+    let opener = if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    if let Err(e) = std::process::Command::new(opener).arg(path).spawn() {
+        log::warn!("impossible d'ouvrir {} : {e}", path.display());
+    }
 }

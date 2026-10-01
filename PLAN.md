@@ -213,8 +213,8 @@ Modules tiers en **WASM** (via `extism` ou `wasmtime`), sandboxés, qui publient
 
 ## 5. Roadmap
 
-### Phase 0 — Fondations ✅ (à valider sur une vraie machine Windows)
-- [x] Workspace Cargo + CI GitHub Actions `windows-latest` (build, clippy, fmt, tests)
+### Phase 0 — Fondations ✅
+- [x] Workspace Cargo + CI GitHub Actions Windows / macOS / Linux (clippy, fmt, tests, binaires release, cache)
 - [x] Fenêtre île : sans bordure, transparente, topmost, no-activate, centrée en haut
 - [x] États compact / attention / ouvert + animations (morph de taille)
 - [x] Zone cliquable limitée à la pilule (`SetWindowRgn`), le reste laisse passer les clics
@@ -224,9 +224,8 @@ Modules tiers en **WASM** (via `extism` ou `wasmtime`), sandboxés, qui publient
 - [x] Bus d'événements + trait `Module` + arbitrage d'attention (+ module `demo`)
 - [x] Mesure perfs : `scripts/measure-idle.ps1`, exécuté en CI à titre indicatif
 
-Reste à vérifier à la main sous Windows : transparence réelle, clics qui
-traversent hors de la pilule, focus jamais volé, plein écran (jeu, vidéo F11),
-changement d'écran / de DPI, chiffres RAM/CPU sur un vrai GPU.
+Validé sur Windows : transparence, clics qui traversent, focus jamais volé,
+masquage en plein écran. Reste à relever les chiffres RAM/CPU sur un vrai GPU.
 
 ### Phase 1 — Claude Code (MVP publiable)
 - [ ] `bw-hook.exe` + named pipe + timeout 300 ms
@@ -263,6 +262,21 @@ changement d'écran / de DPI, chiffres RAM/CPU sur un vrai GPU.
 - [ ] Spotify Web API (like, queue, Connect)
 - [ ] Shelf de fichiers, volume/luminosité, minuteur
 - [ ] Plugins WASM
+
+### Port macOS (en parallèle, sans bloquer Windows)
+
+Le cœur (`bw-core`, `bw-config`, l'UI Slint) est déjà multiplateforme ; seul
+`platform/` est spécifique. Aujourd'hui sur macOS : compilation + binaire en CI,
+icône de barre de menus, pas d'icône dans le Dock. L'île s'ouvre comme une
+fenêtre flottante, sans placement ni zone cliquable.
+
+- [ ] `platform/macos.rs` : `NSPanel` non activant, niveau au-dessus de la barre de menus, centré sous l'encoche
+- [ ] Zone cliquable (`ignoresMouseEvents` selon la position) et masquage en plein écran
+- [ ] Bundle `.app` signé + notarisé (sinon Gatekeeper bloque), démarrage à la connexion (`SMAppService`)
+- [ ] Modules : musique via MediaRemote / AppleScript, hook Claude via socket Unix au lieu du named pipe
+
+Note : sur Mac, boring.notch existe déjà ; l'intérêt est surtout d'avoir la même
+île et la même config sur les deux machines.
 
 ### Phase 6 — Distribution
 - [ ] Installeur (MSI via `cargo-wix` ou Inno Setup) + package **winget**

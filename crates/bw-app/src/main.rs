@@ -17,11 +17,10 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     };
 
-    slint::BackendSelector::new()
+    let selector = slint::BackendSelector::new()
         .backend_name("winit".into())
-        .renderer_name("femtovg".into())
-        .with_winit_window_attributes_hook(platform::window_attributes)
-        .select()?;
+        .renderer_name("femtovg".into());
+    platform::configure_backend(selector).select()?;
 
     controller::run()
 }

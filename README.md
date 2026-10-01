@@ -45,5 +45,9 @@ démarrage, masquer l'île, quitter.
 | `bw-config` | `config.toml` : schéma, validation, rechargement à chaud |
 | `bw-app` | binaire : île Slint (`ui/island.slint`), intégration Win32, icône de notification |
 
-Le code Win32 est isolé dans `crates/bw-app/src/platform/win32.rs` ; hors Windows,
-l'île s'ouvre comme une fenêtre normale, ce qui suffit pour travailler l'UI.
+Le code Win32 est isolé dans `crates/bw-app/src/platform/win32.rs`. Sur macOS et
+Linux, l'île s'ouvre comme une fenêtre flottante (macOS : icône de barre de menus,
+pas d'icône dans le Dock) ; le port macOS complet est décrit dans le plan.
+
+La CI construit un `.exe` Windows et un binaire macOS (Apple Silicon) à chaque
+push : onglet *Actions* → run → *Artifacts*.
