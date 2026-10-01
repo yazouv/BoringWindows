@@ -368,7 +368,7 @@ Note : sur Mac, boring.notch existe déjà ; l'intérêt est surtout d'avoir la 
 - [x] Binaires Windows / macOS / Linux + `.sha256` attachés à chaque release (`release.yml`)
 - [x] CI des PR sur un seul runner Linux (clippy des 3 OS, tests)
 - [x] Mise à jour automatique (GitHub Releases, empreinte vérifiée, jeton facultatif pour un dépôt privé)
-- [ ] Installeur (MSI via `cargo-wix` ou Inno Setup) + package **winget**
+- [x] Installeur Inno Setup (job `installer` de la release, par utilisateur) + manifestes **winget** (première soumission à la main, puis `wingetcreate` avec `WINGET_TOKEN`) : voir `packaging/README.md`
 - [ ] Signature de code (ex. SignPath, gratuit pour l'open source) pour éviter SmartScreen
 - [ ] macOS : bundle `.app` signé + binaire Intel / universel
 - [ ] (opt.) MSIX pour débloquer les API à identité de package (notifications)

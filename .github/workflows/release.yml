@@ -106,24 +106,83 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ needs.release-please.outputs.tag }}" dist/* --clobber
 
+  # Installeur Windows (Inno Setup) à partir du binaire déjà attaché à la release.
+  # Un échec ici ne doit pas bloquer la release : le .exe seul reste disponible.
+  installer:
+    needs: [release-please, build]
+    if: needs.release-please.outputs.created == 'true'
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag }}
+      - name: Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) { choco install innosetup -y --no-progress }
+      - name: Compilation de l'installeur
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release-please.outputs.tag }}
+        run: |
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          gh release download $env:TAG --pattern boringwindows-windows-x64.exe --dir dist
+          $version = $env:TAG.TrimStart('v')
+          & $iscc "/DAppVersion=$version" "/DSourceExe=$PWD\dist\boringwindows-windows-x64.exe" installer\boringwindows.iss
+          if ($LASTEXITCODE -ne 0) { throw "iscc a échoué" }
+          $setup = "installer\Output\boringwindows-windows-x64-setup.exe"
+          $hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
+          "$hash  boringwindows-windows-x64-setup.exe" | Set-Content -Encoding ascii "$setup.sha256"
+          gh release upload $env:TAG $setup "$setup.sha256" --clobber
+
+  # winget : met à jour le paquet Yazouv.BoringWindows (le premier dépôt du
+  # paquet se fait à la main, voir packaging/README.md). Sans jeton, rien ne se passe.
+  winget:
+    needs: [release-please, installer]
+    if: needs.release-please.outputs.created == 'true' && needs.installer.result == 'success'
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - name: wingetcreate update
+        shell: pwsh
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          TAG: ${{ needs.release-please.outputs.tag }}
+        run: |
+          if (-not $env:WINGET_TOKEN) { Write-Host "WINGET_TOKEN absent : publication winget ignorée."; exit 0 }
+          $version = $env:TAG.TrimStart('v')
+          $url = "https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/boringwindows-windows-x64-setup.exe"
+          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+          .\wingetcreate.exe update Yazouv.BoringWindows --version $version --urls $url --submit --token $env:WINGET_TOKEN
+
   # Liens de téléchargement en tête des notes de version.
   notes:
-    needs: [release-please, build]
+    needs: [release-please, build, installer]
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Téléchargements dans les notes
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.release-please.outputs.tag }}
+          INSTALLER: ${{ needs.installer.result }}
         run: |
           base="https://github.com/${{ github.repository }}/releases/download/$TAG"
           body=$(gh release view "$TAG" --repo "${{ github.repository }}" --json body -q .body)
+          win_rows="| Windows 10/11 (x64) | [boringwindows-windows-x64.exe]($base/boringwindows-windows-x64.exe) |"
+          if [ "$INSTALLER" = "success" ]; then
+            win_rows="| Windows 10/11 (x64), installeur | [boringwindows-windows-x64-setup.exe]($base/boringwindows-windows-x64-setup.exe) |
+          $win_rows"
+          fi
           cat > notes.md <<NOTES
           ## Téléchargements
 
           | Système | Fichier |
           |---|---|
-          | Windows 10/11 (x64) | [boringwindows-windows-x64.exe]($base/boringwindows-windows-x64.exe) |
+          $win_rows
           | macOS (Apple Silicon) | [boringwindows-macos-arm64.tar.gz]($base/boringwindows-macos-arm64.tar.gz) |
           | Linux (x64) | [boringwindows-linux-x64.tar.gz]($base/boringwindows-linux-x64.tar.gz) |
 

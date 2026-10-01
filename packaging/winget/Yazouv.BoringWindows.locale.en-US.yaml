@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+PackageIdentifier: Yazouv.BoringWindows
+PackageVersion: 0.1.0
+PackageLocale: en-US
+Publisher: Yazouv
+PublisherUrl: https://github.com/yazouv
+PublisherSupportUrl: https://github.com/yazouv/BoringWindows/issues
+PackageName: BoringWindows
+PackageUrl: https://yazouv.github.io/BoringWindows/
+License: MIT
+ShortDescription: A lightweight, fully customizable Dynamic Island for Windows.
+Description: Shows Claude Code status, now-playing music and upcoming meetings in a small pill at the top of the screen. Themes and modules are configured by files, reloaded live.
+Tags:
+  - dynamic-island
+  - claude-code
+  - music
+  - calendar
+  - rust
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0
