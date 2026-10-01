@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use bw_config::{Config, ConfigError, ConfigWatcher, OpenOn};
 use bw_core::{Arbiter, Attention, Module, ModuleEvent, ModuleEventKind, ModuleHost};
+use slint::winit_030::WinitWindowAccessor;
 use slint::{ComponentHandle, Timer, TimerMode};
 
 use crate::geometry::{self, Shape};
@@ -94,13 +95,24 @@ impl Controller {
         }
         self.ui.show()?;
 
-        let platform = Platform::attach(self.ui.window(), |event| {
-            post(move |c| c.on_platform_event(event));
+        // La fenêtre native n'est créée qu'une fois la boucle d'événements
+        // lancée : l'intégration système se branche à ce moment-là.
+        let this = self.clone();
+        slint::spawn_local(async move {
+            let attached = match this.ui.window().winit_window().await {
+                Ok(window) => Platform::attach(&window, |event| {
+                    post(move |c| c.on_platform_event(event));
+                }),
+                Err(e) => Err(e.into()),
+            };
+            match attached {
+                Ok(platform) => this.on_platform_ready(platform),
+                Err(e) => {
+                    log::error!("intégration système impossible : {e:#}");
+                    let _ = slint::quit_event_loop();
+                }
+            }
         })?;
-        self.fullscreen.set(platform.fullscreen_now());
-        *self.platform.borrow_mut() = Some(platform);
-        self.update_visibility();
-        self.sync_region();
 
         let weak = Rc::downgrade(self);
         self.ui
@@ -126,6 +138,14 @@ impl Controller {
             self.report_config_error(&e);
         }
         Ok(())
+    }
+
+    fn on_platform_ready(&self, platform: Platform) {
+        log::info!("intégration système prête");
+        self.fullscreen.set(platform.fullscreen_now());
+        *self.platform.borrow_mut() = Some(platform);
+        self.update_visibility();
+        self.sync_region();
     }
 
     fn shutdown(&self) {

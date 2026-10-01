@@ -4,12 +4,10 @@
 use std::cell::RefCell;
 use std::path::Path;
 
-use anyhow::Context as _;
 use bw_config::MonitorChoice;
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-use slint::winit_030::WinitWindowAccessor;
 use slint::winit_030::winit::platform::windows::WindowAttributesExtWindows;
-use slint::winit_030::winit::window::WindowAttributes;
+use slint::winit_030::winit::window::{Window, WindowAttributes};
 use windows::Win32::Foundation::{
     CloseHandle, ERROR_ALREADY_EXISTS, ERROR_FILE_NOT_FOUND, GetLastError, HANDLE, HWND, LPARAM,
     LRESULT, POINT, RECT, WPARAM,
@@ -157,18 +155,15 @@ pub struct Platform {
 }
 
 impl Platform {
-    /// À appeler après `show()` : la fenêtre native doit exister.
+    /// À appeler une fois la fenêtre native créée (boucle d'événements active).
     pub fn attach(
-        window: &slint::Window,
+        window: &Window,
         on_event: impl Fn(PlatformEvent) + 'static,
     ) -> anyhow::Result<Self> {
-        let hwnd = window
-            .with_winit_window(|w| match w.window_handle().map(|h| h.as_raw()) {
-                Ok(RawWindowHandle::Win32(h)) => Some(HWND(h.hwnd.get() as *mut _)),
-                _ => None,
-            })
-            .flatten()
-            .context("fenêtre native introuvable")?;
+        let hwnd = match window.window_handle().map(|h| h.as_raw()) {
+            Ok(RawWindowHandle::Win32(h)) => HWND(h.hwnd.get() as *mut _),
+            _ => anyhow::bail!("fenêtre native introuvable"),
+        };
 
         // SAFETY: `hwnd` est la fenêtre vivante de l'île, sur son thread.
         unsafe {

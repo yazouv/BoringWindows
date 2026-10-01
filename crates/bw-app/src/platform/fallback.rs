@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use bw_config::MonitorChoice;
-use slint::winit_030::winit::window::WindowAttributes;
+use slint::winit_030::winit::window::{Window, WindowAttributes};
 
 use super::{PlatformEvent, TrayCommand};
 use crate::geometry::PhysRect;
@@ -26,7 +26,7 @@ pub struct Platform;
 
 impl Platform {
     pub fn attach(
-        _window: &slint::Window,
+        _window: &Window,
         _on_event: impl Fn(PlatformEvent) + 'static,
     ) -> anyhow::Result<Self> {
         Ok(Self)
