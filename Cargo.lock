@@ -520,6 +520,7 @@ dependencies = [
  "anyhow",
  "bw-core",
  "bw-i18n",
+ "chrono",
  "dirs 7.0.0",
  "log",
  "serde",

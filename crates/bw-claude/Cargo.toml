@@ -10,6 +10,7 @@ rust-version.workspace = true
 bw-i18n.workspace = true
 anyhow.workspace = true
 bw-core.workspace = true
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 dirs = "7"
 log.workspace = true
 serde.workspace = true

@@ -28,8 +28,8 @@ use crate::geometry::{self, Shape};
 use crate::platform::{self, Platform, PlatformEvent, Tray, TrayCommand};
 use crate::shelf::{Shelf, ShelfConfig};
 use crate::{
-    AgendaRow, ClaudePrompt, ClaudeRow, Island, MediaInfo, PluginRow, ShelfRow, TimerInfo, clock,
-    demo,
+    AgendaRow, ClaudePrompt, ClaudeRow, Island, MediaInfo, PluginRow, RecentRow, ShelfRow,
+    TimerInfo, clock, demo,
 };
 
 /// Pseudo-module utilisé pour signaler une config invalide dans l'île.
@@ -102,6 +102,7 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         shelf: RefCell::new(Shelf::load(&shelf_file)),
         shelf_file,
         viz_active: Cell::new(false),
+        activity: RefCell::new(None),
         timer_tick: Timer::default(),
         media_seen: RefCell::new(BTreeSet::new()),
     });
@@ -148,6 +149,7 @@ pub struct Controller {
     shelf: RefCell<Shelf>,
     shelf_file: PathBuf,
     viz_active: Cell<bool>,
+    activity: RefCell<Option<Arc<bw_claude::ActivitySnapshot>>>,
     timer_tick: Timer,
     /// Lecteurs vus depuis le lancement (jetons `ignore`), pour les réglages.
     media_seen: RefCell<BTreeSet<String>>,
@@ -212,6 +214,8 @@ impl Controller {
             }));
         self.ui
             .on_media_seek(with(&weak, |c, fraction: f32| c.media_seek(fraction)));
+        self.ui
+            .on_recent_open(with(&weak, |c, id: slint::SharedString| c.open_recent(&id)));
         self.ui
             .on_shelf_open(with(&weak, |c, i: i32| c.shelf_open(i as usize)));
         self.ui
@@ -337,6 +341,9 @@ impl Controller {
         self.collapse_timer.stop();
         if self.expanded.replace(expanded) != expanded {
             self.refresh_shape();
+            if expanded {
+                self.refresh_activity();
+            }
             self.update_progress();
             self.update_viz_activity();
             self.update_timer_ui();
@@ -572,6 +579,9 @@ impl Controller {
         *self.calendar.borrow_mut() = None;
         *self.timer.borrow_mut() = None;
         self.viz_active.set(false);
+        *self.activity.borrow_mut() = None;
+        self.ui.set_has_claude_tab(false);
+        self.ui.set_recent_rows(ModelRc::default());
         self.ui.set_plugin_rows(ModelRc::default());
         self.ui.set_viz_bars(ModelRc::default());
         self.timer_tick.stop();
@@ -616,6 +626,9 @@ impl Controller {
             ModuleEventKind::State(state) => {
                 if let Some(snapshot) = state.downcast_ref::<MediaSnapshot>() {
                     self.apply_media(event.module, Arc::new(snapshot.clone()));
+                } else if let Ok(snapshot) = state.clone().downcast::<bw_claude::ActivitySnapshot>()
+                {
+                    self.apply_activity(snapshot);
                 } else if let Some(snapshot) = state.downcast_ref::<bw_plugins::PluginsSnapshot>() {
                     self.apply_plugins(snapshot);
                 } else if let Some(snapshot) = state.downcast_ref::<bw_viz::VizSnapshot>() {
@@ -631,6 +644,94 @@ impl Controller {
                     self.apply_claude(Some(snapshot));
                 }
             }
+        }
+    }
+
+    // --- Activité Claude : conversations récentes et consommation ------------
+
+    fn apply_activity(&self, snapshot: Arc<bw_claude::ActivitySnapshot>) {
+        let config = bw_claude::ActivityConfig::from_table(
+            self.config.borrow().modules.get(bw_claude::ACTIVITY_ID),
+        )
+        .unwrap_or_default();
+        let now = chrono::Utc::now();
+
+        let rows: Vec<RecentRow> = snapshot
+            .recent
+            .iter()
+            .map(|r| RecentRow {
+                id: r.id.as_str().into(),
+                title: if r.title.is_empty() {
+                    tr!("(untitled)", "(sans titre)").into()
+                } else {
+                    r.title.as_str().into()
+                },
+                meta: format!("{} · {}", r.project, ago(r.last_at, now)).into(),
+            })
+            .collect();
+        self.ui.set_recent_rows(ModelRc::new(VecModel::from(rows)));
+
+        let usage = &snapshot.usage;
+        let limit = snapshot.limit_tokens;
+        self.ui.set_usage_text(match usage.window_end {
+            Some(end) => {
+                let h = config.window_hours;
+                let used = compact_tokens(usage.tokens);
+                let of = if limit > 0 {
+                    format!(" / {}", compact_tokens(limit))
+                } else {
+                    String::new()
+                };
+                let reset = duration_text((end - now).to_std().unwrap_or_default());
+                tr!(
+                    "≈ {used}{of} tokens in the {h} h window · resets in {reset}",
+                    "≈ {used}{of} tokens sur la fenêtre de {h} h · reset dans {reset}"
+                )
+            }
+            None => tr!(
+                "No active usage window (estimate from local transcripts)",
+                "Aucune fenêtre de consommation active (estimation d'après les transcripts locaux)"
+            ),
+        }
+        .into());
+        self.ui
+            .set_usage_has_limit(limit > 0 && usage.window_end.is_some());
+        self.ui.set_usage_ratio(if limit > 0 {
+            (usage.tokens as f64 / limit as f64) as f32
+        } else {
+            0.0
+        });
+        self.ui.set_has_claude_tab(true);
+        *self.activity.borrow_mut() = Some(snapshot);
+        self.sync_custom_view();
+    }
+
+    /// Rouvre la conversation `id` dans un terminal.
+    fn open_recent(&self, id: &str) {
+        let session = self
+            .activity
+            .borrow()
+            .as_ref()
+            .and_then(|a| a.recent.iter().find(|r| r.id == id).cloned());
+        if let Some(session) = session
+            && !platform::resume_claude_session(&session.cwd, &session.id)
+        {
+            self.settings_status(
+                &tr!(
+                    "Could not reopen the conversation (is `claude` installed?)",
+                    "Impossible de rouvrir la conversation (`claude` est-il installé ?)"
+                ),
+                true,
+            );
+        }
+    }
+
+    fn refresh_activity(&self) {
+        if let Some(host) = self.host.borrow().as_ref() {
+            host.send_action(Action {
+                module: bw_claude::ACTIVITY_ID.into(),
+                name: "refresh".into(),
+            });
         }
     }
 
@@ -1293,6 +1394,12 @@ fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
             Err(e) => errors.push(format!("modules.visualizer : {e:#}")),
         }
     }
+    if config.module_enabled(bw_claude::ACTIVITY_ID, true) {
+        match bw_claude::ActivityConfig::from_table(config.modules.get(bw_claude::ACTIVITY_ID)) {
+            Ok(c) => modules.push(Box::new(bw_claude::ActivityModule::new(c))),
+            Err(e) => errors.push(format!("modules.claude_activity : {e:#}")),
+        }
+    }
     if config.module_enabled(bw_plugins::MODULE_ID, false) {
         match bw_plugins::PluginsConfig::from_table(config.modules.get(bw_plugins::MODULE_ID)) {
             Ok(c) => modules.push(Box::new(bw_plugins::PluginsModule::new(
@@ -1322,6 +1429,42 @@ fn split_rows(agenda: usize, claude: usize, budget: usize) -> (usize, usize) {
 }
 
 /// « 3:07 », « 1:02:45 ».
+/// « 950 », « 123k », « 1.2M » : lisible dans une ligne étroite.
+fn compact_tokens(n: u64) -> String {
+    match n {
+        0..=999 => n.to_string(),
+        1_000..=999_999 => format!("{}k", n / 1_000),
+        _ => format!("{:.1}M", n as f64 / 1_000_000.0),
+    }
+}
+
+/// « 2 h 10 » ou « 45 min ».
+fn duration_text(d: Duration) -> String {
+    let minutes = d.as_secs().div_ceil(60);
+    if minutes >= 60 {
+        format!("{} h {:02}", minutes / 60, minutes % 60)
+    } else {
+        format!("{minutes} min")
+    }
+}
+
+/// « à l'instant », « il y a 12 min », « il y a 3 h », « il y a 2 j ».
+fn ago(then: chrono::DateTime<chrono::Utc>, now: chrono::DateTime<chrono::Utc>) -> String {
+    let minutes = (now - then).num_minutes().max(0);
+    match minutes {
+        0 => tr!("just now", "à l'instant"),
+        1..=59 => tr!("{minutes} min ago", "il y a {minutes} min"),
+        60..=1439 => {
+            let hours = minutes / 60;
+            tr!("{hours} h ago", "il y a {hours} h")
+        }
+        _ => {
+            let days = minutes / 1440;
+            tr!("{days} d ago", "il y a {days} j")
+        }
+    }
+}
+
 fn format_time(d: Duration) -> String {
     let s = d.as_secs();
     if s >= 3600 {
@@ -1371,7 +1514,29 @@ fn select_ui_language() {
 
 #[cfg(test)]
 mod tests {
-    use super::split_rows;
+    use super::{ago, compact_tokens, duration_text, split_rows};
+
+    #[test]
+    fn activity_formats() {
+        use chrono::{Duration as D, TimeZone, Utc};
+        bw_i18n::set(bw_i18n::Lang::Fr);
+        assert_eq!(compact_tokens(950), "950");
+        assert_eq!(compact_tokens(123_456), "123k");
+        assert_eq!(compact_tokens(1_250_000), "1.2M");
+        assert_eq!(
+            duration_text(std::time::Duration::from_secs(45 * 60)),
+            "45 min"
+        );
+        assert_eq!(
+            duration_text(std::time::Duration::from_secs(130 * 60)),
+            "2 h 10"
+        );
+        let now = Utc.with_ymd_and_hms(2026, 10, 1, 12, 0, 0).unwrap();
+        assert_eq!(ago(now - D::seconds(20), now), "à l'instant");
+        assert_eq!(ago(now - D::minutes(12), now), "il y a 12 min");
+        assert_eq!(ago(now - D::hours(3), now), "il y a 3 h");
+        assert_eq!(ago(now - D::days(2), now), "il y a 2 j");
+    }
 
     #[test]
     fn rows_are_shared() {

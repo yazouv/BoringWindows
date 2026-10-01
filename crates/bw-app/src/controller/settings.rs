@@ -156,6 +156,11 @@ impl Controller {
         ui.set_volume_enabled(config.module_enabled(bw_volume::MODULE_ID, false));
         ui.set_viz_enabled(config.module_enabled(bw_viz::MODULE_ID, false));
         ui.set_plugins_enabled(config.module_enabled(bw_plugins::MODULE_ID, false));
+        let activity =
+            bw_claude::ActivityConfig::from_table(config.modules.get(bw_claude::ACTIVITY_ID))
+                .unwrap_or_default();
+        ui.set_activity_enabled(config.module_enabled(bw_claude::ACTIVITY_ID, true));
+        ui.set_activity_limit_millions((activity.limit_tokens / 1_000_000) as i32);
         let shelf =
             crate::shelf::ShelfConfig::from_table(config.modules.get("shelf")).unwrap_or_default();
         ui.set_shelf_enabled(shelf.enabled);
@@ -674,6 +679,14 @@ impl Controller {
             "modules.media.accent_from_artwork" => Some((
                 vec!["modules", "media", "accent_from_artwork"],
                 Value::Bool(ui.get_media_accent()),
+            )),
+            "modules.claude_activity.enabled" => Some((
+                vec!["modules", "claude_activity", "enabled"],
+                Value::Bool(ui.get_activity_enabled()),
+            )),
+            "modules.claude_activity.limit_millions" => Some((
+                vec!["modules", "claude_activity", "limit_tokens"],
+                Value::Int(i64::from(ui.get_activity_limit_millions()) * 1_000_000),
             )),
             "modules.plugins.enabled" => Some((
                 vec!["modules", "plugins", "enabled"],

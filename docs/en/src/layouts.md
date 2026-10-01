@@ -49,6 +49,8 @@ declare are ignored.
 | `agenda-rows` | `[{ title, time, location, relative, join-url: string, has-join, soon: bool }]` | upcoming events |
 | `viz-bars` | `[float]` | visualizer levels 0 to 1 (empty when off) |
 | `shelf-rows`, `shelf-more` | `[{ name, path: string }]`, string | shelf files (at most 4), "+n" |
+| `recent-rows` | `[{ id, title, meta: string }]` | recent Claude Code conversations (at most 4) |
+| `usage-text`, `usage-ratio`, `usage-has-limit` | string, float, bool | estimated usage, share of the limit (0 to 1) |
 | `plugin-rows` | `[{ name, text: string, attention: int }]` | WASM plugin lines (at most 2) |
 | `has-timer`, `timer-phase`, `timer-time`, `timer-progress`, `timer-presets` | bool, int, string, float, `[string]` | timer (phase: 0 ready, 1 running, 2 paused, 3 done) |
 
@@ -62,6 +64,7 @@ declare are ignored.
 | `claude-focus(string)` | brings the session's terminal to the front (`id`) |
 | `open-url(string)` | opens an `https://` link (e.g. `join-url`) |
 | `shelf-open(int)`, `shelf-remove(int)` | opens / removes the file at the given index |
+| `recent-open(string)` | reopens the conversation with the given id |
 | `timer-action(string)` | `"start:<minutes>"`, `"pause"`, `"resume"`, `"reset"` |
 
 ## Example

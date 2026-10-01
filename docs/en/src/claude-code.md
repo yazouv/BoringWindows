@@ -89,3 +89,39 @@ file name. Never the content of your files nor your messages to Claude. The
 channel (a *named pipe*) is local and restricted to your Windows account. If
 BoringWindows is closed or doesn't answer within 300 ms, the relay steps aside
 and does nothing: **Claude is never blocked**.
+
+## Recent conversations and usage
+
+Open the island and click **Claude ›** (top right): a tab shows
+
+- an **estimate of your usage** over the current 5-hour window, with the time
+  until it renews (and a gauge if you set a limit);
+- your **4 latest conversations** (title, folder, age). Click one to reopen it: a
+  terminal opens in its folder and runs `claude --resume <id>`.
+
+It is read from the transcripts Claude Code keeps locally
+(`~/.claude/projects`): no connection, nothing is sent. Transcripts are only
+re-read when the island opens (at most every 15 s), and only the files that
+changed.
+
+**Usage is an estimate, not your real quota.** Your subscription's limits live
+server-side and Claude Code does not publish them. BoringWindows adds up the
+tokens (input, output, cache creation) of the messages in the current window, as
+the `ccusage` tool does; for a gauge, enter the limit you believe you have
+(millions of tokens) in Settings › Claude Code. For your real remainder, `/usage`
+in Claude Code is the reference.
+
+**Remote** conversations (SSH sessions) are not listed: their folder does not
+exist on this PC. They still count toward usage.
+
+```toml
+[modules.claude_activity]
+enabled = true
+recent = 4                # conversations offered (0 to 4)
+window_hours = 5          # usage window length (1 to 24)
+limit_tokens = 0          # estimated limit for the gauge (0: no gauge)
+count_cache_reads = false # also count cache reads
+```
+
+Reopening uses Windows Terminal (`wt`) if installed, otherwise a console, and
+assumes the `claude` command is on your `PATH`. Windows only for now.

@@ -30,6 +30,12 @@ export struct AgendaRow {
     soon: bool,
 }
 
+export struct RecentRow {
+    id: string,
+    title: string,
+    meta: string,
+}
+
 export struct PluginRow {
     name: string,
     text: string,
@@ -171,6 +177,19 @@ export component Island inherits Window {
     in property <bool> has-media;
     in property <MediaInfo> media;
     in property <[AgendaRow]> agenda-rows;
+    // Onglet Claude : consommation estimée et conversations récentes.
+    in property <bool> has-claude-tab;
+    in-out property <int> tab;
+    in property <[RecentRow]> recent-rows;
+    in property <string> usage-text;
+    in property <float> usage-ratio;
+    in property <bool> usage-has-limit;
+    callback recent-open(string /* id de session */);
+    changed expanded => {
+        if !self.expanded {
+            self.tab = 0;
+        }
+    }
     in property <[float]> viz-bars;
     in property <[PluginRow]> plugin-rows;
     in property <[ShelfRow]> shelf-rows;
@@ -282,13 +301,108 @@ export component Island inherits Window {
                 }
             }
 
+            // Onglet Claude : remplace le contenu ouvert tant qu'il est choisi.
+            if !root.custom-view && root.has-claude-tab && root.tab == 1: VerticalLayout {
+                padding: 16px;
+                padding-top: 10px + root.top-offset / 2;
+                padding-bottom: 8px;
+                spacing: 3px;
+                opacity: root.expanded ? 1 : 0;
+                visible: self.opacity > 0;
+                animate opacity { duration: root.anim; }
+
+                HorizontalLayout {
+                    spacing: 10px;
+                    height: 22px;
+
+                    Text {
+                        text: "‹  " + @tr("Back");
+                        color: back-ta.has-hover ? root.accent : root.fg.with-alpha(0.7);
+                        font-size: 12px;
+                        vertical-alignment: center;
+
+                        back-ta := TouchArea {
+                            clicked => { root.tab = 0; }
+                        }
+                    }
+
+                    Text {
+                        text: "Claude Code";
+                        color: root.fg;
+                        font-size: 14px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                    }
+                }
+
+                Text {
+                    text: root.usage-text;
+                    color: root.fg.with-alpha(0.8);
+                    font-size: 12px;
+                    overflow: elide;
+                }
+
+                if root.usage-has-limit: Rectangle {
+                    height: 4px;
+                    border-radius: 2px;
+                    background: root.fg.with-alpha(0.15);
+
+                    Rectangle {
+                        x: 0;
+                        width: parent.width * clamp(root.usage-ratio, 0, 1);
+                        border-radius: 2px;
+                        background: root.usage-ratio > 0.85 ? #FF453A : root.accent;
+                    }
+                }
+
+                for item in root.recent-rows: Rectangle {
+                    height: 20px;
+                    border-radius: 6px;
+                    background: recent-ta.has-hover ? root.fg.with-alpha(0.12) : transparent;
+
+                    recent-ta := TouchArea {
+                        clicked => { root.recent-open(item.id); }
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        spacing: 10px;
+
+                        Text {
+                            text: item.title;
+                            color: root.fg;
+                            font-size: 12px;
+                            vertical-alignment: center;
+                            overflow: elide;
+                            horizontal-stretch: 1;
+                        }
+
+                        Text {
+                            text: item.meta;
+                            color: root.fg.with-alpha(0.5);
+                            font-size: 11px;
+                            vertical-alignment: center;
+                            horizontal-alignment: right;
+                        }
+                    }
+                }
+
+                if root.recent-rows.length == 0: Text {
+                    text: @tr("No conversation found");
+                    color: root.fg.with-alpha(0.5);
+                    font-size: 12px;
+                }
+            }
+
             // Contenu ouvert.
             if !root.custom-view: VerticalLayout {
                 padding: 16px;
                 padding-top: 10px + root.top-offset / 2;
                 spacing: 8px;
                 opacity: root.expanded ? 1 : 0;
-                visible: self.opacity > 0;
+                visible: self.opacity > 0 && root.tab == 0;
                 animate opacity { duration: root.anim; }
 
                 HorizontalLayout {
@@ -308,6 +422,18 @@ export component Island inherits Window {
                         font-size: 12px;
                         vertical-alignment: center;
                         horizontal-stretch: 1;
+                    }
+
+                    // Onglet Claude (consommation, conversations récentes).
+                    if root.has-claude-tab: Text {
+                        text: "Claude  ›";
+                        color: claude-tab-ta.has-hover ? root.accent : root.fg.with-alpha(0.55);
+                        font-size: 12px;
+                        vertical-alignment: center;
+
+                        claude-tab-ta := TouchArea {
+                            clicked => { root.tab = 1; }
+                        }
                     }
 
                     // Visualiseur audio (désactivé par défaut) : barres d'équaliseur.

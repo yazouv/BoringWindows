@@ -556,3 +556,32 @@ pub fn pick_ics_file() -> Option<std::path::PathBuf> {
         &buffer[..len],
     )))
 }
+
+/// Rouvre une conversation Claude Code : `claude --resume <id>` dans un
+/// terminal ouvert sur le dossier de la session. L'identifiant est validé
+/// (hexadécimal et tirets) avant d'arriver sur une ligne de commande.
+pub fn resume_claude_session(cwd: &Path, session_id: &str) -> bool {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NEW_CONSOLE: u32 = 0x0000_0010;
+
+    if !bw_claude::is_session_id(session_id) || !cwd.is_dir() {
+        log::warn!("reprise de session refusée (id ou dossier invalide)");
+        return false;
+    }
+    // Windows Terminal s'il est là ; `cmd /k` résout `claude.cmd` comme `claude.exe`.
+    let in_terminal = std::process::Command::new("wt.exe")
+        .arg("-d")
+        .arg(cwd)
+        .args(["cmd.exe", "/k", "claude", "--resume", session_id])
+        .spawn();
+    if in_terminal.is_ok() {
+        return true;
+    }
+    std::process::Command::new("cmd.exe")
+        .args(["/k", "claude", "--resume", session_id])
+        .current_dir(cwd)
+        .creation_flags(CREATE_NEW_CONSOLE)
+        .spawn()
+        .map_err(|e| log::warn!("impossible de rouvrir la session : {e}"))
+        .is_ok()
+}

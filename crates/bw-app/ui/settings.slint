@@ -66,6 +66,8 @@ export component SettingsWindow inherits Window {
     in-out property <bool> autostart;
     in-out property <bool> volume-enabled;
     in-out property <bool> viz-enabled;
+    in-out property <bool> activity-enabled;
+    in-out property <int> activity-limit-millions;
     in-out property <bool> plugins-enabled;
     callback open-plugins-folder();
     // --- Apparence ---
@@ -566,6 +568,22 @@ export component SettingsWindow inherits Window {
 
                     Hint {
                         text: @tr("After installing, restart your Claude Code sessions: they only read their hooks at startup.");
+                    }
+
+                    CheckBox {
+                        text: @tr("Recent conversations and usage (Claude Code)");
+                        checked <=> root.activity-enabled;
+                        toggled => { root.changed("modules.claude_activity.enabled"); }
+                    }
+
+                    Row {
+                        label: @tr("Estimated limit, millions of tokens (0 = no gauge)");
+                        SpinBox {
+                            minimum: 0;
+                            maximum: 100000;
+                            value <=> root.activity-limit-millions;
+                            edited => { root.changed("modules.claude_activity.limit_millions"); }
+                        }
                     }
 
                     CheckBox {

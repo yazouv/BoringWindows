@@ -302,3 +302,15 @@ msgstr "Lancer les plugins WASM (code tiers, dans un bac à sable)"
 
 msgid "Plugins folder"
 msgstr "Dossier des plugins"
+
+msgid "Back"
+msgstr "Retour"
+
+msgid "No conversation found"
+msgstr "Aucune conversation trouvée"
+
+msgid "Recent conversations and usage (Claude Code)"
+msgstr "Conversations récentes et consommation (Claude Code)"
+
+msgid "Estimated limit, millions of tokens (0 = no gauge)"
+msgstr "Limite estimée, millions de tokens (0 = pas de jauge)"

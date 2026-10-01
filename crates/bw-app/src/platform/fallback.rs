@@ -135,3 +135,9 @@ pub fn open_path(path: &Path) {
         log::warn!("impossible d'ouvrir {} : {e}", path.display());
     }
 }
+
+/// Reprise d'une conversation Claude Code : pas encore gérée hors Windows.
+pub fn resume_claude_session(_cwd: &Path, _session_id: &str) -> bool {
+    log::warn!("rouvrir une conversation n'est géré que sous Windows");
+    false
+}

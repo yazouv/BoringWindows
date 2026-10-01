@@ -146,6 +146,17 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 | `bands` | `12` | 4 à 32 | nombre de barres |
 | `fps` | `30` | 10 à 60 | images par seconde |
 
+## `[modules.claude_activity]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `true` | | [conversations récentes et consommation estimée](claude-code.md#conversations-récentes-et-consommation) |
+| `recent` | `4` | 0 à 4 | conversations proposées |
+| `window_hours` | `5` | 1 à 24 | durée de la fenêtre de consommation (h) |
+| `limit_tokens` | `0` | | limite estimée pour la jauge (0 : pas de jauge) |
+| `count_cache_reads` | `false` | | compter aussi les lectures de cache |
+| `projects_dir` | `""` | | dossier des transcripts (vide : `~/.claude/projects`) |
+
 ## `[modules.plugins]`
 
 | Option | Défaut | Rôle |

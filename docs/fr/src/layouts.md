@@ -49,6 +49,8 @@ que tu ne déclares pas sont ignorés.
 | `agenda-rows` | `[{ title, time, location, relative, join-url: string, has-join, soon: bool }]` | prochains événements |
 | `viz-bars` | `[float]` | niveaux 0 à 1 du visualiseur (vide si éteint) |
 | `shelf-rows`, `shelf-more` | `[{ name, path: string }]`, string | fichiers de l'étagère (4 au plus), « +n » |
+| `recent-rows` | `[{ id, title, meta: string }]` | conversations Claude Code récentes (4 au plus) |
+| `usage-text`, `usage-ratio`, `usage-has-limit` | string, float, bool | consommation estimée, part de la limite (0 à 1) |
 | `plugin-rows` | `[{ name, text: string, attention: int }]` | lignes des plugins WASM (2 au plus) |
 | `has-timer`, `timer-phase`, `timer-time`, `timer-progress`, `timer-presets` | bool, int, string, float, `[string]` | minuteur (phase : 0 prêt, 1 en cours, 2 pause, 3 terminé) |
 
@@ -62,6 +64,7 @@ que tu ne déclares pas sont ignorés.
 | `claude-focus(string)` | amène au premier plan le terminal de la session (`id`) |
 | `open-url(string)` | ouvre un lien `https://` (ex. `join-url`) |
 | `shelf-open(int)`, `shelf-remove(int)` | ouvre / retire le fichier d'index donné |
+| `recent-open(string)` | rouvre la conversation d'identifiant donné |
 | `timer-action(string)` | `"start:<minutes>"`, `"pause"`, `"resume"`, `"reset"` |
 
 ## Exemple

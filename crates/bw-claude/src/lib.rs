@@ -7,6 +7,7 @@
 //!   ([`tracker`]) et répond aux demandes de permission.
 //! - [`install`] : ajoute/retire nos hooks dans `~/.claude/settings.json`.
 
+mod activity;
 mod config;
 pub mod doctor;
 pub mod event;
@@ -15,7 +16,10 @@ pub mod install;
 pub mod ipc;
 mod module;
 pub mod tracker;
+pub mod transcripts;
 
+pub use activity::{ACTIVITY_ID, ActivityConfig, ActivityModule, ActivitySnapshot, RecentSession};
 pub use config::ClaudeConfig;
 pub use module::{ClaudeModule, MODULE_ID};
 pub use tracker::{PromptView, SessionKind, SessionView, Snapshot};
+pub use transcripts::{UsageSummary, is_session_id};

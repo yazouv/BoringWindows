@@ -269,6 +269,27 @@ impl Controller {
         );
         set("shelf-more", s(ui.get_shelf_more()));
         set(
+            "recent-rows",
+            model(
+                ui.get_recent_rows()
+                    .iter()
+                    .map(|r| {
+                        row([
+                            ("id", s(&r.id)),
+                            ("title", s(&r.title)),
+                            ("meta", s(&r.meta)),
+                        ])
+                    })
+                    .collect(),
+            ),
+        );
+        set("usage-text", s(ui.get_usage_text()));
+        set(
+            "usage-ratio",
+            Value::Number(f64::from(ui.get_usage_ratio())),
+        );
+        set("usage-has-limit", Value::Bool(ui.get_usage_has_limit()));
+        set(
             "plugin-rows",
             model(
                 ui.get_plugin_rows()
@@ -333,6 +354,10 @@ fn wire_callbacks(inst: &ComponentInstance, declared: &HashSet<String>, ui: &sli
     wire(
         "open-url",
         Box::new(|ui, a| ui.invoke_open_url(text_arg(a, 0))),
+    );
+    wire(
+        "recent-open",
+        Box::new(|ui, a| ui.invoke_recent_open(text_arg(a, 0))),
     );
     wire(
         "shelf-open",

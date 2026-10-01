@@ -145,6 +145,17 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 | `bands` | `12` | 4 to 32 | number of bars |
 | `fps` | `30` | 10 to 60 | frames per second |
 
+## `[modules.claude_activity]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `true` | | [recent conversations and estimated usage](claude-code.md#recent-conversations-and-usage) |
+| `recent` | `4` | 0 to 4 | conversations offered |
+| `window_hours` | `5` | 1 to 24 | usage window length (h) |
+| `limit_tokens` | `0` | | estimated limit for the gauge (0: no gauge) |
+| `count_cache_reads` | `false` | | also count cache reads |
+| `projects_dir` | `""` | | transcripts folder (empty: `~/.claude/projects`) |
+
 ## `[modules.plugins]`
 
 | Option | Default | Purpose |

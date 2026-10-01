@@ -343,6 +343,7 @@ de texte aux écrans de l'assistant), puis la fenêtre de réglages.
 - [x] Layouts `.slint` au runtime (`layout.view`, slint-interpreter + ComponentContainer, rechargement à chaud) + doc de l'API de données, FR + EN
 
 ### Phase 5 — Extensions
+- [x] Claude : conversations récentes (reprise `claude --resume`) et consommation estimée de la fenêtre de 5 h, depuis les transcripts locaux (`[modules.claude_activity]`, doc FR + EN)
 - [ ] Spotify Web API (like, queue, Connect)
 - [x] Minuteur (module `bw-timer`, durées prédéfinies, doc FR + EN)
 - [x] Étagère de fichiers (glisser-déposer sur l'île, `[modules.shelf]`, doc FR + EN)
