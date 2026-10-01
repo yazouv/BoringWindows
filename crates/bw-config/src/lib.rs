@@ -282,6 +282,10 @@ impl Config {
 
 /// `%APPDATA%\BoringWindows` sous Windows (équivalent XDG ailleurs).
 pub fn config_dir() -> PathBuf {
+    // Pour tester avec une config jetable sans toucher à la vraie.
+    if let Some(dir) = std::env::var_os("BORINGWINDOWS_CONFIG_DIR") {
+        return PathBuf::from(dir);
+    }
     dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("BoringWindows")

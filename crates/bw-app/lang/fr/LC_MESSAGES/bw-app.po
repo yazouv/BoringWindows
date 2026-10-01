@@ -233,3 +233,36 @@ msgstr "Identifiant"
 
 msgid "App password"
 msgstr "Mot de passe d'application"
+
+msgid "Timer"
+msgstr "Minuteur"
+
+msgid "Time's up!"
+msgstr "C'est fini !"
+
+msgid "{} min"
+msgstr "{} min"
+
+msgid "Pause"
+msgstr "Pause"
+
+msgid "Resume"
+msgstr "Reprendre"
+
+msgid "Reset"
+msgstr "Arrêter"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "Show the timer in the open island"
+msgstr "Afficher le minuteur dans l'île ouverte"
+
+msgid "Play a sound when it ends"
+msgstr "Jouer un son à la fin"
+
+msgid "Durations (minutes)"
+msgstr "Durées (minutes)"
+
+msgid "Up to 5 durations, separated by commas (1 to 600). Open the island and pick one to start; 25 is the classic Pomodoro."
+msgstr "Jusqu'à 5 durées séparées par des virgules (1 à 600). Ouvre l'île et choisis-en une pour démarrer ; 25 est le Pomodoro classique."

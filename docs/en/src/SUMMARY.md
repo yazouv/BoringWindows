@@ -11,6 +11,7 @@
 
 - [Claude Code](claude-code.md)
 - [Music](musique.md)
+- [Timer](minuteur.md)
 - [Calendar](agenda/index.md)
   - [Google Calendar](agenda/google.md)
   - [Outlook and Microsoft 365](agenda/outlook.md)

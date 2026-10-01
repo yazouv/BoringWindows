@@ -17,6 +17,7 @@ use bw_config::{Config, ConfigError, ConfigWatcher, OpenOn};
 use bw_core::{Action, Arbiter, Attention, Module, ModuleEvent, ModuleEventKind, ModuleHost};
 use bw_i18n::tr;
 use bw_media::{MediaConfig, MediaModule, MediaSnapshot};
+use bw_timer::{Phase as TimerPhase, TimerConfig, TimerModule, TimerSnapshot};
 use slint::winit_030::WinitWindowAccessor;
 use slint::{
     ComponentHandle, Image, ModelRc, Rgba8Pixel, SharedPixelBuffer, Timer, TimerMode, VecModel,
@@ -24,7 +25,7 @@ use slint::{
 
 use crate::geometry::{self, Shape};
 use crate::platform::{self, Platform, PlatformEvent, Tray, TrayCommand};
-use crate::{AgendaRow, ClaudePrompt, ClaudeRow, Island, MediaInfo, clock, demo};
+use crate::{AgendaRow, ClaudePrompt, ClaudeRow, Island, MediaInfo, TimerInfo, clock, demo};
 
 /// Pseudo-module utilisé pour signaler une config invalide dans l'île.
 const CONFIG_ERROR: &str = "config";
@@ -90,6 +91,8 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         artwork: RefCell::new(None),
         progress_timer: Timer::default(),
         remind_timer: Timer::default(),
+        timer: RefCell::new(None),
+        timer_tick: Timer::default(),
         media_seen: RefCell::new(BTreeSet::new()),
     });
     CONTROLLER.with(|c| {
@@ -129,6 +132,9 @@ pub struct Controller {
     artwork: RefCell<Option<(Arc<Vec<u8>>, Image)>>,
     progress_timer: Timer,
     remind_timer: Timer,
+    /// Dernier état du minuteur (absent si le module est désactivé).
+    timer: RefCell<Option<Arc<TimerSnapshot>>>,
+    timer_tick: Timer,
     /// Lecteurs vus depuis le lancement (jetons `ignore`), pour les réglages.
     media_seen: RefCell<BTreeSet<String>>,
     calendar: RefCell<Option<Arc<CalendarSnapshot>>>,
@@ -190,6 +196,10 @@ impl Controller {
             }));
         self.ui
             .on_media_seek(with(&weak, |c, fraction: f32| c.media_seek(fraction)));
+        self.ui
+            .on_timer_action(with(&weak, |c, action: slint::SharedString| {
+                c.timer_action(action.to_string());
+            }));
         self.ui.on_open_url(|url| {
             // Uniquement des liens web : jamais de chemin ou de commande venus d'un ICS.
             if url.starts_with("https://") {
@@ -286,6 +296,7 @@ impl Controller {
         if self.expanded.replace(expanded) != expanded {
             self.refresh_shape();
             self.update_progress();
+            self.update_timer_ui();
         }
     }
 
@@ -505,6 +516,9 @@ impl Controller {
         }
 
         *self.calendar.borrow_mut() = None;
+        *self.timer.borrow_mut() = None;
+        self.timer_tick.stop();
+        self.ui.set_has_timer(false);
         self.apply_claude(None);
         *self.media.borrow_mut() = None;
         *self.artwork.borrow_mut() = None;
@@ -545,6 +559,8 @@ impl Controller {
             ModuleEventKind::State(state) => {
                 if let Some(snapshot) = state.downcast_ref::<MediaSnapshot>() {
                     self.apply_media(event.module, Arc::new(snapshot.clone()));
+                } else if let Some(snapshot) = state.downcast_ref::<TimerSnapshot>() {
+                    self.apply_timer(snapshot.clone());
                 } else if let Ok(snapshot) = state.clone().downcast::<CalendarSnapshot>() {
                     *self.calendar.borrow_mut() = Some(snapshot);
                     self.layout_rows();
@@ -557,6 +573,73 @@ impl Controller {
         }
     }
 
+    // --- Minuteur -----------------------------------------------------------
+
+    fn apply_timer(&self, snapshot: TimerSnapshot) {
+        let finished = snapshot.phase == TimerPhase::Done
+            && self
+                .timer
+                .borrow()
+                .as_ref()
+                .is_none_or(|t| t.phase != TimerPhase::Done);
+        if finished && self.timer_config().sound {
+            platform::alert_sound();
+        }
+        *self.timer.borrow_mut() = Some(Arc::new(snapshot));
+        self.ui.set_has_timer(true);
+        self.update_timer_ui();
+        self.layout_rows();
+    }
+
+    fn timer_config(&self) -> TimerConfig {
+        TimerConfig::from_table(self.config.borrow().modules.get(bw_timer::MODULE_ID))
+            .unwrap_or_default()
+    }
+
+    /// Affiche le minuteur ; les secondes ne défilent que si l'île est ouverte.
+    fn update_timer_ui(&self) {
+        let timer = self.timer.borrow();
+        let Some(t) = timer.as_ref() else {
+            self.timer_tick.stop();
+            return;
+        };
+        let now = std::time::Instant::now();
+        self.ui.set_timer(TimerInfo {
+            phase: match t.phase {
+                TimerPhase::Idle => 0,
+                TimerPhase::Running => 1,
+                TimerPhase::Paused => 2,
+                TimerPhase::Done => 3,
+            },
+            time: format_time(t.remaining_now(now) + Duration::from_millis(999)).into(),
+            progress: t.progress_now(now),
+            presets: ModelRc::new(VecModel::from(
+                t.presets
+                    .iter()
+                    .map(|m| slint::SharedString::from(m.to_string()))
+                    .collect::<Vec<_>>(),
+            )),
+        });
+        let ticking = self.expanded.get() && t.phase == TimerPhase::Running;
+        if ticking && !self.timer_tick.running() {
+            self.timer_tick
+                .start(TimerMode::Repeated, Duration::from_secs(1), || {
+                    post(|c| c.update_timer_ui())
+                });
+        } else if !ticking {
+            self.timer_tick.stop();
+        }
+    }
+
+    fn timer_action(&self, action: String) {
+        if let Some(host) = self.host.borrow().as_ref() {
+            host.send_action(Action {
+                module: bw_timer::MODULE_ID.into(),
+                name: action,
+            });
+        }
+    }
+
     // --- Lignes : agenda et sessions Claude ---------------------------------
 
     /// Répartit les lignes disponibles entre l'agenda et les sessions Claude.
@@ -565,6 +648,12 @@ impl Controller {
             MAX_ROWS_WITH_MEDIA
         } else {
             MAX_ROWS
+        };
+        // La ligne du minuteur prend une place, sans jamais vider le reste.
+        let budget = if self.ui.get_has_timer() && budget > 1 {
+            budget - 1
+        } else {
+            budget
         };
 
         let mut agenda: Vec<AgendaRow> = Vec::new();
@@ -979,6 +1068,12 @@ fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
         match CalendarConfig::from_table(config.modules.get(bw_calendar::MODULE_ID)) {
             Ok(c) => modules.push(Box::new(CalendarModule::new(c))),
             Err(e) => errors.push(format!("modules.calendar : {e:#}")),
+        }
+    }
+    if config.module_enabled(bw_timer::MODULE_ID, false) {
+        match TimerConfig::from_table(config.modules.get(bw_timer::MODULE_ID)) {
+            Ok(c) => modules.push(Box::new(TimerModule::new(c))),
+            Err(e) => errors.push(format!("modules.timer : {e:#}")),
         }
     }
     if config.module_enabled("demo", false) {

@@ -173,6 +173,20 @@ impl Controller {
             MediaConfig::from_table(config.modules.get(bw_media::MODULE_ID)).unwrap_or_default();
         ui.set_media_accent(media.accent_from_artwork);
         ui.set_media_ignore(media.ignore.join(", ").into());
+
+        let timer = bw_timer::TimerConfig::from_table(config.modules.get(bw_timer::MODULE_ID))
+            .unwrap_or_default();
+        ui.set_timer_enabled(config.module_enabled(bw_timer::MODULE_ID, false));
+        ui.set_timer_sound(timer.sound);
+        ui.set_timer_presets(
+            timer
+                .presets
+                .iter()
+                .map(u32::to_string)
+                .collect::<Vec<_>>()
+                .join(", ")
+                .into(),
+        );
         drop(config);
 
         self.refresh_sources(ui);
@@ -634,6 +648,23 @@ impl Controller {
                 vec!["modules", "media", "accent_from_artwork"],
                 Value::Bool(ui.get_media_accent()),
             )),
+            "modules.timer.enabled" => Some((
+                vec!["modules", "timer", "enabled"],
+                Value::Bool(ui.get_timer_enabled()),
+            )),
+            "modules.timer.sound" => Some((
+                vec!["modules", "timer", "sound"],
+                Value::Bool(ui.get_timer_sound()),
+            )),
+            "modules.timer.presets" => {
+                let minutes: Vec<i64> = ui
+                    .get_timer_presets()
+                    .split(',')
+                    .filter_map(|s| s.trim().parse().ok())
+                    .collect();
+                // Saisie incomplète (« 5, » ou vide) : on attend la suite.
+                (!minutes.is_empty()).then(|| (vec!["modules", "timer", "presets"], Value::IntList(minutes)))
+            }
             "modules.media.ignore" => Some((
                 vec!["modules", "media", "ignore"],
                 Value::StrList(

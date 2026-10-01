@@ -19,6 +19,7 @@ bw-i18n = { path = "crates/bw-i18n" }
 bw-net = { path = "crates/bw-net" }
 bw-update = { path = "crates/bw-update" }
 bw-secrets = { path = "crates/bw-secrets" }
+bw-timer = { path = "crates/bw-timer" }
 anyhow = "1"
 log = "0.4"
 serde = { version = "1", features = ["derive"] }

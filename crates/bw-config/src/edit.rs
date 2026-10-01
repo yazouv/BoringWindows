@@ -15,6 +15,7 @@ pub enum Value {
     Int(i64),
     Float(f64),
     StrList(Vec<String>),
+    IntList(Vec<i64>),
 }
 
 pub struct ConfigEditor {
@@ -61,6 +62,7 @@ impl ConfigEditor {
             Value::Int(i) => value(i),
             Value::Float(f) => value(f),
             Value::StrList(list) => value(list.into_iter().collect::<Array>()),
+            Value::IntList(list) => value(list.into_iter().collect::<Array>()),
         };
         // Garder la décoration (commentaire en fin de ligne) d'une valeur existante.
         match table.get_mut(last) {

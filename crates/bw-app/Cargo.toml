@@ -19,6 +19,7 @@ bw-claude.workspace = true
 bw-config.workspace = true
 bw-core.workspace = true
 bw-media.workspace = true
+bw-timer.workspace = true
 bw-update.workspace = true
 bw-secrets.workspace = true
 env_logger = { version = "0.11", default-features = false, features = ["auto-color", "humantime"] }

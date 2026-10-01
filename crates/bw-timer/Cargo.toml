@@ -1,0 +1,18 @@
+[package]
+name = "bw-timer"
+description = "Minuteur pour BoringWindows (Pomodoro, cuisson…)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+bw-i18n.workspace = true
+anyhow.workspace = true
+bw-core.workspace = true
+serde.workspace = true
+tokio.workspace = true
+toml.workspace = true
+
+[lints]
+workspace = true

@@ -475,6 +475,7 @@ dependencies = [
  "bw-i18n",
  "bw-media",
  "bw-secrets",
+ "bw-timer",
  "bw-update",
  "chrono",
  "env_logger",
@@ -583,6 +584,18 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "keyring",
+]
+
+[[package]]
+name = "bw-timer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bw-core",
+ "bw-i18n",
+ "serde",
+ "tokio",
+ "toml",
 ]
 
 [[package]]

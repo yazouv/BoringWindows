@@ -106,6 +106,9 @@ export component SettingsWindow inherits Window {
     // --- Musique ---
     in-out property <bool> media-accent;
     in-out property <string> media-ignore;
+    in-out property <bool> timer-enabled;
+    in-out property <bool> timer-sound;
+    in-out property <string> timer-presets;
     // --- Pied de page ---
     in property <string> status;
     in property <bool> status-error;
@@ -595,6 +598,38 @@ export component SettingsWindow inherits Window {
 
                     Hint {
                         text: @tr("Separate names with commas; part of the name is enough. Spotify, Apple Music, browsers, VLC… are detected automatically.");
+                    }
+                }
+            }
+
+            Tab {
+                title: @tr("Timer");
+                VerticalBox {
+                    alignment: start;
+
+                    CheckBox {
+                        text: @tr("Show the timer in the open island");
+                        checked <=> root.timer-enabled;
+                        toggled => { root.changed("modules.timer.enabled"); }
+                    }
+
+                    CheckBox {
+                        text: @tr("Play a sound when it ends");
+                        checked <=> root.timer-sound;
+                        toggled => { root.changed("modules.timer.sound"); }
+                    }
+
+                    Row {
+                        label: @tr("Durations (minutes)");
+                        LineEdit {
+                            text <=> root.timer-presets;
+                            placeholder-text: "5, 15, 25";
+                            edited => { root.changed("modules.timer.presets"); }
+                        }
+                    }
+
+                    Hint {
+                        text: @tr("Up to 5 durations, separated by commas (1 to 600). Open the island and pick one to start; 25 is the classic Pomodoro.");
                     }
                 }
             }

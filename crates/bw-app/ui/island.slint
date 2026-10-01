@@ -30,6 +30,14 @@ export struct AgendaRow {
     soon: bool,
 }
 
+export struct TimerInfo {
+    /// 0 prêt, 1 en cours, 2 en pause, 3 terminé.
+    phase: int,
+    time: string,
+    progress: float,
+    presets: [string],
+}
+
 export struct MediaInfo {
     title: string,
     artist: string,
@@ -152,6 +160,9 @@ export component Island inherits Window {
     in property <bool> has-media;
     in property <MediaInfo> media;
     in property <[AgendaRow]> agenda-rows;
+    in property <bool> has-timer;
+    in property <TimerInfo> timer;
+    callback timer-action(string /* start:<min> | pause | resume | reset */);
     in property <bool> compact-art-visible;
     in property <image> compact-art;
 
@@ -441,6 +452,83 @@ export component Island inherits Window {
                             line: root.fg.with-alpha(0.25);
                             clicked => { root.claude-decide(root.prompt.id, "ask"); }
                         }
+                    }
+                }
+
+                // Minuteur : durées prédéfinies, compte à rebours, pause.
+                if !root.has-prompt && root.has-timer: HorizontalLayout {
+                    height: 30px;
+                    spacing: 6px;
+                    padding-left: 6px;
+
+                    Text {
+                        text: root.timer.phase == 0 ? @tr("Timer")
+                            : root.timer.phase == 3 ? @tr("Time's up!") : root.timer.time;
+                        color: root.timer.phase == 0 ? root.fg.with-alpha(0.7) : root.accent;
+                        font-size: root.timer.phase == 0 ? 12px : 16px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                        min-width: 64px;
+                    }
+
+                    if root.timer.phase == 0: HorizontalLayout {
+                        spacing: 6px;
+
+                        for minutes in root.timer.presets: PillButton {
+                            text: @tr("{} min", minutes);
+                            fill: root.fg.with-alpha(0.12);
+                            ink: root.fg;
+                            clicked => { root.timer-action("start:" + minutes); }
+                        }
+                    }
+
+                    if root.timer.phase == 1 || root.timer.phase == 2: Rectangle {
+                        horizontal-stretch: 1;
+                        height: 12px;
+
+                        Rectangle {
+                            y: (parent.height - self.height) / 2;
+                            height: 3px;
+                            border-radius: 1.5px;
+                            background: root.fg.with-alpha(0.15);
+                        }
+
+                        Rectangle {
+                            y: (parent.height - self.height) / 2;
+                            width: parent.width * clamp(root.timer.progress, 0, 1);
+                            height: 3px;
+                            border-radius: 1.5px;
+                            background: root.accent;
+                        }
+                    }
+
+                    if root.timer.phase == 1: PillButton {
+                        text: @tr("Pause");
+                        fill: root.fg.with-alpha(0.12);
+                        ink: root.fg;
+                        clicked => { root.timer-action("pause"); }
+                    }
+
+                    if root.timer.phase == 2: PillButton {
+                        text: @tr("Resume");
+                        fill: root.accent;
+                        ink: root.bg;
+                        clicked => { root.timer-action("resume"); }
+                    }
+
+                    if root.timer.phase == 1 || root.timer.phase == 2: PillButton {
+                        text: @tr("Reset");
+                        fill: transparent;
+                        ink: root.fg.with-alpha(0.8);
+                        line: root.fg.with-alpha(0.25);
+                        clicked => { root.timer-action("reset"); }
+                    }
+
+                    if root.timer.phase == 3: PillButton {
+                        text: @tr("OK");
+                        fill: root.accent;
+                        ink: root.bg;
+                        clicked => { root.timer-action("reset"); }
                     }
                 }
 
