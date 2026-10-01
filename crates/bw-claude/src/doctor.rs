@@ -59,6 +59,9 @@ pub fn run(app_exe: &Path) -> String {
     r.section("3. BoringWindows en cours d'exécution");
     let reachable = check_app(&mut r, &endpoint);
 
+    // Lu avant le test 4, qui écrit lui-même dans le journal.
+    let journal = std::fs::read_to_string(install::hook_log_path()).ok();
+
     r.section("4. Relais lancé comme le fait Claude Code");
     if let Some(command) = &command {
         check_like_claude(&mut r, command);
@@ -67,7 +70,7 @@ pub fn run(app_exe: &Path) -> String {
     }
 
     r.section("5. Journal du relais (derniers appels de Claude Code)");
-    check_journal(&mut r);
+    check_journal(&mut r, journal);
 
     if reachable {
         r.section("6. Test visuel");
@@ -129,6 +132,9 @@ fn check_settings(r: &mut Report, installer: &Installer) -> Option<String> {
     }
     if found.len() == install::HOOK_EVENTS.len() {
         r.ok(format!("{} événements branchés", found.len()));
+        if !install::is_current(&settings, &install::hook_command(&installer.binary_path)) {
+            r.info("hooks d'une version précédente : mis à jour au prochain lancement de l'app");
+        }
     }
     if let Some(c) = &command {
         r.info(format!("commande : {c}"));
@@ -338,10 +344,10 @@ fn wait_with_timeout(
     }
 }
 
-fn check_journal(r: &mut Report) {
+fn check_journal(r: &mut Report, journal: Option<String>) {
     let path = install::hook_log_path();
     r.info(format!("fichier : {}", path.display()));
-    let Ok(text) = std::fs::read_to_string(&path) else {
+    let Some(text) = journal else {
         r.bad("aucun journal : Claude Code n'a jamais lancé le relais");
         r.info("→ relance tes sessions Claude Code après l'installation des hooks");
         return;

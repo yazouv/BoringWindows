@@ -131,6 +131,36 @@ pub fn without_hooks(mut settings: Value) -> Value {
 }
 
 /// Ajoute nos hooks (en remplaçant une éventuelle installation précédente).
+/// Entrée de settings.json pour un événement.
+///
+/// Seule la demande de permission bloque Claude (il attend la réponse de
+/// l'île) ; les autres événements sont `async` : Claude n'attend pas le
+/// relais, aucune latence ajoutée aux outils.
+fn hook_group(event: &str, command: &str) -> Value {
+    let blocking = event == "PermissionRequest";
+    let mut hook = json!({
+        "type": "command",
+        "command": command,
+        "timeout": if blocking { PERMISSION_TIMEOUT } else { TIMEOUT },
+    });
+    if !blocking {
+        hook["async"] = true.into();
+    }
+    let mut group = json!({ "hooks": [hook] });
+    if TOOL_EVENTS.contains(&event) {
+        group["matcher"] = "*".into();
+    }
+    group
+}
+
+/// Nos entrées sont exactement celles de cette version (sinon : mise à jour).
+pub fn is_current(settings: &Value, command: &str) -> bool {
+    HOOK_EVENTS.iter().all(|event| {
+        let expected = hook_group(event, command);
+        entries(&settings["hooks"][*event]).any(|g| *g == expected)
+    })
+}
+
 pub fn with_hooks(settings: Value, command: &str) -> anyhow::Result<Value> {
     let mut settings = without_hooks(settings);
     let root = settings
@@ -143,17 +173,7 @@ pub fn with_hooks(settings: Value, command: &str) -> anyhow::Result<Value> {
         .context("« hooks » doit être un objet")?;
 
     for event in HOOK_EVENTS {
-        let timeout = if event == "PermissionRequest" {
-            PERMISSION_TIMEOUT
-        } else {
-            TIMEOUT
-        };
-        let mut group = json!({
-            "hooks": [{ "type": "command", "command": command, "timeout": timeout }]
-        });
-        if TOOL_EVENTS.contains(&event) {
-            group["matcher"] = "*".into();
-        }
+        let group = hook_group(event, command);
         hooks
             .entry(event)
             .or_insert_with(|| Value::Array(Vec::new()))
@@ -191,8 +211,9 @@ impl Installer {
 
     /// Installés par une version précédente, avec moins d'événements.
     pub fn needs_upgrade(&self) -> bool {
+        let command = hook_command(&self.binary_path);
         self.read()
-            .is_ok_and(|s| is_installed(&s) && !is_complete(&s))
+            .is_ok_and(|s| is_installed(&s) && !is_current(&s, &command))
     }
 
     /// Copie `source` (l'exécutable courant) comme relais et déclare les hooks.
@@ -331,6 +352,30 @@ mod tests {
         let mut s = with_hooks(json!({}), CMD).unwrap();
         s["hooks"].as_object_mut().unwrap().remove("PostToolUse");
         assert!(is_installed(&s) && !is_complete(&s));
+        assert!(!is_current(&s, CMD));
+    }
+
+    #[test]
+    fn only_permission_request_blocks_claude() {
+        let s = with_hooks(json!({}), CMD).unwrap();
+        assert!(is_current(&s, CMD));
+        for event in HOOK_EVENTS {
+            let hook = &s["hooks"][event][0]["hooks"][0];
+            assert_eq!(
+                hook.get("async").is_none(),
+                event == "PermissionRequest",
+                "{event}"
+            );
+        }
+        // Une entrée de l'utilisateur ajoutée après les nôtres ne force pas
+        // de réinstallation.
+        let mut s2 = s.clone();
+        s2["hooks"]["Stop"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({ "hooks": [{ "type": "command", "command": "x" }] }));
+        assert!(is_current(&s2, CMD));
+        assert!(!is_current(&s, "\"autre\" hook"));
     }
 
     #[test]
