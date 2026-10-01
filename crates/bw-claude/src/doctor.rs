@@ -15,7 +15,7 @@ use crate::install::{self, Installer};
 use crate::ipc::{self, Message};
 
 /// Session fictive utilisée pour les tests (affichée « diagnostic »).
-const SESSION: &str = "bw-doctor";
+pub const SESSION: &str = "bw-doctor";
 
 struct Report {
     text: String,
@@ -356,13 +356,10 @@ fn check_journal(r: &mut Report, journal: Option<String>) {
     for line in &lines[lines.len().saturating_sub(12)..] {
         r.info(line);
     }
-    if lines
-        .iter()
-        .rev()
-        .take(12)
-        .any(|l| l.contains("injoignable"))
-    {
-        r.bad("des appels récents n'ont pas joint l'app (voir ci-dessus)");
+    // Seul le dernier appel compte : les échecs plus anciens datent souvent
+    // d'un moment où l'app était simplement fermée.
+    if lines.last().is_some_and(|l| l.contains("injoignable")) {
+        r.bad("le dernier appel de Claude n'a pas joint l'app (était-elle lancée ?)");
     }
 }
 
