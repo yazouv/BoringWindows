@@ -515,6 +515,7 @@ impl Controller {
             agenda.extend(cal.items.iter().map(|i| AgendaRow {
                 title: i.title.as_str().into(),
                 time: i.time.as_str().into(),
+                location: i.location.clone().unwrap_or_default().into(),
                 relative: i.relative.clone().unwrap_or_default().into(),
                 join_url: i.join_url.clone().unwrap_or_default().into(),
                 has_join: i.join_url.is_some(),

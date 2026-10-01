@@ -22,6 +22,8 @@ pub struct AgendaItem {
     /// « dans 12 min », « en cours »…
     pub relative: Option<String>,
     pub join_url: Option<String>,
+    /// Salle ou lieu court (« 112 », « R52 ») ; les adresses et liens sont omis.
+    pub location: Option<String>,
     /// Imminent ou en cours : mis en valeur.
     pub soon: bool,
 }
@@ -58,18 +60,26 @@ pub fn agenda(
         .map(|e| item(e, now, remind))
         .collect();
 
-    let next_meeting = visible.iter().find(|e| !e.all_day);
+    // Prochaine réunion : celle qui vient de commencer ou la suivante. Un
+    // cours en cours depuis longtemps ne masque pas celui qui enchaîne.
+    let next_meeting = visible
+        .iter()
+        .filter(|e| !e.all_day)
+        .find(|e| e.start > now || now < e.start + JOIN_GRACE);
+    // L'essentiel en tête (quand, où), le titre souvent long à la fin.
+    let line = |when: String, e: &Event| match room(e) {
+        Some(r) => format!("{when} · {r} · {}", e.title),
+        None => format!("{when} · {}", e.title),
+    };
     let (attention, summary) = match next_meeting {
-        Some(e) if e.start <= now && now < e.start + JOIN_GRACE => {
-            (Attention::High, Some(format!("{} · a commencé", e.title)))
-        }
-        Some(e) if e.start > now && e.start - now <= remind => (
+        Some(e) if e.start <= now => (Attention::High, Some(line("Commencé".into(), e))),
+        Some(e) if e.start - now <= remind => (
             Attention::High,
-            Some(format!("{} {}", e.title, countdown(e.start - now))),
+            Some(line(capitalize(&countdown(e.start - now)), e)),
         ),
-        Some(e) if e.start > now && e.start - now <= COUNTDOWN => (
+        Some(e) if e.start - now <= COUNTDOWN => (
             Attention::Low,
-            Some(format!("{} à {}", e.title, clock(e.start))),
+            Some(line(format!("À {}", clock(e.start)), e)),
         ),
         _ => (Attention::None, None),
     };
@@ -101,17 +111,42 @@ fn item(e: &Event, now: DateTime<Utc>, remind: Duration) -> AgendaItem {
         title: e.title.clone(),
         time: if e.all_day {
             "toute la journée".into()
-        } else if e.start.with_timezone(&Local).date_naive()
-            != now.with_timezone(&Local).date_naive()
-        {
-            format!("demain {}", clock(e.start))
         } else {
-            clock(e.start)
+            match (e.start.with_timezone(&Local).date_naive()
+                - now.with_timezone(&Local).date_naive())
+            .num_days()
+            {
+                ..=0 => clock(e.start),
+                1 => format!("demain {}", clock(e.start)),
+                _ => format!("{} {}", weekday(e.start), clock(e.start)),
+            }
         },
         relative,
         join_url: e.join_url.clone(),
+        location: room(e),
         soon: !e.all_day && (ongoing || until <= remind),
     }
+}
+
+/// Lieu affichable : court, sans lien ni adresse.
+fn room(e: &Event) -> Option<String> {
+    let loc = e.location.as_deref()?.trim();
+    let useful = loc.chars().any(char::is_alphanumeric);
+    (useful && !loc.contains("://") && loc.chars().count() <= 20).then(|| loc.to_owned())
+}
+
+fn weekday(t: DateTime<Utc>) -> &'static str {
+    use chrono::Datelike;
+    ["lun.", "mar.", "mer.", "jeu.", "ven.", "sam.", "dim."]
+        [t.with_timezone(&Local).weekday().num_days_from_monday() as usize]
+}
+
+fn capitalize(s: &str) -> String {
+    let mut chars = s.chars();
+    chars
+        .next()
+        .map(|c| c.to_uppercase().chain(chars).collect())
+        .unwrap_or_default()
 }
 
 fn clock(t: DateTime<Utc>) -> String {
@@ -200,12 +235,12 @@ mod tests {
 
         let (s, next) = agenda(&events, at(26), &config());
         assert_eq!(s.attention, Attention::High);
-        assert_eq!(s.summary.as_deref(), Some("Daily dans 4 min"));
+        assert_eq!(s.summary.as_deref(), Some("Dans 4 min · Daily"));
         assert!(s.items[0].soon);
         assert_eq!(next, Some(at(27)));
 
         let (s, _) = agenda(&events, at(32), &config());
-        assert_eq!(s.summary.as_deref(), Some("Daily · a commencé"));
+        assert_eq!(s.summary.as_deref(), Some("Commencé · Daily"));
         assert_eq!(s.items[0].relative.as_deref(), Some("en cours"));
 
         // Après le délai pour rejoindre : encore listée, plus d'alerte.
@@ -224,7 +259,7 @@ mod tests {
         let mut ev = meeting("X", 4, 10);
         ev.start += Duration::seconds(10);
         let (s, next) = agenda(&[ev], at(0), &config());
-        assert_eq!(s.summary.as_deref(), Some("X dans 5 min"));
+        assert_eq!(s.summary.as_deref(), Some("Dans 5 min · X"));
         assert_eq!(next, Some(at(0) + Duration::seconds(10)));
     }
 
@@ -244,6 +279,42 @@ mod tests {
         };
         let (s, _) = agenda(&events, at(0), &hidden);
         assert_eq!(s.items.len(), 1);
+    }
+
+    #[test]
+    fn back_to_back_classes() {
+        // 08:00-10:00 puis 10:00-12:00 : à 09:58, on annonce le suivant.
+        let events = [meeting("SAÉ", 0, 120), meeting("TP", 120, 120)];
+        let (s, _) = agenda(&events, at(118), &config());
+        assert_eq!(s.attention, Attention::High);
+        assert_eq!(s.summary.as_deref(), Some("Dans 2 min · TP"));
+        assert_eq!(s.items[0].relative.as_deref(), Some("en cours"));
+    }
+
+    #[test]
+    fn room_comes_first_and_links_are_not_rooms() {
+        let mut class = meeting(
+            "R5A.07 - Automatisation de la chaîne de production / TP",
+            3,
+            60,
+        );
+        class.location = Some("112".into());
+        let (s, _) = agenda(&[class.clone()], at(0), &config());
+        assert_eq!(
+            s.summary.as_deref(),
+            Some("Dans 3 min · 112 · R5A.07 - Automatisation de la chaîne de production / TP")
+        );
+        assert_eq!(s.items[0].location.as_deref(), Some("112"));
+
+        for useless in [
+            ".",
+            "https://teams.microsoft.com/l/x",
+            "Salle de réunion du 3e étage, bâtiment B",
+        ] {
+            class.location = Some(useless.into());
+            let (s, _) = agenda(&[class.clone()], at(0), &config());
+            assert_eq!(s.items[0].location, None, "{useless}");
+        }
     }
 
     #[test]

@@ -23,6 +23,7 @@ export struct ClaudePrompt {
 export struct AgendaRow {
     title: string,
     time: string,
+    location: string,
     relative: string,
     join-url: string,
     has-join: bool,
@@ -457,6 +458,14 @@ export component Island inherits Window {
                             Text {
                                 text: item.time;
                                 color: item.soon ? root.accent : root.fg.with-alpha(0.7);
+                                font-size: 12px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                            }
+
+                            if item.location != "": Text {
+                                text: item.location;
+                                color: root.fg.with-alpha(0.55);
                                 font-size: 12px;
                                 font-weight: 600;
                                 vertical-alignment: center;

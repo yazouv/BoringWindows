@@ -9,7 +9,7 @@ mod join;
 mod module;
 mod tz;
 
-pub use agenda::{AgendaItem, CalendarSnapshot};
+pub use agenda::{AgendaItem, CalendarSnapshot, agenda};
 pub use config::{CalendarConfig, Source};
 pub use ics::Event;
 pub use module::{CalendarModule, MODULE_ID};
