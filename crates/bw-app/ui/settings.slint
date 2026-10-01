@@ -119,6 +119,8 @@ export component SettingsWindow inherits Window {
     callback theme-picked(int);
     callback update-clicked();
     callback open-themes-folder();
+    callback open-layouts-folder();
+    in-out property <string> view-name;
     callback provider-changed(int);
     callback open-guide();
     callback browse-file();
@@ -215,6 +217,23 @@ export component SettingsWindow inherits Window {
                             text: @tr("Themes folder");
                             clicked => { root.open-themes-folder(); }
                         }
+                    }
+
+                    Row {
+                        label: @tr("Custom view of the open island");
+                        LineEdit {
+                            text <=> root.view-name;
+                            placeholder-text: "my-view";
+                            edited => { root.changed("layout.view"); }
+                        }
+                        Button {
+                            text: @tr("Layouts folder");
+                            clicked => { root.open-layouts-folder(); }
+                        }
+                    }
+
+                    Hint {
+                        text: @tr("Name of a file in the layouts folder, without .slint. Leave empty for the built-in view; see the documentation for the data you can use.");
                     }
 
                     Row {

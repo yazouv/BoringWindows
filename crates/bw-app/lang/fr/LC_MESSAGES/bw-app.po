@@ -266,3 +266,12 @@ msgstr "Durées (minutes)"
 
 msgid "Up to 5 durations, separated by commas (1 to 600). Open the island and pick one to start; 25 is the classic Pomodoro."
 msgstr "Jusqu'à 5 durées séparées par des virgules (1 à 600). Ouvre l'île et choisis-en une pour démarrer ; 25 est le Pomodoro classique."
+
+msgid "Custom view of the open island"
+msgstr "Vue personnelle de l'île ouverte"
+
+msgid "Layouts folder"
+msgstr "Dossier des vues"
+
+msgid "Name of a file in the layouts folder, without .slint. Leave empty for the built-in view; see the documentation for the data you can use."
+msgstr "Nom d'un fichier du dossier des vues, sans .slint. Laisse vide pour la vue fournie ; la documentation liste les données utilisables."

@@ -31,6 +31,13 @@ slint = { version = "~1.18", default-features = false, features = [
     "renderer-femtovg",
     "unstable-winit-030",
 ] }
+slint-interpreter = { version = "~1.18", default-features = false, features = [
+    "std",
+    "compat-1-2",
+    "backend-winit",
+    "renderer-femtovg",
+    "internal",
+] }
 tokio.workspace = true
 
 [target.'cfg(any(windows, target_os = "macos"))'.dependencies]

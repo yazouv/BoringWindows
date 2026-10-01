@@ -68,6 +68,7 @@ Width between 16 and 4000, height between 8 and 2000.
 | Option | Default | Role |
 |---|---|---|
 | `compact` | `["claude", "media", "calendar"]` | priority order of modules **at equal importance** (something urgent always wins) |
+| `view` | `""` | name of a file in `layouts/` (without `.slint`): [custom view](layouts.md) of the open island |
 
 ## `[modules.claude]`
 

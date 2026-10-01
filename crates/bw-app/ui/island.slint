@@ -160,6 +160,8 @@ export component Island inherits Window {
     in property <bool> has-media;
     in property <MediaInfo> media;
     in property <[AgendaRow]> agenda-rows;
+    in property <bool> custom-view;
+    in property <component-factory> custom-view-factory;
     in property <bool> has-timer;
     in property <TimerInfo> timer;
     callback timer-action(string /* start:<min> | pause | resume | reset */);
@@ -248,8 +250,23 @@ export component Island inherits Window {
                 }
             }
 
+            // Vue personnelle de l'île ouverte (layouts/<nom>.slint, voir la doc).
+            if root.custom-view: Rectangle {
+                opacity: root.expanded ? 1 : 0;
+                visible: self.opacity > 0;
+                animate opacity { duration: root.anim; }
+
+                ComponentContainer {
+                    x: 0;
+                    y: root.top-offset;
+                    width: parent.width;
+                    height: parent.height - root.top-offset;
+                    component-factory: root.custom-view-factory;
+                }
+            }
+
             // Contenu ouvert.
-            VerticalLayout {
+            if !root.custom-view: VerticalLayout {
                 padding: 16px;
                 padding-top: 10px + root.top-offset / 2;
                 spacing: 8px;

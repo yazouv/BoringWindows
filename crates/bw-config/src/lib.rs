@@ -158,14 +158,51 @@ impl Size {
 pub struct Layout {
     /// Ordre de priorité des modules en mode compact.
     pub compact: Vec<String>,
+    /// Vue personnelle de l'île ouverte : `layouts/<view>.slint` (vide = vue fournie).
+    pub view: String,
+    /// Empreinte du fichier de la vue : le rechargement à chaud repose dessus.
+    #[serde(skip)]
+    pub view_stamp: u64,
 }
 
 impl Default for Layout {
     fn default() -> Self {
         Self {
             compact: vec!["claude".into(), "media".into(), "calendar".into()],
+            view: String::new(),
+            view_stamp: 0,
         }
     }
+}
+
+/// Dossier des vues `.slint` personnelles, à côté de config.toml.
+pub fn layouts_dir(config_dir: &Path) -> PathBuf {
+    config_dir.join("layouts")
+}
+
+/// Fichier de la vue personnelle `name`.
+pub fn layout_path(config_dir: &Path, name: &str) -> PathBuf {
+    layouts_dir(config_dir).join(format!("{name}.slint"))
+}
+
+fn view_stamp(config_dir: &Path, name: &str) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    // Les fichiers importés comptent aussi : tout le dossier entre dans l'empreinte.
+    let mut files: Vec<_> = std::fs::read_dir(layouts_dir(config_dir))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|x| x == "slint"))
+        .collect();
+    files.sort();
+    for file in files {
+        file.hash(&mut hasher);
+        std::fs::read(&file).unwrap_or_default().hash(&mut hasher);
+    }
+    name.hash(&mut hasher);
+    hasher.finish()
 }
 
 impl Config {
@@ -182,8 +219,11 @@ impl Config {
         toml::from_str::<Config>(s)?;
         let mut table: toml::Table = s.parse()?;
         theme::resolve(&mut table, config_dir).map_err(|e| ConfigError::Invalid(vec![e]))?;
-        let config: Config = toml::Value::Table(table).try_into()?;
+        let mut config: Config = toml::Value::Table(table).try_into()?;
         config.validate()?;
+        if !config.layout.view.is_empty() {
+            config.layout.view_stamp = view_stamp(config_dir, &config.layout.view);
+        }
         Ok(config)
     }
 
@@ -221,6 +261,18 @@ impl Config {
     fn validate(&self) -> Result<(), ConfigError> {
         let mut errors = Vec::new();
         let t = &self.theme;
+
+        if !self
+            .layout
+            .view
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        {
+            errors.push(tr!(
+                "layout.view: letters, digits, - and _ only (the file is layouts/<name>.slint)",
+                "layout.view : lettres, chiffres, - et _ seulement (le fichier est layouts/<nom>.slint)"
+            ));
+        }
 
         for (name, size) in [
             ("theme.compact", t.compact),
@@ -298,6 +350,27 @@ pub fn config_path() -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn custom_view_name_and_stamp() {
+        let dir = tempfile::tempdir().unwrap();
+        let cfg = |s: &str| Config::parse(s, dir.path());
+
+        assert_eq!(cfg("").unwrap().layout.view, "");
+        assert_eq!(cfg("").unwrap().layout.view_stamp, 0);
+        assert!(cfg("[layout]\nview = \"../evil\"").is_err());
+        assert!(cfg("[layout]\nview = \"a b\"").is_err());
+
+        std::fs::create_dir(layouts_dir(dir.path())).unwrap();
+        let file = layout_path(dir.path(), "mine");
+        std::fs::write(&file, "export component View inherits Window {}").unwrap();
+        let a = cfg("[layout]\nview = \"mine\"").unwrap();
+        assert_eq!(a.layout.view, "mine");
+        assert_eq!(a, cfg("[layout]\nview = \"mine\"").unwrap());
+        std::fs::write(&file, "export component View inherits Window { }").unwrap();
+        // Le contenu du fichier change : la config n'est plus « la même ».
+        assert_ne!(a, cfg("[layout]\nview = \"mine\"").unwrap());
+    }
 
     #[test]
     fn default_template_matches_default_config() {

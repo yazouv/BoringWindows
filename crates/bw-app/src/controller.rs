@@ -1,5 +1,6 @@
 //! Orchestration sur le thread UI : config, modules, forme de l'île, système.
 
+mod custom_view;
 mod settings;
 mod update;
 
@@ -92,6 +93,7 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         progress_timer: Timer::default(),
         remind_timer: Timer::default(),
         timer: RefCell::new(None),
+        custom_view: RefCell::new(None),
         timer_tick: Timer::default(),
         media_seen: RefCell::new(BTreeSet::new()),
     });
@@ -134,6 +136,7 @@ pub struct Controller {
     remind_timer: Timer,
     /// Dernier état du minuteur (absent si le module est désactivé).
     timer: RefCell<Option<Arc<TimerSnapshot>>>,
+    custom_view: RefCell<Option<custom_view::CustomView>>,
     timer_tick: Timer,
     /// Lecteurs vus depuis le lancement (jetons `ignore`), pour les réglages.
     media_seen: RefCell<BTreeSet<String>>,
@@ -148,6 +151,7 @@ impl Controller {
     fn start(self: &Rc<Self>, config_error: Option<ConfigError>) -> anyhow::Result<()> {
         select_ui_language();
         self.apply_theme();
+        self.reload_custom_view();
         let (choice, size) = self.placement();
         if let Some(pos) = platform::initial_position(choice, size) {
             self.ui.window().set_position(pos);
@@ -297,6 +301,7 @@ impl Controller {
             self.refresh_shape();
             self.update_progress();
             self.update_timer_ui();
+            self.sync_custom_view();
         }
     }
 
@@ -415,6 +420,7 @@ impl Controller {
         let (text, next) = clock::now();
         self.ui.set_time_text(text.time.into());
         self.ui.set_date_text(text.date.into());
+        self.sync_custom_view();
         self.clock_timer
             .start(TimerMode::SingleShot, next, || post(|c| c.update_clock()));
     }
@@ -463,6 +469,13 @@ impl Controller {
         drop(config);
 
         self.apply_theme();
+        let view_changed = {
+            let config = self.config.borrow();
+            old.layout.view != config.layout.view || old.layout.view_stamp != config.layout.view_stamp
+        };
+        if view_changed {
+            self.reload_custom_view();
+        }
         if moved {
             self.place();
         }
@@ -629,6 +642,8 @@ impl Controller {
         } else if !ticking {
             self.timer_tick.stop();
         }
+        drop(timer);
+        self.sync_custom_view();
     }
 
     fn timer_action(&self, action: String) {
@@ -703,6 +718,7 @@ impl Controller {
             .set_agenda_rows(ModelRc::new(VecModel::from(agenda)));
         self.ui
             .set_claude_rows(ModelRc::new(VecModel::from(claude)));
+        self.sync_custom_view();
     }
 
     // --- Musique ------------------------------------------------------------
@@ -776,6 +792,7 @@ impl Controller {
             |[r, g, b]| slint::Color::from_rgb_u8(r, g, b),
         );
         self.ui.set_accent(accent);
+        self.sync_custom_view();
     }
 
     fn media_config(&self) -> MediaConfig {
@@ -808,6 +825,7 @@ impl Controller {
         } else if !ticking {
             self.progress_timer.stop();
         }
+        self.sync_custom_view();
     }
 
     fn media_action(&self, action: String) {

@@ -20,6 +20,7 @@
   - [CalDAV (iCloud, Fastmail, Nextcloud)](agenda/caldav.md)
   - [Other calendars and .ics files](agenda/autres.md)
 - [Themes](themes.md)
+- [Custom views (.slint)](layouts.md)
 
 # Reference
 

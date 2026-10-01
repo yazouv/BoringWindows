@@ -152,6 +152,7 @@ impl Controller {
         self.fill_themes(ui, &config.theme.name);
         fill_appearance(ui, &config.theme);
         fill_layout(ui, &config.layout.compact);
+        ui.set_view_name(config.layout.view.as_str().into());
 
         let cal = CalendarConfig::from_table(config.modules.get(bw_calendar::MODULE_ID))
             .unwrap_or_default();
@@ -453,6 +454,13 @@ impl Controller {
             }
             platform::open_path(&dir);
         }));
+        ui.on_open_layouts_folder(with(|c, _| {
+            let dir = bw_config::layouts_dir(c.path.parent().unwrap_or(std::path::Path::new(".")));
+            if let Err(e) = std::fs::create_dir_all(&dir) {
+                log::warn!("dossier des vues : {e}");
+            }
+            platform::open_path(&dir);
+        }));
         ui.on_open_config_file(with(|c, _| platform::open_path(&c.path)));
         ui.on_open_docs(with(|_, _| {
             platform::open_path(std::path::Path::new(docs()))
@@ -647,6 +655,10 @@ impl Controller {
             "modules.media.accent_from_artwork" => Some((
                 vec!["modules", "media", "accent_from_artwork"],
                 Value::Bool(ui.get_media_accent()),
+            )),
+            "layout.view" => Some((
+                vec!["layout", "view"],
+                Value::Str(ui.get_view_name().trim().to_owned()),
             )),
             "modules.timer.enabled" => Some((
                 vec!["modules", "timer", "enabled"],
