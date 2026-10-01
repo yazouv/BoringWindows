@@ -279,7 +279,7 @@ mod tests {
 
         assert_eq!(
             hook::relay(&endpoint, &message("UserPromptSubmit", false)),
-            None
+            hook::Outcome::Sent
         );
 
         let ep = endpoint.clone();
@@ -300,7 +300,10 @@ mod tests {
             module: MODULE_ID.into(),
             name: format!("allow:{prompt_id}"),
         });
-        assert_eq!(pending.join().unwrap(), Some(Decision::Allow));
+        assert_eq!(
+            pending.join().unwrap(),
+            hook::Outcome::Decided(Decision::Allow)
+        );
 
         // L'attention retombe sur « travaille ».
         let level = loop {
@@ -322,10 +325,10 @@ mod tests {
             .to_string_lossy()
             .into_owned();
         let start = Instant::now();
-        assert_eq!(
+        assert!(matches!(
             hook::relay(&endpoint, &message("PermissionRequest", true)),
-            None
-        );
+            hook::Outcome::Unreachable(_)
+        ));
         assert!(start.elapsed() < hook::CONNECT_BUDGET + Duration::from_millis(100));
     }
 }

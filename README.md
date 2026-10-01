@@ -54,6 +54,18 @@ Dans l'île ouverte, un clic sur une session ramène son terminal au premier pla
 Sans réponse dans l'île au bout de `permission_wait_secs` (60 s par défaut), la
 question repasse dans le terminal.
 
+**Rien ne s'affiche ?** Lance le diagnostic (BoringWindows ouvert) :
+
+```powershell
+cargo run -- doctor          # ou : boringwindows.exe doctor
+```
+
+Il vérifie les hooks dans `settings.json`, la copie du relais, que l'app
+répond, lance le relais comme le fait Claude Code (via bash et cmd), affiche
+les derniers appels du journal (`%LOCALAPPDATA%\BoringWindows\hook.log`) et
+fait apparaître « diagnostic » dans l'île. Le rapport est aussi enregistré dans
+`%LOCALAPPDATA%\BoringWindows\doctor.txt`.
+
 **Sécurité** : le relais (`boringwindows hook`, copié dans
 `%LOCALAPPDATA%\BoringWindows\bin\bw-hook.exe`) n'envoie qu'un résumé (projet,
 outil, commande ou nom de fichier, jamais le contenu des fichiers ni tes

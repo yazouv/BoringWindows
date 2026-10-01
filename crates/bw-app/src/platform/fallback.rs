@@ -103,6 +103,8 @@ pub fn focus_terminal(_ancestors: &[u32], _console_window: Option<i64>) -> bool 
     false
 }
 
+pub fn attach_parent_console() {}
+
 /// Ouvre un fichier avec l'application associée.
 pub fn open_path(path: &Path) {
     let opener = if cfg!(target_os = "macos") {

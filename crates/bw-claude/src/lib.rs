@@ -8,6 +8,7 @@
 //! - [`install`] : ajoute/retire nos hooks dans `~/.claude/settings.json`.
 
 mod config;
+pub mod doctor;
 pub mod event;
 pub mod hook;
 pub mod install;

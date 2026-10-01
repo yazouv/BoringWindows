@@ -177,7 +177,7 @@ impl Controller {
         Ok(())
     }
 
-    fn on_platform_ready(&self, platform: Platform) {
+    fn on_platform_ready(self: &Rc<Self>, platform: Platform) {
         log::info!("intégration système prête");
         self.fullscreen.set(platform.fullscreen_now());
         *self.platform.borrow_mut() = Some(platform);
@@ -191,6 +191,10 @@ impl Controller {
         }) {
             Ok(tray) => *self.tray.borrow_mut() = Some(tray),
             Err(e) => log::error!("icône de notification indisponible : {e:#}"),
+        }
+
+        if !hooks_installed && self.module_ids.borrow().contains(&bw_claude::MODULE_ID) {
+            self.flash("Claude Code : hooks non installés · clic droit sur l'icône");
         }
 
         // Relais à jour après une recompilation ou une mise à jour de l'app.

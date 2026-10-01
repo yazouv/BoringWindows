@@ -21,53 +21,97 @@ enum Step {
     Reply(Decision),
 }
 
+/// Ce qu'il s'est passé, pour le journal et le diagnostic.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Outcome {
+    /// L'app n'a pas pu être jointe (fermée, autre utilisateur, pipe introuvable…).
+    Unreachable(String),
+    /// Événement remis, aucune réponse attendue.
+    Sent,
+    /// Réponse de l'île à une demande de permission.
+    Decided(Decision),
+    /// Demande remise, mais pas de réponse exploitable (délai, app fermée entre-temps).
+    NoReply,
+}
+
+impl Outcome {
+    pub fn decision(&self) -> Option<Decision> {
+        match self {
+            Self::Decided(d) => Some(*d),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for Outcome {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unreachable(e) => write!(f, "app injoignable ({e})"),
+            Self::Sent => f.write_str("remis"),
+            Self::Decided(d) => write!(f, "réponse : {d:?}"),
+            Self::NoReply => f.write_str("remis, sans réponse"),
+        }
+    }
+}
+
 /// Point d'entrée : lit stdin, relaie, écrit éventuellement la décision sur
 /// stdout. Retourne le code de sortie (toujours 0).
 pub fn run() -> i32 {
     let mut input = String::new();
     if std::io::stdin().read_to_string(&mut input).is_err() {
+        journal("?", "stdin illisible");
         return 0;
     }
     let Some(event) = HookEvent::from_hook_input(&input) else {
+        journal("?", "événement illisible");
         return 0;
     };
-    let wants_reply = event.kind == "PermissionRequest";
+    let kind = event.kind.clone();
     let message = Message {
         v: ipc::PROTOCOL_VERSION,
-        wants_reply,
+        wants_reply: kind == "PermissionRequest",
         ancestors: process::ancestors(),
         console_window: process::console_window(),
         event,
     };
 
-    if let Some(decision) = relay(&ipc::endpoint(), &message) {
+    let endpoint = ipc::endpoint();
+    let outcome = relay(&endpoint, &message);
+    journal(&kind, &outcome.to_string());
+    if let Some(decision) = outcome.decision() {
         print_decision(decision);
     }
     0
 }
 
-/// Envoie `message` et attend la décision si besoin. `None` = rien à dire à Claude.
-pub fn relay(endpoint: &str, message: &Message) -> Option<Decision> {
+/// Envoie `message` et attend la décision si besoin.
+pub fn relay(endpoint: &str, message: &Message) -> Outcome {
     let (tx, rx) = mpsc::channel();
     let endpoint = endpoint.to_owned();
-    let line = serde_json::to_string(message).ok()? + "\n";
+    let Ok(line) = serde_json::to_string(message) else {
+        return Outcome::Unreachable("message non sérialisable".into());
+    };
     let wants_reply = message.wants_reply;
 
     // Le travail bloquant se fait dans un thread : le thread principal garde
     // la maîtrise des délais et peut sortir même si le pipe est figé.
     std::thread::spawn(move || {
         let deadline = Instant::now() + CONNECT_BUDGET;
-        let Some(mut stream) = connect(&endpoint, deadline) else {
-            return;
+        let mut stream = match connect(&endpoint, deadline) {
+            Ok(s) => s,
+            Err(e) => {
+                let _ = tx.send(Err(e.to_string()));
+                return;
+            }
         };
-        if stream
-            .write_all(line.as_bytes())
+        if let Err(e) = stream
+            .write_all(format!("{line}\n").as_bytes())
             .and_then(|()| stream.flush())
-            .is_err()
         {
+            let _ = tx.send(Err(format!("écriture : {e}")));
             return;
         }
-        let _ = tx.send(Step::Sent);
+        let _ = tx.send(Ok(Step::Sent));
         if !wants_reply {
             return;
         }
@@ -76,20 +120,50 @@ pub fn relay(endpoint: &str, message: &Message) -> Option<Decision> {
         if reader.read_line(&mut reply).is_ok()
             && let Ok(reply) = serde_json::from_str::<Reply>(&reply)
         {
-            let _ = tx.send(Step::Reply(reply.decision));
+            let _ = tx.send(Ok(Step::Reply(reply.decision)));
         }
     });
 
     match rx.recv_timeout(CONNECT_BUDGET) {
-        Ok(Step::Sent) => {}
-        _ => return None,
+        Ok(Ok(Step::Sent)) => {}
+        Ok(Err(e)) => return Outcome::Unreachable(e),
+        _ => return Outcome::Unreachable("pas de réponse en 300 ms".into()),
     }
     if !wants_reply {
-        return None;
+        return Outcome::Sent;
     }
     match rx.recv_timeout(REPLY_CAP) {
-        Ok(Step::Reply(decision)) => Some(decision),
-        _ => None,
+        Ok(Ok(Step::Reply(decision))) => Outcome::Decided(decision),
+        _ => Outcome::NoReply,
+    }
+}
+
+/// Journal du relais (`hook.log`), une ligne par appel, pour le diagnostic.
+/// Plafonné : au-delà de 256 Ko, l'ancien journal est mis de côté.
+fn journal(kind: &str, outcome: &str) {
+    const MAX: u64 = 256 * 1024;
+    let path = crate::install::hook_log_path();
+    if path.metadata().is_ok_and(|m| m.len() > MAX) {
+        let _ = std::fs::rename(&path, path.with_extension("log.old"));
+    }
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    let line = format!(
+        "{:02}:{:02}:{:02} UTC  {kind:<18} {outcome}\n",
+        secs / 3600 % 24,
+        secs / 60 % 60,
+        secs % 60
+    );
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        let _ = f.write_all(line.as_bytes());
     }
 }
 
@@ -112,7 +186,7 @@ fn print_decision(decision: Decision) {
 }
 
 #[cfg(windows)]
-fn connect(endpoint: &str, deadline: Instant) -> Option<std::fs::File> {
+fn connect(endpoint: &str, deadline: Instant) -> std::io::Result<std::fs::File> {
     // ERROR_PIPE_BUSY : toutes les instances sont occupées, on réessaie.
     const ERROR_PIPE_BUSY: i32 = 231;
     loop {
@@ -121,18 +195,17 @@ fn connect(endpoint: &str, deadline: Instant) -> Option<std::fs::File> {
             .write(true)
             .open(endpoint)
         {
-            Ok(f) => return Some(f),
             Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY) && Instant::now() < deadline => {
                 std::thread::sleep(Duration::from_millis(10));
             }
-            Err(_) => return None,
+            other => return other,
         }
     }
 }
 
 #[cfg(unix)]
-fn connect(endpoint: &str, _deadline: Instant) -> Option<std::os::unix::net::UnixStream> {
-    std::os::unix::net::UnixStream::connect(endpoint).ok()
+fn connect(endpoint: &str, _deadline: Instant) -> std::io::Result<std::os::unix::net::UnixStream> {
+    std::os::unix::net::UnixStream::connect(endpoint)
 }
 
 #[cfg(windows)]

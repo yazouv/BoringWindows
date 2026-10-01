@@ -44,11 +44,19 @@ pub fn hook_binary_path() -> PathBuf {
     } else {
         "bw-hook"
     };
+    data_dir().join("bin").join(name)
+}
+
+/// `%LOCALAPPDATA%\BoringWindows` (données locales, hors config).
+pub fn data_dir() -> PathBuf {
     dirs::data_local_dir()
         .unwrap_or_else(std::env::temp_dir)
         .join("BoringWindows")
-        .join("bin")
-        .join(name)
+}
+
+/// Journal du relais : une ligne par événement reçu de Claude Code.
+pub fn hook_log_path() -> PathBuf {
+    data_dir().join("hook.log")
 }
 
 /// Commande de hook. Chemin avec des `/` : compris par bash comme par cmd.
@@ -203,7 +211,7 @@ impl Installer {
         Ok(true)
     }
 
-    fn read(&self) -> anyhow::Result<Value> {
+    pub fn read(&self) -> anyhow::Result<Value> {
         match std::fs::read_to_string(&self.settings_path) {
             Ok(s) if s.trim().is_empty() => Ok(json!({})),
             Ok(s) => serde_json::from_str(&s).with_context(|| {

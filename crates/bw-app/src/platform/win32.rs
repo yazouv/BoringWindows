@@ -487,3 +487,13 @@ fn activate(hwnd: HWND) -> bool {
         SetForegroundWindow(hwnd).as_bool()
     }
 }
+
+/// En release l'exécutable n'a pas de console : pour `doctor`, on réutilise
+/// celle du terminal qui l'a lancé.
+pub fn attach_parent_console() {
+    use windows::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
+    // SAFETY: appel sans pointeur ; échoue sans effet si une console existe déjà.
+    unsafe {
+        let _ = AttachConsole(ATTACH_PARENT_PROCESS);
+    }
+}
