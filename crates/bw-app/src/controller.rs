@@ -10,19 +10,23 @@ use bw_claude::install::Installer;
 use bw_claude::{ClaudeConfig, ClaudeModule, SessionKind, Snapshot};
 use bw_config::{Config, ConfigError, ConfigWatcher, OpenOn};
 use bw_core::{Action, Arbiter, Attention, Module, ModuleEvent, ModuleEventKind, ModuleHost};
+use bw_media::{MediaConfig, MediaModule, MediaSnapshot};
 use slint::winit_030::WinitWindowAccessor;
-use slint::{ComponentHandle, ModelRc, Timer, TimerMode, VecModel};
+use slint::{
+    ComponentHandle, Image, ModelRc, Rgba8Pixel, SharedPixelBuffer, Timer, TimerMode, VecModel,
+};
 
 use crate::geometry::{self, Shape};
 use crate::platform::{self, Platform, PlatformEvent, Tray, TrayCommand};
-use crate::{ClaudePrompt, ClaudeRow, Island, clock, demo};
+use crate::{ClaudePrompt, ClaudeRow, Island, MediaInfo, clock, demo};
 
 /// Pseudo-module utilisé pour signaler une config invalide dans l'île.
 const CONFIG_ERROR: &str = "config";
 /// Pseudo-module des messages brefs de l'app (« hooks installés »…).
 const FLASH: &str = "app";
-/// Sessions Claude affichées dans l'île ouverte.
+/// Sessions Claude affichées dans l'île ouverte (moins quand le lecteur est là).
 const MAX_CLAUDE_ROWS: usize = 3;
+const MAX_CLAUDE_ROWS_WITH_MEDIA: usize = 2;
 
 thread_local! {
     static CONTROLLER: OnceCell<Rc<Controller>> = const { OnceCell::new() };
@@ -66,6 +70,9 @@ pub fn run() -> anyhow::Result<()> {
         flash_timer: Timer::default(),
         claude: RefCell::new(None),
         installer: Installer::default(),
+        media: RefCell::new(None),
+        artwork: RefCell::new(None),
+        progress_timer: Timer::default(),
     });
     CONTROLLER.with(|c| {
         let _ = c.set(controller.clone());
@@ -98,6 +105,11 @@ pub struct Controller {
     /// Dernier état Claude reçu (pour retrouver le terminal d'une session).
     claude: RefCell<Option<Arc<Snapshot>>>,
     installer: Installer,
+    /// Dernier état musical et module qui l'a publié (destinataire des actions).
+    media: RefCell<Option<(&'static str, Arc<MediaSnapshot>)>>,
+    /// Pochette convertie pour Slint, gardée tant que le morceau ne change pas.
+    artwork: RefCell<Option<(Arc<Vec<u8>>, Image)>>,
+    progress_timer: Timer,
 }
 
 impl Controller {
@@ -145,6 +157,12 @@ impl Controller {
             .on_claude_focus(with(&weak, |c, session: slint::SharedString| {
                 c.focus_claude_session(&session);
             }));
+        self.ui
+            .on_media_action(with(&weak, |c, action: slint::SharedString| {
+                c.media_action(action.to_string());
+            }));
+        self.ui
+            .on_media_seek(with(&weak, |c, fraction: f32| c.media_seek(fraction)));
         self.update_clock();
 
         match bw_config::watch(&self.path, |res| post(move |c| c.on_config(res))) {
@@ -200,6 +218,7 @@ impl Controller {
         self.collapse_timer.stop();
         if self.expanded.replace(expanded) != expanded {
             self.refresh_shape();
+            self.update_progress();
         }
     }
 
@@ -242,6 +261,18 @@ impl Controller {
                 .as_ref()
                 .is_some_and(|w| w.level == Attention::Urgent),
         );
+        // Musique en tête de pilule : la pochette remplace le point.
+        let media_wins = winner.as_ref().is_some_and(|w| {
+            self.media
+                .borrow()
+                .as_ref()
+                .is_some_and(|(owner, _)| w.module == *owner)
+        });
+        let art = self.artwork.borrow().as_ref().map(|(_, img)| img.clone());
+        self.ui.set_compact_art_visible(media_wins && art.is_some());
+        if let Some(art) = art.filter(|_| media_wins) {
+            self.ui.set_compact_art(art);
+        }
         self.ui
             .set_attention_label(winner.and_then(|w| w.summary).unwrap_or_default().into());
 
@@ -327,7 +358,8 @@ impl Controller {
         ui.set_anim(t.animation_ms.into());
         ui.set_bg(color(t.background));
         ui.set_fg(color(t.foreground));
-        ui.set_accent(color(t.accent));
+        drop(config);
+        self.apply_accent();
     }
 
     fn on_config(self: &Rc<Self>, result: Result<Config, ConfigError>) {
@@ -387,6 +419,10 @@ impl Controller {
         }
 
         self.apply_claude(None);
+        *self.media.borrow_mut() = None;
+        *self.artwork.borrow_mut() = None;
+        self.ui.set_has_media(false);
+        self.progress_timer.stop();
         let (modules, errors) = build_modules(&self.config.borrow());
         for e in errors {
             log::error!("{e}");
@@ -420,7 +456,9 @@ impl Controller {
                 }
             }
             ModuleEventKind::State(state) => {
-                if event.module == bw_claude::MODULE_ID
+                if let Some(snapshot) = state.downcast_ref::<MediaSnapshot>() {
+                    self.apply_media(event.module, Arc::new(snapshot.clone()));
+                } else if event.module == bw_claude::MODULE_ID
                     && let Ok(snapshot) = state.downcast::<Snapshot>()
                 {
                     self.apply_claude(Some(snapshot));
@@ -429,9 +467,135 @@ impl Controller {
         }
     }
 
+    // --- Musique ------------------------------------------------------------
+
+    fn apply_media(&self, owner: &'static str, snapshot: Arc<MediaSnapshot>) {
+        let np = snapshot.now_playing.as_ref();
+
+        // Pochette : conversion seulement quand elle change.
+        let art = np.and_then(|n| n.artwork.as_ref());
+        let image = art.map(|a| {
+            let mut cache = self.artwork.borrow_mut();
+            match cache.as_ref() {
+                Some((pixels, img)) if Arc::ptr_eq(pixels, &a.rgba) => img.clone(),
+                _ => {
+                    let buffer = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
+                        &a.rgba, a.width, a.height,
+                    );
+                    let img = Image::from_rgba8(buffer);
+                    *cache = Some((a.rgba.clone(), img.clone()));
+                    img
+                }
+            }
+        });
+        if image.is_none() {
+            *self.artwork.borrow_mut() = None;
+        }
+
+        self.ui.set_has_media(np.is_some());
+        if let Some(n) = np {
+            self.ui.set_media(MediaInfo {
+                title: n.title.as_str().into(),
+                artist: n.artist.as_str().into(),
+                source: n.source.as_str().into(),
+                playing: n.playing,
+                can_previous: n.can_previous,
+                can_next: n.can_next,
+                can_toggle: n.can_play_pause,
+                can_seek: n.can_seek && n.duration.is_some(),
+                has_art: image.is_some(),
+                art: image.unwrap_or_default(),
+                has_timeline: n.duration.is_some(),
+                position: "".into(),
+                duration: n.duration.map(format_time).unwrap_or_default().into(),
+                progress: 0.0,
+                multi_source: snapshot.source_count > 1,
+            });
+        }
+
+        *self.media.borrow_mut() = np.is_some().then_some((owner, snapshot));
+        self.apply_accent();
+        self.update_progress();
+        self.refresh_shape();
+    }
+
+    /// Teinte de l'île : couleur de la pochette en cours, sinon celle du thème.
+    fn apply_accent(&self) {
+        let from_artwork = self
+            .media
+            .borrow()
+            .as_ref()
+            .filter(|_| self.media_config().accent_from_artwork)
+            .and_then(|(_, s)| s.now_playing.as_ref()?.artwork.as_ref()?.accent);
+        let accent = from_artwork.map_or_else(
+            || color(self.config.borrow().theme.accent),
+            |[r, g, b]| slint::Color::from_rgb_u8(r, g, b),
+        );
+        self.ui.set_accent(accent);
+    }
+
+    fn media_config(&self) -> MediaConfig {
+        MediaConfig::from_table(self.config.borrow().modules.get(bw_media::MODULE_ID))
+            .unwrap_or_default()
+    }
+
+    /// Met à jour la barre de progression ; tourne à 1 Hz seulement quand
+    /// l'île est ouverte et que la musique joue.
+    fn update_progress(&self) {
+        let media = self.media.borrow();
+        let Some(np) = media.as_ref().and_then(|(_, s)| s.now_playing.as_ref()) else {
+            self.progress_timer.stop();
+            return;
+        };
+        let position = np.position_now(std::time::Instant::now());
+        let mut info = self.ui.get_media();
+        info.position = format_time(position).into();
+        info.progress = np
+            .duration
+            .map_or(0.0, |d| position.as_secs_f32() / d.as_secs_f32().max(1.0));
+        self.ui.set_media(info);
+
+        let ticking = self.expanded.get() && np.playing && np.duration.is_some();
+        if ticking && !self.progress_timer.running() {
+            self.progress_timer
+                .start(TimerMode::Repeated, Duration::from_secs(1), || {
+                    post(|c| c.update_progress())
+                });
+        } else if !ticking {
+            self.progress_timer.stop();
+        }
+    }
+
+    fn media_action(&self, action: String) {
+        let owner = self.media.borrow().as_ref().map(|(owner, _)| *owner);
+        if let (Some(owner), Some(host)) = (owner, self.host.borrow().as_ref()) {
+            host.send_action(Action {
+                module: owner.into(),
+                name: action,
+            });
+        }
+    }
+
+    fn media_seek(&self, fraction: f32) {
+        let duration = self
+            .media
+            .borrow()
+            .as_ref()
+            .and_then(|(_, s)| s.now_playing.as_ref()?.duration);
+        if let Some(d) = duration {
+            let ms = (d.as_millis() as f64 * f64::from(fraction.clamp(0.0, 1.0))) as u64;
+            self.media_action(format!("seek:{ms}"));
+        }
+    }
+
     // --- Claude Code -------------------------------------------------------
 
     fn apply_claude(&self, snapshot: Option<Arc<Snapshot>>) {
+        let max_rows = if self.ui.get_has_media() {
+            MAX_CLAUDE_ROWS_WITH_MEDIA
+        } else {
+            MAX_CLAUDE_ROWS
+        };
         let rows: Vec<ClaudeRow> = snapshot.as_ref().map_or_else(Vec::new, |s| {
             let rank = |k: SessionKind| match k {
                 SessionKind::Permission | SessionKind::NeedsYou => 0,
@@ -442,7 +606,7 @@ impl Controller {
             sessions.sort_by_key(|s| rank(s.kind));
             sessions
                 .into_iter()
-                .take(MAX_CLAUDE_ROWS)
+                .take(max_rows)
                 .map(|s| ClaudeRow {
                     id: s.id.as_str().into(),
                     project: s.project.as_str().into(),
@@ -624,10 +788,26 @@ fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
             Err(e) => errors.push(format!("{e:#}")),
         }
     }
+    if MediaModule::is_supported() && config.module_enabled(bw_media::MODULE_ID, true) {
+        match MediaConfig::from_table(config.modules.get(bw_media::MODULE_ID)) {
+            Ok(c) => modules.push(Box::new(MediaModule::new(c))),
+            Err(e) => errors.push(format!("modules.media : {e:#}")),
+        }
+    }
     if config.module_enabled("demo", false) {
-        modules.push(Box::new(demo::Demo));
+        modules.push(Box::new(demo::Demo::default()));
     }
     (modules, errors)
+}
+
+/// « 3:07 », « 1:02:45 ».
+fn format_time(d: Duration) -> String {
+    let s = d.as_secs();
+    if s >= 3600 {
+        format!("{}:{:02}:{:02}", s / 3600, s / 60 % 60, s % 60)
+    } else {
+        format!("{}:{:02}", s / 60, s % 60)
+    }
 }
 
 fn color(c: bw_config::Color) -> slint::Color {

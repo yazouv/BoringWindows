@@ -20,6 +20,56 @@ export struct ClaudePrompt {
     detail: string,
 }
 
+export struct MediaInfo {
+    title: string,
+    artist: string,
+    source: string,
+    playing: bool,
+    can-previous: bool,
+    can-next: bool,
+    can-toggle: bool,
+    can-seek: bool,
+    has-art: bool,
+    art: image,
+    has-timeline: bool,
+    position: string,
+    duration: string,
+    progress: float,
+    multi-source: bool,
+}
+
+// Icônes dessinées (pas de police d'icônes à embarquer), viewbox 24x24.
+component IconButton inherits Rectangle {
+    in property <string> icon;
+    in property <color> ink;
+    in property <bool> enabled: true;
+    in property <length> size: 30px;
+    callback clicked;
+
+    width: root.size;
+    height: root.size;
+    border-radius: root.size / 2;
+    background: ta.has-hover && root.enabled ? root.ink.with-alpha(0.12) : transparent;
+    opacity: root.enabled ? 1 : 0.3;
+
+    Path {
+        width: root.size * 0.6;
+        height: root.size * 0.6;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        fill: root.ink;
+        commands: root.icon == "play" ? "M 7 4 L 20 12 L 7 20 Z"
+            : root.icon == "pause" ? "M 6 4 L 10 4 L 10 20 L 6 20 Z M 14 4 L 18 4 L 18 20 L 14 20 Z"
+            : root.icon == "next" ? "M 4 5 L 14 12 L 4 19 Z M 15 5 L 18 5 L 18 19 L 15 19 Z"
+            : "M 20 5 L 10 12 L 20 19 Z M 6 5 L 9 5 L 9 19 L 6 19 Z";
+    }
+
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+}
+
 component Dot inherits Rectangle {
     width: 8px;
     height: 8px;
@@ -85,11 +135,17 @@ export component Island inherits Window {
     in property <[ClaudeRow]> claude-rows;
     in property <bool> has-prompt;
     in property <ClaudePrompt> prompt;
+    in property <bool> has-media;
+    in property <MediaInfo> media;
+    in property <bool> compact-art-visible;
+    in property <image> compact-art;
 
     callback hover-changed(bool);
     callback clicked();
     callback claude-decide(string /* id */, string /* allow | deny | ask */);
     callback claude-focus(string /* session */);
+    callback media-action(string /* toggle | next | prev | source */);
+    callback media-seek(float /* 0..1 */);
 
     // Taille fixe de la fenêtre : la pilule grandit dedans, la zone cliquable
     // est restreinte à la pilule côté Win32.
@@ -134,9 +190,24 @@ export component Island inherits Window {
                 opacity: root.has-attention && !root.expanded ? 1 : 0;
                 animate opacity { duration: root.anim / 2; }
 
-                Dot {
+                if !root.compact-art-visible: Dot {
                     y: (parent.height - self.height) / 2;
                     background: root.urgent ? root.accent : root.fg.with-alpha(0.6);
+                }
+
+                if root.compact-art-visible: Rectangle {
+                    width: 22px;
+                    height: 22px;
+                    y: (parent.height - self.height) / 2;
+                    border-radius: 5px;
+                    clip: true;
+
+                    Image {
+                        width: parent.width;
+                        height: parent.height;
+                        source: root.compact-art;
+                        image-fit: cover;
+                    }
                 }
 
                 Text {
@@ -150,9 +221,9 @@ export component Island inherits Window {
 
             // Contenu ouvert.
             VerticalLayout {
-                padding: 18px;
-                padding-top: 12px + root.top-offset / 2;
-                spacing: 6px;
+                padding: 16px;
+                padding-top: 10px + root.top-offset / 2;
+                spacing: 8px;
                 opacity: root.expanded ? 1 : 0;
                 visible: self.opacity > 0;
                 animate opacity { duration: root.anim; }
@@ -163,23 +234,149 @@ export component Island inherits Window {
                     Text {
                         text: root.time-text;
                         color: root.fg;
-                        font-size: 26px;
-                        font-weight: 600;
+                        font-size: 15px;
+                        font-weight: 700;
                         vertical-alignment: center;
                     }
 
                     Text {
                         text: root.date-text;
-                        color: root.fg.with-alpha(0.6);
-                        font-size: 13px;
+                        color: root.fg.with-alpha(0.55);
+                        font-size: 12px;
                         vertical-alignment: center;
                         horizontal-stretch: 1;
                     }
+
+                    // Source de la musique ; cliquable s'il y en a plusieurs.
+                    if root.has-media: Text {
+                        text: root.media.multi-source ? root.media.source + "  ⇄" : root.media.source;
+                        color: source-ta.has-hover && root.media.multi-source ? root.fg : root.fg.with-alpha(0.55);
+                        font-size: 12px;
+                        vertical-alignment: center;
+
+                        source-ta := TouchArea {
+                            enabled: root.media.multi-source;
+                            clicked => { root.media-action("source"); }
+                        }
+                    }
                 }
 
-                Rectangle {
-                    height: 1px;
-                    background: root.fg.with-alpha(0.12);
+                // Lecteur (masqué pendant une demande de permission, prioritaire).
+                if root.has-media && !root.has-prompt: HorizontalLayout {
+                    height: 56px;
+                    spacing: 12px;
+
+                    Rectangle {
+                        width: 56px;
+                        height: 56px;
+                        border-radius: 8px;
+                        clip: true;
+                        background: root.fg.with-alpha(0.08);
+
+                        if root.media.has-art: Image {
+                            width: parent.width;
+                            height: parent.height;
+                            source: root.media.art;
+                            image-fit: cover;
+                        }
+                    }
+
+                    VerticalLayout {
+                        spacing: 2px;
+                        alignment: center;
+                        horizontal-stretch: 1;
+
+                        Text {
+                            text: root.media.title;
+                            color: root.fg;
+                            font-size: 14px;
+                            font-weight: 600;
+                            overflow: elide;
+                        }
+
+                        Text {
+                            text: root.media.artist;
+                            color: root.fg.with-alpha(0.6);
+                            font-size: 12px;
+                            overflow: elide;
+                        }
+
+                        if root.media.has-timeline: HorizontalLayout {
+                            spacing: 6px;
+                            padding-top: 4px;
+
+                            Text {
+                                text: root.media.position;
+                                color: root.fg.with-alpha(0.5);
+                                font-size: 10px;
+                                vertical-alignment: center;
+                            }
+
+                            bar := Rectangle {
+                                height: 12px;
+                                horizontal-stretch: 1;
+
+                                Rectangle {
+                                    y: (parent.height - self.height) / 2;
+                                    height: bar-ta.has-hover && root.media.can-seek ? 5px : 3px;
+                                    border-radius: self.height / 2;
+                                    background: root.fg.with-alpha(0.15);
+                                }
+
+                                Rectangle {
+                                    x: 0;
+                                    y: (parent.height - self.height) / 2;
+                                    width: parent.width * clamp(root.media.progress, 0, 1);
+                                    height: bar-ta.has-hover && root.media.can-seek ? 5px : 3px;
+                                    border-radius: self.height / 2;
+                                    background: root.accent;
+                                }
+
+                                bar-ta := TouchArea {
+                                    enabled: root.media.can-seek;
+                                    clicked => { root.media-seek(self.mouse-x / self.width); }
+                                }
+                            }
+
+                            Text {
+                                text: root.media.duration;
+                                color: root.fg.with-alpha(0.5);
+                                font-size: 10px;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 2px;
+                        alignment: center;
+                        horizontal-stretch: 0;
+
+                        IconButton {
+                            y: (parent.height - self.height) / 2;
+                            icon: "previous";
+                            ink: root.fg;
+                            enabled: root.media.can-previous;
+                            clicked => { root.media-action("prev"); }
+                        }
+
+                        IconButton {
+                            y: (parent.height - self.height) / 2;
+                            size: 36px;
+                            icon: root.media.playing ? "pause" : "play";
+                            ink: root.fg;
+                            enabled: root.media.can-toggle;
+                            clicked => { root.media-action("toggle"); }
+                        }
+
+                        IconButton {
+                            y: (parent.height - self.height) / 2;
+                            icon: "next";
+                            ink: root.fg;
+                            enabled: root.media.can-next;
+                            clicked => { root.media-action("next"); }
+                        }
+                    }
                 }
 
                 // Demande de permission de Claude Code.
@@ -273,7 +470,7 @@ export component Island inherits Window {
                     }
                 }
 
-                if !root.has-prompt && root.claude-rows.length == 0: Text {
+                if !root.has-prompt && !root.has-media && root.claude-rows.length == 0: Text {
                     text: root.has-attention ? root.attention-label : "Rien à signaler";
                     color: root.has-attention && root.urgent ? root.accent : root.fg.with-alpha(0.75);
                     font-size: 14px;

@@ -53,6 +53,14 @@ permission_wait_secs = 60
 # Durée d'affichage de « terminé » (s).
 done_secs = 8
 
+[modules.media]
+# Musique en cours (Spotify, Apple Music, navigateurs, VLC…) via les contrôles média de Windows.
+enabled = true
+# Teinter l'île avec la couleur de la pochette.
+accent_from_artwork = true
+# Sources à ignorer (morceau de nom, ex. ["chrome", "msedge"]).
+ignore = []
+
 [modules.demo]
 # Module de démonstration : fait varier l'attention toutes les quelques secondes
 # pour tester les animations. À désactiver une fois les vrais modules en place.

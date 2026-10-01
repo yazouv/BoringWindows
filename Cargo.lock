@@ -462,6 +462,7 @@ dependencies = [
  "bw-claude",
  "bw-config",
  "bw-core",
+ "bw-media",
  "chrono",
  "env_logger",
  "log",
@@ -509,6 +510,20 @@ dependencies = [
  "anyhow",
  "log",
  "tokio",
+]
+
+[[package]]
+name = "bw-media"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "bw-core",
+ "image",
+ "log",
+ "serde",
+ "tokio",
+ "toml",
+ "windows",
 ]
 
 [[package]]

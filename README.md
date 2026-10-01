@@ -17,6 +17,21 @@ Inspiré de [boring.notch](https://github.com/TheBoredTeam/boring.notch) et [cou
   et change de forme quand un module réclame l'attention.
 - **Phase 1** (Claude Code) : statut des sessions en direct, et réponse aux
   demandes de permission depuis l'île.
+- **Phase 2** (musique) : morceau en cours, pochette, précédent / lecture / suivant,
+  barre de progression cliquable, île teintée à la couleur de la pochette.
+
+## Musique
+
+Rien à configurer : BoringWindows lit les contrôles média de Windows, ceux de
+l'overlay de volume. Ça couvre Spotify, Apple Music, Deezer, les navigateurs
+(YouTube, SoundCloud…), VLC, le lecteur Windows… sans clé d'API ni connexion.
+
+- Pilule : pochette + `♪ titre — artiste` tant que la musique joue.
+- Île ouverte : pochette, titre, artiste, ⏮ ⏯ ⏭, barre de progression (clic pour
+  se déplacer dans le morceau).
+- Plusieurs lecteurs ouverts : celui qui joue est affiché ; clic sur le nom de la
+  source (en haut à droite, `⇄`) pour passer au suivant.
+- `[modules.media]` : `accent_from_artwork`, `ignore = ["msedge"]`…
 
 ## Claude Code
 
@@ -72,6 +87,7 @@ démarrage, masquer l'île, quitter.
 | `bw-core` | trait `Module`, hôte des modules (tokio), arbitrage d'attention |
 | `bw-config` | `config.toml` : schéma, validation, rechargement à chaud |
 | `bw-claude` | relais de hooks, protocole IPC, suivi des sessions, installation dans `settings.json` |
+| `bw-media` | musique : contrôles média de Windows (GSMTC), pochette, couleur d'accent |
 | `bw-app` | binaire : île Slint (`ui/island.slint`), intégration Win32, icône de notification |
 
 Le code Win32 est isolé dans `crates/bw-app/src/platform/win32.rs`. Sur macOS et

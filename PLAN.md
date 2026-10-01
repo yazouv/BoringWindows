@@ -242,11 +242,15 @@ Vérifié sous Linux (Xvfb) de bout en bout : événements reçus, clic sur
 
 ➡️ **Release v0.1** : déjà utile seule, c'est l'accroche du projet.
 
-### Phase 2 — Musique
-- [ ] GSMTC : métadonnées, pochette, prev / play-pause / next, seek
-- [ ] Accent couleur depuis la pochette
-- [ ] Sélection de la source
+### Phase 2 — Musique ✅ (à valider sur Windows avec de vrais lecteurs)
+- [x] GSMTC : titre, artiste, pochette, précédent / lecture-pause / suivant, seek par clic sur la barre
+- [x] Accent couleur depuis la pochette (teinte dominante, éclaircie pour le fond noir)
+- [x] Sélection de la source : celle qui joue d'abord, `⇄` pour changer, liste `ignore`
+- [x] 100 % événementiel ; la progression ne tourne (1 Hz) que quand l'île est ouverte et que ça joue
 - [ ] (opt.) visualiseur WASAPI
+
+Vérifié sous Linux avec le lecteur du module `demo` (mêmes données que GSMTC) :
+pause, suivant, seek, changement de pochette et d'accent, pilule avec pochette.
 
 ➡️ **v0.2**
 
