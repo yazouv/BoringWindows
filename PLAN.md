@@ -298,7 +298,15 @@ de vérité (versionnable, partageable), mais une interface l'édite pour nous.
 - Plus tard : connexion Google / Microsoft (OAuth) directement depuis
   l'assistant, pour les agendas pro dont la publication ICS est interdite.
 
-**Documentation en ligne (GitHub Pages)** ✅ (`docs/`, publiée depuis `main`)
+**Langues de l'app**
+- Réglage `general.language = "auto" | "fr" | "en"` (auto = langue de Windows).
+- Textes de l'UI Slint marqués `@tr(...)`, traductions embarquées dans le
+  binaire (`slint-build` + fichiers `.po`) : changement de langue à chaud.
+- Textes côté Rust (statuts Claude, agenda, menus de l'icône, messages)
+  regroupés dans un petit catalogue `bw-i18n` au lieu d'être écrits en dur.
+- La doc et l'app partagent les mêmes termes (glossaire fr/en dans `docs/`).
+
+**Documentation en ligne (GitHub Pages)** ✅ français + anglais (`docs/fr`, `docs/en`), publiée depuis `main`
 - Site statique généré depuis `docs/` (mdBook ou page simple) et publié par une
   GitHub Action à chaque push sur la branche principale.
 - Pages : installation, premier lancement, un guide par source d'agenda

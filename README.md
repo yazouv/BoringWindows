@@ -11,7 +11,8 @@ Inspiré de [boring.notch](https://github.com/TheBoredTeam/boring.notch) et [cou
 
 📖 **Documentation : [yazouv.github.io/BoringWindows](https://yazouv.github.io/BoringWindows/)**
 (installation, configuration de l'agenda pour Google / Outlook / iCloud…,
-Claude Code, dépannage). Sources dans [`docs/`](docs/src).
+Claude Code, dépannage) · 🇬🇧 [English](https://yazouv.github.io/BoringWindows/en/).
+Sources dans [`docs/`](docs/).
 
 👉 Voir le [plan du projet](PLAN.md).
 

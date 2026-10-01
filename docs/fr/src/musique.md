@@ -33,8 +33,8 @@ ignore = ["msedge"]
 ```
 
 Il suffit d'un morceau du nom : `"chrome"`, `"msedge"`, `"firefox"`,
-`"spotify"`… Le nom exact apparaît dans la console si tu lances BoringWindows
-depuis un terminal.
+`"spotify"`… Les noms exacts sont affichés dans la console
+(`musique : sources [...]`) si tu lances BoringWindows depuis un terminal.
 
 ## Réglages
 

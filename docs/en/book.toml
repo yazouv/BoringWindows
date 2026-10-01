@@ -1,0 +1,22 @@
+[book]
+title = "BoringWindows"
+description = "A Dynamic Island for Windows: Claude Code, music, calendar."
+authors = ["BoringWindows"]
+language = "en"
+src = "src"
+
+[build]
+build-dir = "../book/en"
+
+[output.html]
+git-repository-url = "https://github.com/yazouv/BoringWindows"
+edit-url-template = "https://github.com/yazouv/BoringWindows/edit/main/docs/en/{path}"
+site-url = "/BoringWindows/en/"
+default-theme = "navy"
+preferred-dark-theme = "navy"
+no-section-label = true
+additional-js = ["lang.js"]
+additional-css = ["lang.css"]
+
+[output.html.search]
+enable = true
