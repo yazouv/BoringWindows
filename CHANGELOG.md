@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.2.0](https://github.com/yazouv/BoringWindows/compare/v0.1.0...v0.2.0) (2026-10-01)
+
+
+### Nouveautés
+
+* **agenda:** CalDAV et secrets dans le Gestionnaire d'identifiants ([fdbddb1](https://github.com/yazouv/BoringWindows/commit/fdbddb146aae78b4e951ff01f9981e06fa7d8315))
+* **claude:** conversations récentes (reprise) et consommation estimée depuis les transcripts ([18040c7](https://github.com/yazouv/BoringWindows/commit/18040c70d583d32349bafc8dd2548e6fbb5c8237))
+* **claude:** rappel sonore tant qu'une session attend (remind_secs) ([b0047c2](https://github.com/yazouv/BoringWindows/commit/b0047c27038930dcf4cb381390539dd09c1c7986))
+* **distribution:** installeur Inno Setup attaché aux releases et manifestes winget ([087c9ef](https://github.com/yazouv/BoringWindows/commit/087c9efdea5fb1a5be4fbecb0d889a5ab3d2ec48))
+* **étagère:** garder des fichiers déposés sur l'île, réglages et doc ([a4042a7](https://github.com/yazouv/BoringWindows/commit/a4042a7197f4e64f3c0bf2a9e0e0b6d1820d94fe))
+* **layouts:** vues .slint personnelles chargées à l'exécution (layout.view) ([bbeac40](https://github.com/yazouv/BoringWindows/commit/bbeac400f60aec8858d80bb5bdb94143e3f5426c))
+* **minuteur:** module bw-timer, ligne dans l'île, réglages et doc ([c71df8a](https://github.com/yazouv/BoringWindows/commit/c71df8ad33c3c03dda1cd5ac71fbce6ddc4d39c6))
+* **musique:** visualiseur audio optionnel (capture loopback WASAPI) ([a9bc00d](https://github.com/yazouv/BoringWindows/commit/a9bc00dd75622bcb49a222ae1009ed5edc46aeee))
+* **plugins:** plugins WASM sandboxés (wasmi) qui publient du texte dans l'île ([b15c134](https://github.com/yazouv/BoringWindows/commit/b15c1341a08fc97a6cfcca226c9ad55d6ee7c7cb))
+* **réglages:** lecteurs musique à cocher, tailles de l'île, ordre des modules ([07c9016](https://github.com/yazouv/BoringWindows/commit/07c901657a183ddcf20edc6cf5cb0bbbb053e327))
+* **volume:** changements de volume du système dans l'île (module bw-volume) ([f3627d3](https://github.com/yazouv/BoringWindows/commit/f3627d346aaa39c236031c1d57ae728ab2326b8e))
+
+
+### Corrections
+
+* **claude:** fenêtre de consommation à l'heure exacte, calage sur l'heure de reset (reset_at) ([25eb81f](https://github.com/yazouv/BoringWindows/commit/25eb81fd8ad79ddf075ca1b7c2c87760bcc3937f))
+* code mort hors Windows signalé par clippy (macOS/Linux) ([a0f3fb5](https://github.com/yazouv/BoringWindows/commit/a0f3fb55bbded924838a93e809069df573aecdb2))
+
+
+### Documentation
+
+* options du minuteur dans la référence de configuration ([d5c4ef7](https://github.com/yazouv/BoringWindows/commit/d5c4ef7614a9454159b05e7f8f71e99ac933e630))
+
 ## [0.1.0](https://github.com/yazouv/BoringWindows/compare/v0.0.1...v0.1.0) (2026-10-01)
 
 
