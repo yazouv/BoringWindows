@@ -59,7 +59,7 @@ pub fn accent_color(rgba: &[u8]) -> Option<[u8; 3]> {
     let mut sum = [[0f32; 3]; BUCKETS];
     let mut total = 0f32;
 
-    for px in rgba.chunks_exact(4) {
+    for px in rgba.as_chunks::<4>().0 {
         if px[3] < 128 {
             continue;
         }
