@@ -1,0 +1,27 @@
+[package]
+name = "bw-media"
+description = "Musique en cours pour BoringWindows (contrôles média du système)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+bw-core.workspace = true
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "bmp"] }
+log.workspace = true
+serde.workspace = true
+tokio.workspace = true
+toml.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Foundation",
+    "Foundation_Collections",
+    "Media_Control",
+    "Storage_Streams",
+] }
+
+[lints]
+workspace = true

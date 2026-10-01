@@ -1,0 +1,55 @@
+[package]
+name = "bw-app"
+description = "BoringWindows : une Dynamic Island pour Windows"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "boringwindows"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+bw-calendar.workspace = true
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+bw-claude.workspace = true
+bw-config.workspace = true
+bw-core.workspace = true
+bw-media.workspace = true
+env_logger = { version = "0.11", default-features = false, features = ["auto-color", "humantime"] }
+log.workspace = true
+slint = { version = "~1.18", default-features = false, features = [
+    "std",
+    "compat-1-2",
+    "backend-winit",
+    "renderer-femtovg",
+    "unstable-winit-030",
+] }
+tokio.workspace = true
+
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
+tray-icon = { version = "0.24", default-features = false }
+
+[target.'cfg(windows)'.dependencies]
+raw-window-handle = "0.6"
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
+    "Win32_Security",
+    "Win32_System_Console",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[build-dependencies]
+slint-build = "~1.18"
+
+[lints]
+workspace = true

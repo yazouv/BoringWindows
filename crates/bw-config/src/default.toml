@@ -1,0 +1,85 @@
+# Configuration de BoringWindows.
+# Sauvegarde ce fichier : l'île se met à jour instantanément.
+
+[general]
+# Écran de l'île : "primary" (écran principal) ou "cursor" (écran sous la souris au lancement).
+monitor = "primary"
+# Cache l'île quand une appli est en plein écran (jeu, vidéo, présentation).
+hide_in_fullscreen = true
+# Ouverture de l'île : "hover" (survol) ou "click".
+open_on = "hover"
+# Délai avant de refermer l'île quand la souris s'en va (ms).
+collapse_delay_ms = 350
+
+[theme]
+# Couleurs au format "#RRGGBB" ou "#RRGGBBAA".
+background = "#000000"
+foreground = "#FFFFFF"
+accent = "#FF8A3D"
+# Rayon des coins de l'île ouverte (la pilule compacte est toujours arrondie au max).
+corner_radius = 22.0
+# Durée des animations (ms). 0 = pas d'animation.
+animation_ms = 240
+# Décalage depuis le haut de l'écran (px).
+top_offset = 0.0
+
+[theme.compact]
+width = 190.0
+height = 32.0
+
+[theme.attention]
+# Taille de la pilule quand un module réclame l'attention.
+width = 300.0
+height = 36.0
+
+[theme.expanded]
+width = 520.0
+height = 170.0
+
+[layout]
+# Ordre de priorité des modules quand plusieurs réclament l'attention en même temps.
+compact = ["claude", "media", "calendar"]
+
+# Chaque module se configure dans sa section [modules.<nom>].
+# Un module avec enabled = false n'est même pas démarré.
+
+[modules.claude]
+# Statut de Claude Code. Installer les hooks : clic droit sur l'icône de notification.
+enabled = true
+# Répondre aux demandes de permission depuis l'île.
+permissions = true
+# Temps laissé pour répondre dans l'île avant de rendre la main au terminal (s, max 280).
+permission_wait_secs = 60
+# Durée d'affichage de « terminé » (s).
+done_secs = 8
+# Son système quand Claude se met à t'attendre (question, plan, permission).
+sound = true
+
+[modules.media]
+# Musique en cours (Spotify, Apple Music, navigateurs, VLC…) via les contrôles média de Windows.
+enabled = true
+# Teinter l'île avec la couleur de la pochette.
+accent_from_artwork = true
+# Sources à ignorer (morceau de nom, ex. ["chrome", "msedge"]).
+ignore = []
+
+[modules.calendar]
+# Prochaines réunions, rappel avant le début et bouton « Rejoindre » (Teams, Meet, Zoom…).
+enabled = true
+# Prévenir combien de minutes avant le début.
+remind_minutes = 5
+# Rafraîchissement (minutes).
+refresh_minutes = 10
+show_all_day = true
+# Ajoute un bloc par calendrier, avec son lien ICS privé :
+#  - Google : Paramètres › (ton agenda) › « Adresse secrète au format iCal »
+#  - Outlook / Microsoft 365 : Paramètres › Calendrier › Calendriers partagés › Publier › lien ICS
+#  - iCloud : Partager le calendrier › Calendrier public › copier le lien (webcal://)
+# [[modules.calendar.sources]]
+# name = "Pro"
+# url = "https://outlook.office365.com/owa/calendar/…/calendar.ics"
+
+[modules.demo]
+# Module de démonstration : fait varier l'attention toutes les quelques secondes
+# pour tester les animations. À désactiver une fois les vrais modules en place.
+enabled = false

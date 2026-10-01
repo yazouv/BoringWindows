@@ -1,0 +1,43 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/yazouv/BoringWindows"
+rust-version = "1.92"
+
+[workspace.dependencies]
+bw-core = { path = "crates/bw-core" }
+bw-config = { path = "crates/bw-config" }
+bw-claude = { path = "crates/bw-claude" }
+bw-media = { path = "crates/bw-media" }
+bw-calendar = { path = "crates/bw-calendar" }
+anyhow = "1"
+log = "0.4"
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+tokio = { version = "1", default-features = false, features = ["rt", "sync", "time", "macros"] }
+toml = "1"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+# Moins d'infos de debug : builds, link et cache CI plus légers.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
