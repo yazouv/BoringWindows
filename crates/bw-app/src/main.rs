@@ -38,8 +38,12 @@ fn doctor() -> anyhow::Result<()> {
     platform::attach_parent_console();
     let report = bw_claude::doctor::run(&std::env::current_exe()?);
     println!("{report}");
-    let path = bw_claude::install::data_dir().join("doctor.txt");
-    if std::fs::write(&path, &report).is_ok() {
+    let dir = bw_claude::install::data_dir();
+    let path = dir.join("doctor.txt");
+    if std::fs::create_dir_all(&dir)
+        .and_then(|()| std::fs::write(&path, &report))
+        .is_ok()
+    {
         println!("Rapport enregistré dans {}", path.display());
     }
     Ok(())

@@ -178,7 +178,10 @@ fn check_app(r: &mut Report, endpoint: &str) -> bool {
         }
         other => {
             r.bad(format!("{other}"));
-            r.info("→ lance BoringWindows (et le module claude : [modules.claude] enabled = true)");
+            r.info(
+                "→ BoringWindows n'est pas lancé : démarre-le (cargo run) dans un autre terminal,",
+            );
+            r.info("  laisse-le ouvert, puis relance ce diagnostic.");
             false
         }
     }
@@ -197,9 +200,8 @@ fn check_like_claude(r: &mut Report, command: &str) {
 
     for shell in shells() {
         let start = Instant::now();
-        let child = Command::new(shell.0)
-            .args(shell.1)
-            .arg(command)
+        let child = shell
+            .command(command)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -207,7 +209,7 @@ fn check_like_claude(r: &mut Report, command: &str) {
         let mut child = match child {
             Ok(c) => c,
             Err(_) => {
-                r.info(format!("{} : non disponible", shell.0));
+                r.info(format!("{} : non disponible", shell.name));
                 continue;
             }
         };
@@ -218,28 +220,105 @@ fn check_like_claude(r: &mut Report, command: &str) {
             Some(out) if out.status.success() => {
                 r.ok(format!(
                     "via {} : code 0 en {} ms",
-                    shell.0,
+                    shell.name,
                     start.elapsed().as_millis()
                 ));
             }
             Some(out) => {
-                r.bad(format!("via {} : échec ({})", shell.0, out.status));
+                r.bad(format!("via {} : échec ({})", shell.name, out.status));
                 let err = String::from_utf8_lossy(&out.stderr);
                 for line in err.lines().take(5) {
                     r.info(line);
                 }
             }
-            None => r.bad(format!("via {} : bloqué plus de 10 s", shell.0)),
+            None => r.bad(format!("via {} : bloqué plus de 10 s", shell.name)),
         }
     }
 }
 
-fn shells() -> Vec<(&'static str, &'static [&'static str])> {
-    if cfg!(windows) {
-        vec![("bash", &["-c"]), ("cmd", &["/C"])]
-    } else {
-        vec![("sh", &["-c"])]
+/// Interpréteur dans lequel Claude Code peut lancer un hook.
+struct Shell {
+    name: String,
+    program: std::path::PathBuf,
+    /// cmd.exe ne comprend pas l'échappement `\"` de Rust : ligne passée telle quelle.
+    raw: bool,
+}
+
+impl Shell {
+    fn command(&self, line: &str) -> Command {
+        let mut cmd = Command::new(&self.program);
+        if self.raw {
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                cmd.raw_arg("/C").raw_arg(line);
+            }
+        } else {
+            cmd.arg("-c").arg(line);
+        }
+        cmd
     }
+}
+
+#[cfg(windows)]
+fn shells() -> Vec<Shell> {
+    let mut shells = Vec::new();
+    // Claude Code utilise Git Bash, jamais le bash de WSL (System32\bash.exe).
+    match git_bash() {
+        Some(program) => shells.push(Shell {
+            name: format!("Git Bash ({})", program.display()),
+            program,
+            raw: false,
+        }),
+        None => shells.push(Shell {
+            name: "Git Bash (introuvable)".into(),
+            program: "git-bash-introuvable".into(),
+            raw: false,
+        }),
+    }
+    shells.push(Shell {
+        name: "cmd".into(),
+        program: "cmd".into(),
+        raw: true,
+    });
+    shells
+}
+
+#[cfg(not(windows))]
+fn shells() -> Vec<Shell> {
+    vec![Shell {
+        name: "sh".into(),
+        program: "sh".into(),
+        raw: false,
+    }]
+}
+
+/// Même recherche que Claude Code : `CLAUDE_CODE_GIT_BASH_PATH`, sinon le
+/// bash livré avec le `git` du PATH, sinon l'emplacement par défaut.
+#[cfg(windows)]
+fn git_bash() -> Option<std::path::PathBuf> {
+    use std::path::PathBuf;
+
+    if let Some(p) = std::env::var_os("CLAUDE_CODE_GIT_BASH_PATH").map(PathBuf::from)
+        && p.is_file()
+    {
+        return Some(p);
+    }
+    let from_path = std::env::var_os("PATH").into_iter().flat_map(|p| {
+        std::env::split_paths(&p)
+            .filter(|dir| dir.join("git.exe").is_file())
+            .flat_map(|dir| {
+                // …\Git\cmd\git.exe → …\Git\bin\bash.exe
+                let root = dir.parent().map(PathBuf::from).unwrap_or_default();
+                [root.join("bin").join("bash.exe"), dir.join("bash.exe")]
+            })
+            .collect::<Vec<_>>()
+    });
+    let defaults = [
+        PathBuf::from(r"C:\Program Files\Git\bin\bash.exe"),
+        PathBuf::from(r"C:\Program Files (x86)\Git\bin\bash.exe"),
+    ];
+    from_path.chain(defaults).find(|p| p.is_file())
 }
 
 fn wait_with_timeout(
