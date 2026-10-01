@@ -385,3 +385,105 @@ pub fn open_path(path: &Path) {
         log::warn!("impossible d'ouvrir {path}");
     }
 }
+
+// ---------------------------------------------------------------------------
+// Boîte de confirmation et terminal des sessions Claude
+
+/// Question Oui/Non modale.
+pub fn confirm(title: &str, text: &str) -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        IDYES, MB_ICONQUESTION, MB_SETFOREGROUND, MB_TOPMOST, MB_YESNO, MessageBoxW,
+    };
+    // SAFETY: chaînes valides pendant l'appel, pas de fenêtre parente.
+    let answer = unsafe {
+        MessageBoxW(
+            None,
+            &HSTRING::from(text),
+            &HSTRING::from(title),
+            MB_YESNO | MB_ICONQUESTION | MB_TOPMOST | MB_SETFOREGROUND,
+        )
+    };
+    answer == IDYES
+}
+
+/// Ramène au premier plan le terminal qui héberge une session Claude :
+/// d'abord via la console du relais (Windows Terminal, conhost), sinon en
+/// remontant les processus parents jusqu'à une fenêtre visible (VS Code…).
+pub fn focus_terminal(ancestors: &[u32], console_window: Option<i64>) -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{GA_ROOTOWNER, GetAncestor, IsWindow};
+
+    if let Some(raw) = console_window {
+        let hwnd = HWND(raw as isize as *mut _);
+        // SAFETY: on vérifie que la fenêtre existe encore avant de l'utiliser.
+        let root = unsafe {
+            if IsWindow(Some(hwnd)).as_bool() {
+                GetAncestor(hwnd, GA_ROOTOWNER)
+            } else {
+                HWND::default()
+            }
+        };
+        if is_main_window(root) {
+            return activate(root);
+        }
+    }
+    ancestors
+        .iter()
+        .find_map(|&pid| main_window_of(pid))
+        .is_some_and(activate)
+}
+
+fn is_main_window(hwnd: HWND) -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GW_OWNER, GetWindow, GetWindowTextLengthW, IsWindowVisible,
+    };
+    // SAFETY: fonctions de lecture sur un handle éventuellement nul.
+    unsafe {
+        !hwnd.is_invalid()
+            && IsWindowVisible(hwnd).as_bool()
+            && GetWindow(hwnd, GW_OWNER).is_err()
+            && GetWindowTextLengthW(hwnd) > 0
+    }
+}
+
+fn main_window_of(pid: u32) -> Option<HWND> {
+    use windows::Win32::Foundation::TRUE;
+    use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowThreadProcessId};
+    use windows::core::BOOL;
+
+    struct Search {
+        pid: u32,
+        found: Option<HWND>,
+    }
+
+    unsafe extern "system" fn visit(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        // SAFETY: `lparam` pointe sur la `Search` vivante de l'appelant.
+        let search = unsafe { &mut *(lparam.0 as *mut Search) };
+        let mut owner = 0;
+        // SAFETY: `owner` est une sortie locale.
+        unsafe { GetWindowThreadProcessId(hwnd, Some(&mut owner)) };
+        if owner == search.pid && is_main_window(hwnd) {
+            search.found = Some(hwnd);
+            return BOOL(0);
+        }
+        TRUE
+    }
+
+    let mut search = Search { pid, found: None };
+    // SAFETY: `search` vit jusqu'à la fin de l'énumération synchrone.
+    unsafe {
+        let _ = EnumWindows(Some(visit), LPARAM(&mut search as *mut Search as isize));
+    }
+    search.found
+}
+
+fn activate(hwnd: HWND) -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{IsIconic, SW_RESTORE, SetForegroundWindow};
+    // SAFETY: fenêtre vérifiée par l'appelant. Autorisé sans astuce : le clic
+    // sur l'île nous a donné la dernière entrée utilisateur.
+    unsafe {
+        if IsIconic(hwnd).as_bool() {
+            let _ = ShowWindow(hwnd, SW_RESTORE);
+        }
+        SetForegroundWindow(hwnd).as_bool()
+    }
+}

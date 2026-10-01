@@ -10,6 +10,7 @@ use crate::platform::TrayCommand;
 
 pub struct Tray {
     _icon: TrayIcon,
+    claude_hooks: MenuItem,
     autostart: CheckMenuItem,
     autostart_state: Arc<AtomicBool>,
 }
@@ -19,6 +20,7 @@ impl Tray {
     /// il doit renvoyer le travail vers le thread UI.
     pub fn new(
         autostart: bool,
+        claude_hooks_installed: bool,
         on_command: impl Fn(TrayCommand) + Send + Sync + 'static,
     ) -> anyhow::Result<Self> {
         let title = MenuItem::new("BoringWindows", false, None);
@@ -26,6 +28,7 @@ impl Tray {
         let reload = MenuItem::new("Recharger la configuration", true, None);
         let autostart_item = CheckMenuItem::new("Lancer au démarrage", true, autostart, None);
         let pause = CheckMenuItem::new("Masquer l'île", true, false, None);
+        let claude_hooks = MenuItem::new(claude_hooks_label(claude_hooks_installed), true, None);
         let quit = MenuItem::new("Quitter", true, None);
 
         let menu = Menu::new();
@@ -34,6 +37,8 @@ impl Tray {
             &PredefinedMenuItem::separator(),
             &open,
             &reload,
+            &PredefinedMenuItem::separator(),
+            &claude_hooks,
             &PredefinedMenuItem::separator(),
             &autostart_item,
             &pause,
@@ -50,17 +55,19 @@ impl Tray {
             reload.id().clone(),
             autostart_item.id().clone(),
             pause.id().clone(),
+            claude_hooks.id().clone(),
             quit.id().clone(),
         );
         let autostart_flag = autostart_state.clone();
         MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
-            let (open, reload, autostart, pause, quit) = &ids;
+            let (open, reload, autostart, pause, claude, quit) = &ids;
             let toggle = |flag: &AtomicBool| !flag.fetch_xor(true, Ordering::Relaxed);
             let command = match &event.id {
                 id if id == open => TrayCommand::OpenConfig,
                 id if id == reload => TrayCommand::ReloadConfig,
                 id if id == autostart => TrayCommand::Autostart(toggle(&autostart_flag)),
                 id if id == pause => TrayCommand::Pause(toggle(&pause_state)),
+                id if id == claude => TrayCommand::ClaudeHooks,
                 id if id == quit => TrayCommand::Quit,
                 _ => return,
             };
@@ -75,15 +82,28 @@ impl Tray {
 
         Ok(Self {
             _icon: icon,
+            claude_hooks,
             autostart: autostart_item,
             autostart_state,
         })
+    }
+
+    pub fn set_claude_hooks_installed(&self, installed: bool) {
+        self.claude_hooks.set_text(claude_hooks_label(installed));
     }
 
     /// Corrige la case si l'écriture dans le registre a échoué.
     pub fn set_autostart_checked(&self, checked: bool) {
         self.autostart.set_checked(checked);
         self.autostart_state.store(checked, Ordering::Relaxed);
+    }
+}
+
+fn claude_hooks_label(installed: bool) -> &'static str {
+    if installed {
+        "Claude Code : retirer les hooks…"
+    } else {
+        "Claude Code : installer les hooks…"
     }
 }
 

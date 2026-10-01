@@ -41,7 +41,17 @@ height = 170.0
 compact = ["claude", "media", "calendar"]
 
 # Chaque module se configure dans sa section [modules.<nom>].
-# Un module absent ou avec enabled = false n'est même pas démarré.
+# Un module avec enabled = false n'est même pas démarré.
+
+[modules.claude]
+# Statut de Claude Code. Installer les hooks : clic droit sur l'icône de notification.
+enabled = true
+# Répondre aux demandes de permission depuis l'île.
+permissions = true
+# Temps laissé pour répondre dans l'île avant de rendre la main au terminal (s, max 280).
+permission_wait_secs = 60
+# Durée d'affichage de « terminé » (s).
+done_secs = 8
 
 [modules.demo]
 # Module de démonstration : fait varier l'attention toutes les quelques secondes

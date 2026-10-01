@@ -5,6 +5,56 @@
 // Seules les transitions déclenchent un rendu : aucune animation en boucle,
 // pour rester à ~0 % CPU au repos.
 
+export struct ClaudeRow {
+    id: string,
+    project: string,
+    status: string,
+    urgent: bool,
+    active: bool,
+}
+
+export struct ClaudePrompt {
+    id: string,
+    project: string,
+    tool: string,
+    detail: string,
+}
+
+component Dot inherits Rectangle {
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+}
+
+component PillButton inherits Rectangle {
+    in property <string> text;
+    in property <color> fill;
+    in property <color> ink;
+    in property <color> line: transparent;
+    callback clicked;
+
+    height: 28px;
+    min-width: label.preferred-width + 24px;
+    horizontal-stretch: 1;
+    border-radius: 14px;
+    border-width: 1px;
+    border-color: root.line;
+    background: ta.pressed ? root.fill.darker(0.2) : ta.has-hover ? root.fill.brighter(0.15) : root.fill;
+
+    label := Text {
+        text: root.text;
+        color: root.ink;
+        font-size: 13px;
+        font-weight: 600;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    ta := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
 export component Island inherits Window {
     title: "BoringWindows";
     no-frame: true;
@@ -32,9 +82,14 @@ export component Island inherits Window {
     in property <string> attention-label;
     in property <string> time-text: "--:--";
     in property <string> date-text;
+    in property <[ClaudeRow]> claude-rows;
+    in property <bool> has-prompt;
+    in property <ClaudePrompt> prompt;
 
     callback hover-changed(bool);
     callback clicked();
+    callback claude-decide(string /* id */, string /* allow | deny | ask */);
+    callback claude-focus(string /* session */);
 
     // Taille fixe de la fenêtre : la pilule grandit dedans, la zone cliquable
     // est restreinte à la pilule côté Win32.
@@ -61,80 +116,173 @@ export component Island inherits Window {
 
         animate width, height, radius { duration: root.anim; easing: ease-out-quint; }
 
-        // Contenu compact : le module qui réclame l'attention.
-        HorizontalLayout {
-            padding-left: 14px;
-            padding-right: 14px;
-            spacing: 8px;
-            opacity: root.has-attention && !root.expanded ? 1 : 0;
-            animate opacity { duration: root.anim / 2; }
-
-            Rectangle {
-                width: 8px;
-                height: 8px;
-                y: (parent.height - self.height) / 2;
-                border-radius: 4px;
-                background: root.urgent ? root.accent : root.fg.with-alpha(0.6);
-            }
-
-            Text {
-                text: root.attention-label;
-                color: root.fg;
-                font-size: 13px;
-                vertical-alignment: center;
-                overflow: elide;
-            }
-        }
-
-        // Contenu ouvert.
-        VerticalLayout {
-            padding: 20px;
-            padding-top: 14px + root.top-offset / 2;
-            spacing: 4px;
-            opacity: root.expanded ? 1 : 0;
-            animate opacity { duration: root.anim; }
-
-            HorizontalLayout {
-                spacing: 12px;
-
-                Text {
-                    text: root.time-text;
-                    color: root.fg;
-                    font-size: 34px;
-                    font-weight: 600;
-                    vertical-alignment: center;
-                }
-
-                Text {
-                    text: root.date-text;
-                    color: root.fg.with-alpha(0.6);
-                    font-size: 14px;
-                    vertical-alignment: center;
-                    horizontal-stretch: 1;
-                }
-            }
-
-            Rectangle {
-                height: 1px;
-                background: root.fg.with-alpha(0.12);
-            }
-
-            Text {
-                text: root.has-attention ? root.attention-label : "Rien à signaler";
-                color: root.has-attention && root.urgent ? root.accent : root.fg.with-alpha(0.75);
-                font-size: 14px;
-                vertical-alignment: top;
-                overflow: elide;
-                vertical-stretch: 1;
-            }
-        }
-
+        // Le contenu est dans la zone de survol : les boutons reçoivent leurs
+        // clics sans faire perdre le survol à l'île.
         TouchArea {
             changed has-hover => {
                 root.hover-changed(self.has-hover);
             }
             clicked => {
                 root.clicked();
+            }
+
+            // Contenu compact : le module qui réclame l'attention.
+            HorizontalLayout {
+                padding-left: 14px;
+                padding-right: 14px;
+                spacing: 8px;
+                opacity: root.has-attention && !root.expanded ? 1 : 0;
+                animate opacity { duration: root.anim / 2; }
+
+                Dot {
+                    y: (parent.height - self.height) / 2;
+                    background: root.urgent ? root.accent : root.fg.with-alpha(0.6);
+                }
+
+                Text {
+                    text: root.attention-label;
+                    color: root.fg;
+                    font-size: 13px;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+            }
+
+            // Contenu ouvert.
+            VerticalLayout {
+                padding: 18px;
+                padding-top: 12px + root.top-offset / 2;
+                spacing: 6px;
+                opacity: root.expanded ? 1 : 0;
+                visible: self.opacity > 0;
+                animate opacity { duration: root.anim; }
+
+                HorizontalLayout {
+                    spacing: 12px;
+
+                    Text {
+                        text: root.time-text;
+                        color: root.fg;
+                        font-size: 26px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: root.date-text;
+                        color: root.fg.with-alpha(0.6);
+                        font-size: 13px;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                    }
+                }
+
+                Rectangle {
+                    height: 1px;
+                    background: root.fg.with-alpha(0.12);
+                }
+
+                // Demande de permission de Claude Code.
+                if root.has-prompt: VerticalLayout {
+                    spacing: 6px;
+
+                    Text {
+                        text: root.prompt.project + " veut utiliser " + root.prompt.tool;
+                        color: root.accent;
+                        font-size: 14px;
+                        font-weight: 600;
+                        overflow: elide;
+                    }
+
+                    Text {
+                        text: root.prompt.detail;
+                        color: root.fg.with-alpha(0.75);
+                        font-size: 12px;
+                        font-family: "Consolas";
+                        overflow: elide;
+                    }
+
+                    HorizontalLayout {
+                        spacing: 8px;
+
+                        PillButton {
+                            text: "Autoriser";
+                            fill: root.accent;
+                            ink: root.bg;
+                            clicked => { root.claude-decide(root.prompt.id, "allow"); }
+                        }
+
+                        PillButton {
+                            text: "Refuser";
+                            fill: root.fg.with-alpha(0.12);
+                            ink: root.fg;
+                            clicked => { root.claude-decide(root.prompt.id, "deny"); }
+                        }
+
+                        PillButton {
+                            text: "Terminal";
+                            fill: transparent;
+                            ink: root.fg.with-alpha(0.8);
+                            line: root.fg.with-alpha(0.25);
+                            clicked => { root.claude-decide(root.prompt.id, "ask"); }
+                        }
+                    }
+                }
+
+                // Sessions Claude Code en cours (clic : ramène le terminal).
+                if !root.has-prompt && root.claude-rows.length > 0: VerticalLayout {
+                    spacing: 2px;
+
+                    for row in root.claude-rows: Rectangle {
+                        height: 24px;
+                        border-radius: 6px;
+                        background: row-ta.has-hover ? root.fg.with-alpha(0.08) : transparent;
+
+                        HorizontalLayout {
+                            padding-left: 6px;
+                            padding-right: 6px;
+                            spacing: 8px;
+
+                            Dot {
+                                y: (parent.height - self.height) / 2;
+                                background: row.urgent ? root.accent
+                                    : row.active ? root.fg.with-alpha(0.7) : root.fg.with-alpha(0.25);
+                            }
+
+                            Text {
+                                text: row.project;
+                                color: root.fg;
+                                font-size: 13px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                            }
+
+                            Text {
+                                text: row.status;
+                                color: row.urgent ? root.accent : root.fg.with-alpha(0.6);
+                                font-size: 13px;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+                        }
+
+                        row-ta := TouchArea {
+                            clicked => { root.claude-focus(row.id); }
+                        }
+                    }
+                }
+
+                if !root.has-prompt && root.claude-rows.length == 0: Text {
+                    text: root.has-attention ? root.attention-label : "Rien à signaler";
+                    color: root.has-attention && root.urgent ? root.accent : root.fg.with-alpha(0.75);
+                    font-size: 14px;
+                    overflow: elide;
+                }
+
+                Rectangle {
+                    vertical-stretch: 1;
+                }
             }
         }
     }

@@ -73,12 +73,15 @@ pub struct Tray;
 impl Tray {
     pub fn new(
         _autostart: bool,
+        _claude_hooks_installed: bool,
         _on_command: impl Fn(TrayCommand) + Send + Sync + 'static,
     ) -> anyhow::Result<Self> {
         Ok(Self)
     }
 
     pub fn set_autostart_checked(&self, _checked: bool) {}
+
+    pub fn set_claude_hooks_installed(&self, _installed: bool) {}
 }
 
 pub fn autostart_enabled() -> bool {
@@ -87,6 +90,17 @@ pub fn autostart_enabled() -> bool {
 
 pub fn set_autostart(_enabled: bool) -> anyhow::Result<()> {
     anyhow::bail!("démarrage automatique pas encore disponible sur ce système")
+}
+
+/// Pas de boîte de dialogue native ici : on accepte et on journalise.
+pub fn confirm(title: &str, text: &str) -> bool {
+    log::info!("{title} : {text}");
+    true
+}
+
+/// Ramener le terminal d'une session au premier plan : Windows uniquement.
+pub fn focus_terminal(_ancestors: &[u32], _console_window: Option<i64>) -> bool {
+    false
 }
 
 /// Ouvre un fichier avec l'application associée.

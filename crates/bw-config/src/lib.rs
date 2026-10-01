@@ -162,11 +162,14 @@ impl Config {
         }
     }
 
-    /// Un module est actif si sa section existe et ne contient pas `enabled = false`.
-    pub fn module_enabled(&self, id: &str) -> bool {
+    /// Un module est actif selon `enabled` dans sa section `[modules.<id>]`,
+    /// ou selon `default` si la section ou la clé est absente.
+    pub fn module_enabled(&self, id: &str, default: bool) -> bool {
         self.modules
             .get(id)
-            .is_some_and(|m| m.get("enabled").and_then(toml::Value::as_bool) != Some(false))
+            .and_then(|m| m.get("enabled"))
+            .and_then(toml::Value::as_bool)
+            .unwrap_or(default)
     }
 
     fn validate(&self) -> Result<(), ConfigError> {
@@ -235,7 +238,8 @@ mod tests {
     fn default_template_matches_default_config() {
         let mut parsed = Config::from_toml_str(DEFAULT_TOML).unwrap();
         // Le modèle documente le module demo, désactivé.
-        assert!(!parsed.module_enabled("demo"));
+        assert!(!parsed.module_enabled("demo", true));
+        assert!(parsed.module_enabled("claude", false));
         parsed.modules.clear();
         assert_eq!(parsed, Config::default());
     }
@@ -298,10 +302,12 @@ mod tests {
             "[modules.a]\n[modules.b]\nenabled = false\n[modules.c]\nenabled = true\nfoo = 1",
         )
         .unwrap();
-        assert!(c.module_enabled("a"));
-        assert!(!c.module_enabled("b"));
-        assert!(c.module_enabled("c"));
-        assert!(!c.module_enabled("missing"));
+        assert!(c.module_enabled("a", true));
+        assert!(!c.module_enabled("a", false));
+        assert!(!c.module_enabled("b", true));
+        assert!(c.module_enabled("c", false));
+        assert!(c.module_enabled("missing", true));
+        assert!(!c.module_enabled("missing", false));
     }
 
     #[test]

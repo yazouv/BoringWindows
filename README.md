@@ -13,9 +13,37 @@ Inspiré de [boring.notch](https://github.com/TheBoredTeam/boring.notch) et [cou
 
 ## État
 
-Phase 0 (fondations) : l'île s'affiche en haut de l'écran, s'ouvre au survol, et
-change de forme quand un module réclame l'attention. Pas encore de vrais modules :
-un module `demo` permet de tester les animations.
+- **Phase 0** (fondations) : l'île s'affiche en haut de l'écran, s'ouvre au survol
+  et change de forme quand un module réclame l'attention.
+- **Phase 1** (Claude Code) : statut des sessions en direct, et réponse aux
+  demandes de permission depuis l'île.
+
+## Claude Code
+
+1. Lance BoringWindows, puis clic droit sur l'icône de notification →
+   **Claude Code : installer les hooks…**. La boîte de dialogue liste ce qui sera
+   ajouté à `~/.claude/settings.json` ; une sauvegarde datée du fichier est faite
+   avant, et seules nos entrées sont touchées (le même menu les retire).
+2. Relance tes sessions Claude Code (les hooks sont lus au démarrage).
+
+Ce que montre l'île :
+
+| Pilule | Signification |
+|---|---|
+| point gris · `projet · Bash` | Claude travaille |
+| point orange · `projet · autoriser Bash ?` | demande de permission : survole l'île pour **Autoriser / Refuser / Terminal** |
+| point orange · `projet · attend ta réponse` | Claude attend dans le terminal |
+| `projet · terminé` | fin de tour (quelques secondes) |
+
+Dans l'île ouverte, un clic sur une session ramène son terminal au premier plan.
+Sans réponse dans l'île au bout de `permission_wait_secs` (60 s par défaut), la
+question repasse dans le terminal.
+
+**Sécurité** : le relais (`boringwindows hook`, copié dans
+`%LOCALAPPDATA%\BoringWindows\bin\bw-hook.exe`) n'envoie qu'un résumé (projet,
+outil, commande ou nom de fichier, jamais le contenu des fichiers ni tes
+prompts) sur un named pipe local réservé à ton compte. Si l'app est fermée ou ne
+répond pas en 300 ms, il sort sans rien faire : Claude n'est jamais bloqué.
 
 ## Lancer
 
@@ -43,6 +71,7 @@ démarrage, masquer l'île, quitter.
 |---|---|
 | `bw-core` | trait `Module`, hôte des modules (tokio), arbitrage d'attention |
 | `bw-config` | `config.toml` : schéma, validation, rechargement à chaud |
+| `bw-claude` | relais de hooks, protocole IPC, suivi des sessions, installation dans `settings.json` |
 | `bw-app` | binaire : île Slint (`ui/island.slint`), intégration Win32, icône de notification |
 
 Le code Win32 est isolé dans `crates/bw-app/src/platform/win32.rs`. Sur macOS et

@@ -10,6 +10,12 @@ mod platform;
 slint::include_modules!();
 
 fn main() -> anyhow::Result<()> {
+    // `boringwindows hook` : relais appelé par Claude Code. Il sort avant
+    // toute initialisation de l'UI, et ne doit rien écrire d'autre sur stdout.
+    if std::env::args().nth(1).as_deref() == Some("hook") {
+        std::process::exit(bw_claude::hook::run());
+    }
+
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     let Some(_instance) = platform::single_instance() else {

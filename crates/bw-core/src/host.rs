@@ -1,4 +1,7 @@
+use std::any::Any;
+use std::fmt;
 use std::future::Future;
+use std::sync::Arc;
 use std::thread::JoinHandle;
 
 use tokio::runtime::Handle;
@@ -21,18 +24,33 @@ pub trait Module: Send + 'static {
 }
 
 /// Ce qu'un module publie vers l'UI.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct ModuleEvent {
     pub module: &'static str,
     pub kind: ModuleEventKind,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub enum ModuleEventKind {
     Attention {
         level: Attention,
         summary: Option<String>,
     },
+    /// État propre au module, que l'UI sait interpréter (via `downcast_ref`).
+    State(Arc<dyn Any + Send + Sync>),
+}
+
+impl fmt::Debug for ModuleEventKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Attention { level, summary } => f
+                .debug_struct("Attention")
+                .field("level", level)
+                .field("summary", summary)
+                .finish(),
+            Self::State(_) => f.write_str("State(..)"),
+        }
+    }
 }
 
 /// Action de l'UI adressée à un module.
@@ -53,6 +71,10 @@ pub struct ModuleCtx {
 impl ModuleCtx {
     pub fn set_attention(&self, level: Attention, summary: Option<String>) {
         self.emit(ModuleEventKind::Attention { level, summary });
+    }
+
+    pub fn set_state<T: Any + Send + Sync>(&self, state: T) {
+        self.emit(ModuleEventKind::State(Arc::new(state)));
     }
 
     pub fn emit(&self, kind: ModuleEventKind) {
@@ -94,7 +116,7 @@ impl ModuleHost {
         }
 
         let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_time()
+            .enable_all()
             .build()?;
         let (action_tx, action_rx) = unbounded_channel();
 
@@ -252,16 +274,12 @@ mod tests {
         ];
         let host = ModuleHost::spawn(modules, move |e| tx.send(e).unwrap()).unwrap();
 
-        assert_eq!(
-            recv(&rx),
-            ModuleEvent {
-                module: "echo",
-                kind: ModuleEventKind::Attention {
-                    level: Attention::Low,
-                    summary: Some("ready".into()),
-                },
-            }
-        );
+        let first = recv(&rx);
+        assert_eq!(first.module, "echo");
+        assert!(matches!(
+            first.kind,
+            ModuleEventKind::Attention { level: Attention::Low, summary: Some(ref s) } if s == "ready"
+        ));
         assert_eq!(recv(&rx).module, "ticker");
 
         host.send_action(Action {

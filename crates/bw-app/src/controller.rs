@@ -3,19 +3,26 @@
 use std::cell::{Cell, OnceCell, RefCell};
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
+use std::sync::Arc;
 use std::time::Duration;
 
+use bw_claude::install::Installer;
+use bw_claude::{ClaudeConfig, ClaudeModule, SessionKind, Snapshot};
 use bw_config::{Config, ConfigError, ConfigWatcher, OpenOn};
-use bw_core::{Arbiter, Attention, Module, ModuleEvent, ModuleEventKind, ModuleHost};
+use bw_core::{Action, Arbiter, Attention, Module, ModuleEvent, ModuleEventKind, ModuleHost};
 use slint::winit_030::WinitWindowAccessor;
-use slint::{ComponentHandle, Timer, TimerMode};
+use slint::{ComponentHandle, ModelRc, Timer, TimerMode, VecModel};
 
 use crate::geometry::{self, Shape};
 use crate::platform::{self, Platform, PlatformEvent, Tray, TrayCommand};
-use crate::{Island, clock, demo};
+use crate::{ClaudePrompt, ClaudeRow, Island, clock, demo};
 
 /// Pseudo-module utilisé pour signaler une config invalide dans l'île.
 const CONFIG_ERROR: &str = "config";
+/// Pseudo-module des messages brefs de l'app (« hooks installés »…).
+const FLASH: &str = "app";
+/// Sessions Claude affichées dans l'île ouverte.
+const MAX_CLAUDE_ROWS: usize = 3;
 
 thread_local! {
     static CONTROLLER: OnceCell<Rc<Controller>> = const { OnceCell::new() };
@@ -56,6 +63,9 @@ pub fn run() -> anyhow::Result<()> {
         collapse_timer: Timer::default(),
         region_timer: Timer::default(),
         clock_timer: Timer::default(),
+        flash_timer: Timer::default(),
+        claude: RefCell::new(None),
+        installer: Installer::default(),
     });
     CONTROLLER.with(|c| {
         let _ = c.set(controller.clone());
@@ -84,6 +94,10 @@ pub struct Controller {
     collapse_timer: Timer,
     region_timer: Timer,
     clock_timer: Timer,
+    flash_timer: Timer,
+    /// Dernier état Claude reçu (pour retrouver le terminal d'une session).
+    claude: RefCell<Option<Arc<Snapshot>>>,
+    installer: Installer,
 }
 
 impl Controller {
@@ -119,6 +133,18 @@ impl Controller {
             .on_hover_changed(with(&weak, |c, hovered| c.on_hover(hovered)));
         let on_click = with(&weak, |c, ()| c.set_expanded(!c.expanded.get()));
         self.ui.on_clicked(move || on_click(()));
+        self.ui.on_claude_decide({
+            let weak = weak.clone();
+            move |id, decision| {
+                if let Some(c) = weak.upgrade() {
+                    c.on_claude_decide(&id, &decision);
+                }
+            }
+        });
+        self.ui
+            .on_claude_focus(with(&weak, |c, session: slint::SharedString| {
+                c.focus_claude_session(&session);
+            }));
         self.update_clock();
 
         match bw_config::watch(&self.path, |res| post(move |c| c.on_config(res))) {
@@ -141,11 +167,21 @@ impl Controller {
         self.sync_region();
 
         // Créée boucle d'événements lancée : exigé par macOS.
-        match Tray::new(platform::autostart_enabled(), |cmd| {
+        let hooks_installed = self.installer.is_installed();
+        match Tray::new(platform::autostart_enabled(), hooks_installed, |cmd| {
             post(move |c| c.on_tray(cmd));
         }) {
             Ok(tray) => *self.tray.borrow_mut() = Some(tray),
             Err(e) => log::error!("icône de notification indisponible : {e:#}"),
+        }
+
+        // Relais à jour après une recompilation ou une mise à jour de l'app.
+        if hooks_installed && let Ok(exe) = std::env::current_exe() {
+            match self.installer.refresh_binary(&exe, false) {
+                Ok(true) => log::info!("relais Claude mis à jour"),
+                Ok(false) => {}
+                Err(e) => log::warn!("relais Claude non mis à jour : {e:#}"),
+            }
         }
     }
 
@@ -321,11 +357,7 @@ impl Controller {
         self.refresh_shape();
         self.sync_region();
         self.update_visibility();
-        if build_modules(&self.config.borrow())
-            .iter()
-            .map(|m| m.id())
-            .ne(self.module_ids.borrow().iter().copied())
-        {
+        if old.modules != self.config.borrow().modules {
             self.restart_modules();
         }
     }
@@ -354,7 +386,14 @@ impl Controller {
             }
         }
 
-        let modules = build_modules(&self.config.borrow());
+        self.apply_claude(None);
+        let (modules, errors) = build_modules(&self.config.borrow());
+        for e in errors {
+            log::error!("{e}");
+            self.arbiter
+                .borrow_mut()
+                .claim(CONFIG_ERROR, Attention::High, Some(format!("⚠ {e}")));
+        }
         *self.module_ids.borrow_mut() = modules.iter().map(|m| m.id()).collect();
         log::info!("modules actifs : {:?}", self.module_ids.borrow());
 
@@ -380,7 +419,154 @@ impl Controller {
                     self.refresh_shape();
                 }
             }
+            ModuleEventKind::State(state) => {
+                if event.module == bw_claude::MODULE_ID
+                    && let Ok(snapshot) = state.downcast::<Snapshot>()
+                {
+                    self.apply_claude(Some(snapshot));
+                }
+            }
         }
+    }
+
+    // --- Claude Code -------------------------------------------------------
+
+    fn apply_claude(&self, snapshot: Option<Arc<Snapshot>>) {
+        let rows: Vec<ClaudeRow> = snapshot.as_ref().map_or_else(Vec::new, |s| {
+            let rank = |k: SessionKind| match k {
+                SessionKind::Permission | SessionKind::NeedsYou => 0,
+                SessionKind::Done | SessionKind::Working => 1,
+                SessionKind::Idle => 2,
+            };
+            let mut sessions: Vec<_> = s.sessions.iter().collect();
+            sessions.sort_by_key(|s| rank(s.kind));
+            sessions
+                .into_iter()
+                .take(MAX_CLAUDE_ROWS)
+                .map(|s| ClaudeRow {
+                    id: s.id.as_str().into(),
+                    project: s.project.as_str().into(),
+                    status: s.status.as_str().into(),
+                    urgent: rank(s.kind) == 0,
+                    active: s.kind != SessionKind::Idle,
+                })
+                .collect()
+        });
+        self.ui.set_claude_rows(ModelRc::new(VecModel::from(rows)));
+
+        let prompt = snapshot.as_ref().and_then(|s| s.prompt.as_ref());
+        self.ui.set_has_prompt(prompt.is_some());
+        if let Some(p) = prompt {
+            self.ui.set_prompt(ClaudePrompt {
+                id: p.id.to_string().into(),
+                project: p.project.as_str().into(),
+                tool: p.tool.as_str().into(),
+                detail: p.detail.as_str().into(),
+            });
+        }
+        *self.claude.borrow_mut() = snapshot;
+    }
+
+    fn on_claude_decide(&self, id: &str, decision: &str) {
+        if let Some(host) = self.host.borrow().as_ref() {
+            host.send_action(Action {
+                module: bw_claude::MODULE_ID.into(),
+                name: format!("{decision}:{id}"),
+            });
+        }
+        // « Terminal » : la question passe dans le terminal, on l'y amène.
+        if decision == "ask" {
+            let session = self
+                .claude
+                .borrow()
+                .as_ref()
+                .and_then(|s| s.prompt.as_ref())
+                .filter(|p| p.id.to_string() == id)
+                .map(|p| p.session_id.clone());
+            if let Some(session) = session {
+                self.focus_claude_session(&session);
+            }
+        }
+    }
+
+    fn focus_claude_session(&self, session: &str) {
+        let target = self.claude.borrow().as_ref().and_then(|s| {
+            s.sessions
+                .iter()
+                .find(|v| v.id == session)
+                .map(|v| (v.ancestors.clone(), v.console_window))
+        });
+        if let Some((ancestors, console)) = target
+            && !platform::focus_terminal(&ancestors, console)
+        {
+            log::info!("terminal de la session {session} introuvable");
+        }
+    }
+
+    fn toggle_claude_hooks(self: &Rc<Self>) {
+        let installer = &self.installer;
+        let installed = installer.is_installed();
+        let settings = installer.settings_path.display();
+        let question = if installed {
+            format!(
+                "Retirer les hooks BoringWindows de {settings} ?\n\nUne sauvegarde du fichier est faite avant modification."
+            )
+        } else {
+            format!(
+                "BoringWindows va ajouter ses hooks à {settings} pour les événements :\n{}\n\nTes autres réglages et hooks ne sont pas modifiés, et une sauvegarde du fichier est faite avant.\nLe relais est copié dans {}.",
+                bw_claude::install::HOOK_EVENTS.join(", "),
+                installer.binary_path.display()
+            )
+        };
+        if !platform::confirm("BoringWindows · Claude Code", &question) {
+            return;
+        }
+
+        let result = if installed {
+            installer.uninstall()
+        } else {
+            std::env::current_exe()
+                .map_err(anyhow::Error::from)
+                .and_then(|exe| installer.install(&exe))
+        };
+        match result {
+            Ok(report) => {
+                log::info!(
+                    "hooks Claude {} ({}, sauvegarde : {:?})",
+                    if installed { "retirés" } else { "installés" },
+                    report.settings_path.display(),
+                    report.backup
+                );
+                self.flash(if installed {
+                    "Hooks Claude Code retirés"
+                } else {
+                    "Hooks Claude Code installés"
+                });
+            }
+            Err(e) => {
+                log::error!("hooks Claude : {e:#}");
+                self.flash("⚠ Échec des hooks Claude (voir les logs)");
+            }
+        }
+        if let Some(tray) = self.tray.borrow().as_ref() {
+            tray.set_claude_hooks_installed(installer.is_installed());
+        }
+    }
+
+    /// Message bref dans la pilule.
+    fn flash(self: &Rc<Self>, text: &str) {
+        self.arbiter
+            .borrow_mut()
+            .claim(FLASH, Attention::High, Some(text.to_owned()));
+        self.refresh_shape();
+        let weak = Rc::downgrade(self);
+        self.flash_timer
+            .start(TimerMode::SingleShot, Duration::from_secs(4), move || {
+                if let Some(c) = weak.upgrade() {
+                    c.arbiter.borrow_mut().claim(FLASH, Attention::None, None);
+                    c.refresh_shape();
+                }
+            });
     }
 
     // --- Système -----------------------------------------------------------
@@ -420,6 +606,7 @@ impl Controller {
                 self.paused.set(paused);
                 self.update_visibility();
             }
+            TrayCommand::ClaudeHooks => self.toggle_claude_hooks(),
             TrayCommand::Quit => {
                 let _ = slint::quit_event_loop();
             }
@@ -427,12 +614,20 @@ impl Controller {
     }
 }
 
-fn build_modules(config: &Config) -> Vec<Box<dyn Module>> {
+/// Modules actifs selon la config, et erreurs de config propres aux modules.
+fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
     let mut modules: Vec<Box<dyn Module>> = Vec::new();
-    if config.module_enabled("demo") {
+    let mut errors = Vec::new();
+    if config.module_enabled(bw_claude::MODULE_ID, true) {
+        match ClaudeConfig::from_table(config.modules.get(bw_claude::MODULE_ID)) {
+            Ok(c) => modules.push(Box::new(ClaudeModule::new(c, bw_claude::ipc::endpoint()))),
+            Err(e) => errors.push(format!("{e:#}")),
+        }
+    }
+    if config.module_enabled("demo", false) {
         modules.push(Box::new(demo::Demo));
     }
-    modules
+    (modules, errors)
 }
 
 fn color(c: bw_config::Color) -> slint::Color {

@@ -35,5 +35,7 @@ pub enum TrayCommand {
     ReloadConfig,
     Autostart(bool),
     Pause(bool),
+    /// Installer ou retirer les hooks Claude Code.
+    ClaudeHooks,
     Quit,
 }

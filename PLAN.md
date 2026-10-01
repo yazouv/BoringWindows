@@ -227,13 +227,18 @@ Modules tiers en **WASM** (via `extism` ou `wasmtime`), sandboxés, qui publient
 Validé sur Windows : transparence, clics qui traversent, focus jamais volé,
 masquage en plein écran. Reste à relever les chiffres RAM/CPU sur un vrai GPU.
 
-### Phase 1 — Claude Code (MVP publiable)
-- [ ] `bw-hook.exe` + named pipe + timeout 300 ms
-- [ ] Installation / désinstallation des hooks avec diff + backup
-- [ ] Statuts : travaille / attend / terminé, multi-sessions
-- [ ] Répondre à `PermissionRequest` depuis l'île
-- [ ] Clic → focus du terminal
-- [ ] Test WSL
+### Phase 1 — Claude Code ✅ (à valider sur Windows avec un vrai Claude Code)
+- [x] Relais `boringwindows hook` (copié en `bw-hook.exe`) + named pipe / socket Unix + délai de 300 ms
+- [x] Installation / désinstallation des hooks : confirmation, sauvegarde datée, seules nos entrées touchées
+- [x] Statuts : travaille / attend / terminé, multi-sessions, la plus urgente dans la pilule
+- [x] Répondre à `PermissionRequest` depuis l'île (Autoriser / Refuser / Terminal), repli sur le terminal après délai
+- [x] Clic sur une session → focus du terminal (console du relais, sinon processus parents)
+- [ ] Test WSL (Claude Code dans WSL qui appelle `bw-hook.exe` par l'interop)
+- [ ] Son / rappel si Claude attend depuis longtemps
+
+Vérifié sous Linux (Xvfb) de bout en bout : événements reçus, clic sur
+« Autoriser » → le relais renvoie `behavior: allow` à Claude ; ~6 ms par
+événement, ~7 ms quand l'app est fermée.
 
 ➡️ **Release v0.1** : déjà utile seule, c'est l'accroche du projet.
 
