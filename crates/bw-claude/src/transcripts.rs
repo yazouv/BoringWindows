@@ -11,7 +11,7 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-use chrono::{DateTime, Duration, DurationRound, Utc};
+use chrono::{DateTime, Duration, Utc};
 use serde_json::Value;
 
 /// Tokens d'un message de l'assistant.
@@ -239,39 +239,44 @@ pub fn list_transcripts(projects_dir: &Path) -> Vec<(PathBuf, SystemTime, u64)> 
     files
 }
 
-/// Consommation de la fenêtre active : comme `ccusage`, une fenêtre commence à
-/// l'heure pile du premier message et dure `window` ; elle est active tant que
-/// `now` est avant sa fin et que le dernier message date de moins de `window`.
+/// Consommation de la fenêtre active. Une fenêtre commence à l'heure exacte du
+/// premier message qui suit la fin de la précédente et dure `window`.
+///
+/// Les fenêtres de l'abonnement sont communes à tout le compte (claude.ai,
+/// application, Claude Code) : on n'en voit qu'une partie. `reset_at`, la fin
+/// d'une fenêtre connue (lue dans `/usage`), recale le calcul : la fenêtre
+/// `[reset_at - window, reset_at)` est prise comme point de départ, et les
+/// messages d'avant ne comptent pas.
 pub fn summarize(
     entries: &[UsageEntry],
     now: DateTime<Utc>,
     window: Duration,
     count_cache_reads: bool,
+    reset_at: Option<DateTime<Utc>>,
 ) -> UsageSummary {
     let mut sorted: Vec<&UsageEntry> = entries.iter().filter(|e| e.at <= now).collect();
     sorted.sort_by_key(|e| e.at);
 
-    let mut block_start: Option<DateTime<Utc>> = None;
-    let mut last_at = now;
+    // (début, fin) de la fenêtre en cours de lecture.
+    let mut block: Option<(DateTime<Utc>, DateTime<Utc>)> = reset_at.map(|end| (end - window, end));
     let mut tokens = 0u64;
     let mut messages = 0u32;
     for e in sorted {
-        let new_block = match block_start {
-            None => true,
-            Some(start) => e.at >= start + window || e.at - last_at >= window,
-        };
-        if new_block {
-            block_start = Some(e.at.duration_trunc(Duration::hours(1)).unwrap_or(e.at));
+        // Avant la fenêtre connue : message d'une fenêtre précédente.
+        if reset_at.is_some_and(|end| e.at < end - window) {
+            continue;
+        }
+        if block.is_none_or(|(_, end)| e.at >= end) {
+            block = Some((e.at, e.at + window));
             tokens = 0;
             messages = 0;
         }
         tokens += e.tokens.total(count_cache_reads);
         messages += 1;
-        last_at = e.at;
     }
-    match block_start {
-        Some(start) if now < start + window && now - last_at < window => UsageSummary {
-            window_end: Some(start + window),
+    match block {
+        Some((_, end)) if now < end => UsageSummary {
+            window_end: Some(end),
             tokens,
             messages,
         },
@@ -387,24 +392,85 @@ mod tests {
             entry(14, 5, 200),
             entry(15, 0, 300),
         ];
-        // Fenêtre commencée à 14:00 (heure pile du premier message de 14:05).
-        let s = summarize(&entries, at(16, 0), w, false);
+        // Fenêtre commencée à l'heure exacte du premier message (14:05).
+        let s = summarize(&entries, at(16, 0), w, false, None);
         assert_eq!(
             (s.messages, s.tokens),
             (2, (10 + 200 + 100) + (10 + 300 + 100))
         );
-        assert_eq!(s.window_end, Some(at(19, 0)));
+        assert_eq!(s.window_end, Some(at(19, 5)));
         // Avec la lecture de cache, plus de tokens.
-        assert!(summarize(&entries, at(16, 0), w, true).tokens > s.tokens);
+        assert!(summarize(&entries, at(16, 0), w, true, None).tokens > s.tokens);
         // Fenêtre expirée : plus rien d'actif.
         assert_eq!(
-            summarize(&entries, at(21, 0), w, false),
+            summarize(&entries, at(21, 0), w, false, None),
             UsageSummary::default()
         );
         // Premier bloc seul, encore actif à 10:00.
-        let early = summarize(&entries, at(10, 0), w, false);
-        assert_eq!((early.messages, early.window_end), (2, Some(at(13, 0))));
-        assert_eq!(summarize(&[], at(10, 0), w, false), UsageSummary::default());
+        let early = summarize(&entries, at(10, 0), w, false, None);
+        assert_eq!((early.messages, early.window_end), (2, Some(at(13, 10))));
+        assert_eq!(
+            summarize(&[], at(10, 0), w, false, None),
+            UsageSummary::default()
+        );
+    }
+
+    #[test]
+    fn known_reset_time_recalibrates_the_window() {
+        let w = Duration::hours(5);
+        // Messages continus depuis 18:26 ; le vrai reset (vu dans /usage) est à 01:01
+        // le lendemain, donc la fenêtre réelle a commencé à 20:01.
+        let entries = [
+            entry(18, 26, 100),
+            entry(19, 40, 100),
+            entry(20, 5, 200),
+            entry(20, 10, 300),
+        ];
+        let now = at(20, 15);
+        // Sans calage : fenêtre comptée depuis 18:26 → fin à 23:26.
+        let blind = summarize(&entries, now, w, false, None);
+        assert_eq!(blind.window_end, Some(at(23, 26)));
+        // Calée sur le reset de 01:01 : seuls les messages depuis 20:01 comptent.
+        let reset = Utc.with_ymd_and_hms(2026, 10, 2, 1, 1, 0).unwrap();
+        let s = summarize(&entries, now, w, false, Some(reset));
+        assert_eq!(s.window_end, Some(reset));
+        assert_eq!(
+            (s.messages, s.tokens),
+            (2, (10 + 200 + 100) + (10 + 300 + 100))
+        );
+        // Fenêtre calée sans message dedans : active, vide.
+        let empty = summarize(&entries[..2], now, w, false, Some(reset));
+        assert_eq!(
+            (empty.window_end, empty.messages, empty.tokens),
+            (Some(reset), 0, 0)
+        );
+        // Le reset passé : on repart des messages qui suivent, début exact.
+        let later = [UsageEntry {
+            at: Utc.with_ymd_and_hms(2026, 10, 2, 1, 30, 0).unwrap(),
+            tokens: entry(0, 0, 50).tokens,
+        }];
+        let after = summarize(
+            &later,
+            Utc.with_ymd_and_hms(2026, 10, 2, 1, 40, 0).unwrap(),
+            w,
+            false,
+            Some(reset),
+        );
+        assert_eq!(
+            after.window_end,
+            Some(Utc.with_ymd_and_hms(2026, 10, 2, 6, 30, 0).unwrap())
+        );
+        // Reset périmé et plus aucun message : rien d'actif.
+        assert_eq!(
+            summarize(
+                &entries,
+                Utc.with_ymd_and_hms(2026, 10, 2, 3, 0, 0).unwrap(),
+                w,
+                false,
+                Some(reset)
+            ),
+            UsageSummary::default()
+        );
     }
 
     #[test]

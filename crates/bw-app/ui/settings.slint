@@ -68,6 +68,7 @@ export component SettingsWindow inherits Window {
     in-out property <bool> viz-enabled;
     in-out property <bool> activity-enabled;
     in-out property <int> activity-limit-millions;
+    in-out property <string> activity-reset;
     in-out property <bool> plugins-enabled;
     callback open-plugins-folder();
     // --- Apparence ---
@@ -584,6 +585,19 @@ export component SettingsWindow inherits Window {
                             value <=> root.activity-limit-millions;
                             edited => { root.changed("modules.claude_activity.limit_millions"); }
                         }
+                    }
+
+                    Row {
+                        label: @tr("Window reset time (optional)");
+                        LineEdit {
+                            text <=> root.activity-reset;
+                            placeholder-text: "01:00";
+                            edited => { root.changed("modules.claude_activity.reset_at"); }
+                        }
+                    }
+
+                    Hint {
+                        text: @tr("Usage is an estimate from Claude Code only; your plan's window also counts claude.ai and the app. Type the reset time that /usage shows (HH:MM) to align the countdown.");
                     }
 
                     CheckBox {

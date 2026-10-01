@@ -18,6 +18,28 @@ use super::{Controller, build_modules, post};
 use crate::platform;
 use crate::{CalendarSourceRow, PlayerRow, SettingsWindow};
 
+/// « 1:01 » ou « 01:01 » (heure locale) → prochain instant correspondant, en UTC.
+/// Sert à caler la fenêtre de consommation sur l'heure de reset lue dans `/usage`.
+fn next_local_time(
+    text: &str,
+    now: chrono::DateTime<chrono::Local>,
+) -> Option<chrono::DateTime<chrono::Utc>> {
+    use chrono::{Duration, NaiveTime, TimeZone};
+    let time = NaiveTime::parse_from_str(text.trim(), "%H:%M").ok()?;
+    let mut day = now.date_naive();
+    for _ in 0..3 {
+        if let Some(at) = chrono::Local
+            .from_local_datetime(&day.and_time(time))
+            .earliest()
+            && at > now
+        {
+            return Some(at.with_timezone(&chrono::Utc));
+        }
+        day += Duration::days(1);
+    }
+    None
+}
+
 fn ignored_list(text: &str) -> Vec<String> {
     text.split(',')
         .map(str::trim)
@@ -161,6 +183,15 @@ impl Controller {
                 .unwrap_or_default();
         ui.set_activity_enabled(config.module_enabled(bw_claude::ACTIVITY_ID, true));
         ui.set_activity_limit_millions((activity.limit_tokens / 1_000_000) as i32);
+        // Reset connu et encore à venir : affiché en heure locale ; passé, le champ se vide.
+        ui.set_activity_reset(
+            activity
+                .reset_at_utc()
+                .filter(|at| *at > chrono::Utc::now())
+                .map(|at| at.with_timezone(&chrono::Local).format("%H:%M").to_string())
+                .unwrap_or_default()
+                .into(),
+        );
         let shelf =
             crate::shelf::ShelfConfig::from_table(config.modules.get("shelf")).unwrap_or_default();
         ui.set_shelf_enabled(shelf.enabled);
@@ -684,6 +715,23 @@ impl Controller {
                 vec!["modules", "claude_activity", "enabled"],
                 Value::Bool(ui.get_activity_enabled()),
             )),
+            "modules.claude_activity.reset_at" => {
+                let text = ui.get_activity_reset();
+                if text.trim().is_empty() {
+                    Some((
+                        vec!["modules", "claude_activity", "reset_at"],
+                        Value::Str(String::new()),
+                    ))
+                } else {
+                    // Saisie en cours (« 1 », « 01: ») : on attend une heure complète.
+                    next_local_time(&text, chrono::Local::now()).map(|at| {
+                        (
+                            vec!["modules", "claude_activity", "reset_at"],
+                            Value::Str(at.to_rfc3339()),
+                        )
+                    })
+                }
+            }
             "modules.claude_activity.limit_millions" => Some((
                 vec!["modules", "claude_activity", "limit_tokens"],
                 Value::Int(i64::from(ui.get_activity_limit_millions()) * 1_000_000),
@@ -1005,7 +1053,32 @@ fn hex(c: bw_config::Color) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::default_name;
+    use super::{default_name, next_local_time};
+
+    #[test]
+    fn reset_time_is_the_next_occurrence() {
+        use chrono::{Local, TimeZone};
+        let now = Local.with_ymd_and_hms(2026, 10, 1, 22, 15, 0).unwrap();
+        let local = |at: chrono::DateTime<chrono::Utc>| at.with_timezone(&Local);
+        // 01:01 est demain ; 23:30 est ce soir ; 22:00 est déjà passé : demain.
+        let t = |s: &str| local(next_local_time(s, now).unwrap());
+        assert_eq!(
+            t("01:01"),
+            Local.with_ymd_and_hms(2026, 10, 2, 1, 1, 0).unwrap()
+        );
+        assert_eq!(t("1:01"), t("01:01"));
+        assert_eq!(
+            t("23:30"),
+            Local.with_ymd_and_hms(2026, 10, 1, 23, 30, 0).unwrap()
+        );
+        assert_eq!(
+            t("22:00"),
+            Local.with_ymd_and_hms(2026, 10, 2, 22, 0, 0).unwrap()
+        );
+        for bad in ["", "1", "01:", "25:00", "demain"] {
+            assert!(next_local_time(bad, now).is_none(), "{bad}");
+        }
+    }
 
     #[test]
     fn default_names() {

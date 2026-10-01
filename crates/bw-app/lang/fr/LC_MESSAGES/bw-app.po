@@ -314,3 +314,9 @@ msgstr "Conversations récentes et consommation (Claude Code)"
 
 msgid "Estimated limit, millions of tokens (0 = no gauge)"
 msgstr "Limite estimée, millions de tokens (0 = pas de jauge)"
+
+msgid "Window reset time (optional)"
+msgstr "Heure de reset de la fenêtre (facultatif)"
+
+msgid "Usage is an estimate from Claude Code only; your plan's window also counts claude.ai and the app. Type the reset time that /usage shows (HH:MM) to align the countdown."
+msgstr "La consommation est une estimation faite à partir de Claude Code seul ; la fenêtre de ton abonnement compte aussi claude.ai et l'application. Saisis l'heure de reset affichée par /usage (HH:MM) pour caler le compte à rebours."

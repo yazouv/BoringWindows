@@ -38,6 +38,8 @@ pub struct ActivityConfig {
     pub limit_tokens: u64,
     /// Compter aussi les lectures de cache (très nombreuses, quasi gratuites).
     pub count_cache_reads: bool,
+    /// Fin d'une fenêtre connue (RFC 3339, lue dans `/usage`) : recale le calcul.
+    pub reset_at: String,
     /// Dossier des transcripts ; vide = `<dossier de Claude Code>/projects`.
     pub projects_dir: String,
 }
@@ -50,6 +52,7 @@ impl Default for ActivityConfig {
             window_hours: 5,
             limit_tokens: 0,
             count_cache_reads: false,
+            reset_at: String::new(),
             projects_dir: String::new(),
         }
     }
@@ -82,7 +85,21 @@ impl ActivityConfig {
                 "modules.claude_activity.limit_tokens est trop grand"
             )
         );
+        anyhow::ensure!(
+            config.reset_at.trim().is_empty() || config.reset_at_utc().is_some(),
+            tr!(
+                "modules.claude_activity.reset_at must be a date like 2026-10-02T01:01:00Z",
+                "modules.claude_activity.reset_at doit être une date comme 2026-10-02T01:01:00Z"
+            )
+        );
         Ok(config)
+    }
+
+    /// Fin de fenêtre connue, si renseignée.
+    pub fn reset_at_utc(&self) -> Option<DateTime<Utc>> {
+        DateTime::parse_from_rfc3339(self.reset_at.trim())
+            .ok()
+            .map(|d| d.with_timezone(&Utc))
     }
 
     pub fn projects_path(&self) -> PathBuf {
@@ -185,7 +202,13 @@ pub fn collect(config: &ActivityConfig, cache: &mut Cache, now: DateTime<Utc>) -
         .collect();
 
     ActivitySnapshot {
-        usage: summarize(&usage, now, config.window(), config.count_cache_reads),
+        usage: summarize(
+            &usage,
+            now,
+            config.window(),
+            config.count_cache_reads,
+            config.reset_at_utc(),
+        ),
         limit_tokens: config.limit_tokens,
         recent,
     }
@@ -376,6 +399,7 @@ mod tests {
             "window_hours = 0",
             "window_hours = 25",
             "limit_tokens = 2000000000000",
+            "reset_at = \"demain\"",
             "recents = 3",
         ] {
             let t: toml::Table = toml::from_str(bad).unwrap();

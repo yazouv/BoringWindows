@@ -122,9 +122,23 @@ enabled = true
 recent = 4                # conversations proposées (0 à 4)
 window_hours = 5          # durée de la fenêtre de consommation (1 à 24)
 limit_tokens = 0          # limite estimée pour la jauge (0 : pas de jauge)
+reset_at = ""             # fin d'une fenêtre connue (voir ci-dessous)
 count_cache_reads = false # compter aussi les lectures de cache
 ```
 
 La reprise ouvre Windows Terminal (`wt`) s'il est installé, sinon une console, et
 suppose que la commande `claude` est dans le `PATH`. Windows seulement pour
 l'instant.
+
+### Caler le compte à rebours
+
+La fenêtre de 5 h de ton abonnement est **commune à tout le compte** : elle compte
+aussi claude.ai et l'application Claude, que BoringWindows ne voit pas. Résultat :
+sans calage, le début de fenêtre est déduit des seuls messages de Claude Code et
+le « reset dans… » peut être décalé (jusqu'à plusieurs heures).
+
+Pour l'aligner, tape l'heure de reset que Claude affiche (`/usage`, ou claude.ai)
+dans Réglages › Claude Code › **Heure de reset de la fenêtre**, au format
+`HH:MM` (heure locale, ex. `03:01`). BoringWindows retient cette fin de fenêtre ;
+une fois passée, il repart des messages suivants, début exact au premier message.
+Le champ ne sert donc qu'après une activité hors Claude Code.

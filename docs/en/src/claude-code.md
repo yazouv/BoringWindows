@@ -120,8 +120,22 @@ enabled = true
 recent = 4                # conversations offered (0 to 4)
 window_hours = 5          # usage window length (1 to 24)
 limit_tokens = 0          # estimated limit for the gauge (0: no gauge)
+reset_at = ""             # end of a known window (see below)
 count_cache_reads = false # also count cache reads
 ```
 
 Reopening uses Windows Terminal (`wt`) if installed, otherwise a console, and
 assumes the `claude` command is on your `PATH`. Windows only for now.
+
+### Aligning the countdown
+
+Your plan's 5-hour window is **shared across the whole account**: it also counts
+claude.ai and the Claude app, which BoringWindows cannot see. As a result,
+without alignment the window start is inferred from Claude Code messages alone
+and the "resets in…" can be off (by several hours).
+
+To align it, type the reset time Claude shows (`/usage`, or claude.ai) in
+Settings › Claude Code › **Window reset time**, as `HH:MM` (local time, e.g.
+`03:01`). BoringWindows keeps that window end; once it has passed, it starts over
+from the following messages, with the exact time of the first message as the start.
+So the field is only needed after activity outside Claude Code.
