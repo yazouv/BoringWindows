@@ -77,18 +77,29 @@ mod tests {
         std::fs::write(&path, "").unwrap();
 
         let (tx, rx) = mpsc::channel();
-        let _watcher = watch(&path, move |res| tx.send(res).unwrap()).unwrap();
-        let next = || {
-            rx.recv_timeout(Duration::from_secs(10))
-                .expect("rechargement attendu")
+        let _watcher = watch(&path, move |res| {
+            let _ = tx.send(res);
+        })
+        .unwrap();
+        // Une même écriture peut produire plusieurs notifications (création,
+        // modification) : on attend le résultat voulu au lieu d'en compter.
+        let wait_for = |pred: &dyn Fn(&Result<Config, ConfigError>) -> bool| {
+            let deadline = std::time::Instant::now() + Duration::from_secs(10);
+            loop {
+                let left = deadline.saturating_duration_since(std::time::Instant::now());
+                let res = rx.recv_timeout(left).expect("rechargement attendu");
+                if pred(&res) {
+                    return;
+                }
+            }
         };
 
-        // Un autre fichier du dossier ne déclenche rien.
+        // Un autre fichier du dossier ne déclenche rien de faux.
         std::fs::write(dir.path().join("other.txt"), "x").unwrap();
         std::fs::write(&path, "[general]\nopen_on = \"click\"").unwrap();
-        assert_eq!(next().unwrap().general.open_on, OpenOn::Click);
+        wait_for(&|r| r.as_ref().is_ok_and(|c| c.general.open_on == OpenOn::Click));
 
         std::fs::write(&path, "[general]\nopen_on = \"never\"").unwrap();
-        assert!(next().is_err());
+        wait_for(&|r| r.is_err());
     }
 }
