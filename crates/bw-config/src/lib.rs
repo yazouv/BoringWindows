@@ -5,6 +5,7 @@
 
 mod color;
 mod edit;
+mod theme;
 mod watch;
 
 use std::collections::BTreeMap;
@@ -16,6 +17,7 @@ use bw_i18n::tr;
 
 pub use color::Color;
 pub use edit::{ConfigEditor, Value};
+pub use theme::{BUILTIN_THEMES, THEME_KEYS, available_themes, themes_dir};
 pub use watch::{ConfigWatcher, watch};
 
 /// Modèle du fichier créé au premier lancement. Il doit rester équivalent à
@@ -93,9 +95,15 @@ pub enum OpenOn {
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Theme {
+    /// Thème de base (`default`, `light`… ou `themes/<nom>.toml`).
+    pub name: String,
     pub background: Color,
     pub foreground: Color,
     pub accent: Color,
+    /// Contour de l'île (transparent : pas de contour).
+    pub border: Color,
+    /// Police ; vide : celle du système.
+    pub font: String,
     pub corner_radius: f32,
     pub animation_ms: u32,
     pub top_offset: f32,
@@ -107,9 +115,17 @@ pub struct Theme {
 impl Default for Theme {
     fn default() -> Self {
         Self {
+            name: "default".into(),
             background: Color::rgb(0x00, 0x00, 0x00),
             foreground: Color::rgb(0xFF, 0xFF, 0xFF),
             accent: Color::rgb(0xFF, 0x8A, 0x3D),
+            border: Color {
+                r: 0,
+                g: 0,
+                b: 0,
+                a: 0,
+            },
+            font: String::new(),
             corner_radius: 22.0,
             animation_ms: 240,
             top_offset: 0.0,
@@ -150,8 +166,20 @@ impl Default for Layout {
 }
 
 impl Config {
+    /// Lit une config ; les thèmes personnels sont cherchés à côté de
+    /// config.toml, dans le dossier habituel.
     pub fn from_toml_str(s: &str) -> Result<Self, ConfigError> {
-        let config: Config = toml::from_str(s)?;
+        Self::parse(s, &config_dir())
+    }
+
+    /// Lit une config dont les thèmes personnels sont dans
+    /// `config_dir/themes`.
+    pub fn parse(s: &str, config_dir: &Path) -> Result<Self, ConfigError> {
+        // Premier passage sur le texte brut : messages d'erreur avec la ligne.
+        toml::from_str::<Config>(s)?;
+        let mut table: toml::Table = s.parse()?;
+        theme::resolve(&mut table, config_dir).map_err(|e| ConfigError::Invalid(vec![e]))?;
+        let config: Config = toml::Value::Table(table).try_into()?;
         config.validate()?;
         Ok(config)
     }
@@ -164,7 +192,7 @@ impl Config {
             source,
         };
         match std::fs::read_to_string(path) {
-            Ok(s) => Self::from_toml_str(&s),
+            Ok(s) => Self::parse(&s, path.parent().unwrap_or(Path::new("."))),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 if let Some(dir) = path.parent() {
                     std::fs::create_dir_all(dir).map_err(io_err)?;

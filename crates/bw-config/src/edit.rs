@@ -77,6 +77,32 @@ impl ConfigEditor {
         }
     }
 
+    /// Retire la clé `key` si elle existe (ex. une couleur qui masquait
+    /// celle du thème).
+    pub fn remove(&mut self, key: &[&str]) {
+        let Some((last, parents)) = key.split_last() else {
+            return;
+        };
+        let mut item = self.doc.as_item_mut();
+        for part in parents {
+            match item.get_mut(part) {
+                Some(next) => item = next,
+                None => return,
+            }
+        }
+        if let Some(table) = item.as_table_like_mut() {
+            table.remove(last);
+        }
+    }
+
+    /// Config correspondant au texte en cours (thèmes cherchés à côté du fichier).
+    pub fn config(&self) -> Result<Config, ConfigError> {
+        Config::parse(
+            &self.text(),
+            self.path.parent().unwrap_or(std::path::Path::new(".")),
+        )
+    }
+
     /// Calendriers déclarés : (nom, lien).
     pub fn calendar_sources(&self) -> Vec<(String, String)> {
         self.sources()
@@ -128,7 +154,7 @@ impl ConfigEditor {
     /// résultat est invalide : le fichier reste toujours chargeable.
     pub fn save(&self) -> Result<Config, ConfigError> {
         let text = self.text();
-        let config = Config::from_toml_str(&text)?;
+        let config = self.config()?;
         let io_err = |source| ConfigError::Io {
             path: self.path.clone(),
             source,
@@ -176,6 +202,19 @@ mod tests {
 
     fn editor(text: &str) -> ConfigEditor {
         ConfigEditor::from_str(Path::new("config.toml"), text).unwrap()
+    }
+
+    #[test]
+    fn remove_keys() {
+        let mut e = ConfigEditor::from_str(
+            Path::new("config.toml"),
+            "[theme]\nname = \"light\"\naccent = \"#FF0000\"\n",
+        )
+        .unwrap();
+        e.remove(&["theme", "accent"]);
+        e.remove(&["theme", "absent"]);
+        e.remove(&["absent", "x"]);
+        assert_eq!(e.text(), "[theme]\nname = \"light\"\n");
     }
 
     #[test]

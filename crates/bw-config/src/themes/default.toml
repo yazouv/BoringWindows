@@ -1,0 +1,6 @@
+# Noir, accent orange : l'île classique.
+background = "#000000"
+foreground = "#FFFFFF"
+accent = "#FF8A3D"
+border = "#00000000"
+corner_radius = 22.0

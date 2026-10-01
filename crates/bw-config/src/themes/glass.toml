@@ -1,0 +1,6 @@
+# Verre fumé : l'île laisse deviner ce qu'il y a derrière.
+background = "#1C1C1EB8"
+foreground = "#FFFFFF"
+accent = "#64D2FF"
+border = "#FFFFFF2E"
+corner_radius = 26.0

@@ -130,12 +130,8 @@ impl Controller {
         ui.set_language_index(language_index(g.language));
         ui.set_autostart(platform::autostart_enabled());
 
-        let t = &config.theme;
-        ui.set_accent(hex(t.accent).into());
-        ui.set_accent_preview(super::color(t.accent));
-        ui.set_background_color(hex(t.background).into());
-        ui.set_animation_ms(t.animation_ms as i32);
-        ui.set_corner_radius(t.corner_radius.round() as i32);
+        self.fill_themes(ui, &config.theme.name);
+        fill_appearance(ui, &config.theme);
 
         let cal = CalendarConfig::from_table(config.modules.get(bw_calendar::MODULE_ID))
             .unwrap_or_default();
@@ -239,7 +235,7 @@ impl Controller {
                 n => n.to_owned(),
             };
             match c.edit_now(|e| e.add_calendar_source(&name, &url)) {
-                Ok(()) => {
+                Ok(_) => {
                     ui.set_new_name("".into());
                     ui.set_new_url("".into());
                     ui.set_test_status("".into());
@@ -262,7 +258,7 @@ impl Controller {
                 && let Some(s) = c.settings.borrow().as_ref()
             {
                 match c.edit_now(|e| e.remove_calendar_source(i as usize)) {
-                    Ok(()) => {
+                    Ok(_) => {
                         c.refresh_sources(&s.ui);
                         status(
                             &s.ui,
@@ -293,6 +289,16 @@ impl Controller {
                 });
             });
         }));
+        ui.on_theme_picked(move |_| {
+            post(|c| c.pick_theme());
+        });
+        ui.on_open_themes_folder(with(|c, _| {
+            let dir = bw_config::themes_dir(c.path.parent().unwrap_or(std::path::Path::new(".")));
+            if let Err(e) = std::fs::create_dir_all(&dir) {
+                log::warn!("dossier des thèmes : {e}");
+            }
+            platform::open_path(&dir);
+        }));
         ui.on_open_config_file(with(|c, _| platform::open_path(&c.path)));
         ui.on_open_docs(with(|_, _| {
             platform::open_path(std::path::Path::new(docs()))
@@ -311,6 +317,19 @@ impl Controller {
         });
     }
 
+    /// Liste des thèmes (fournis puis personnels), `current` sélectionné.
+    fn fill_themes(&self, ui: &SettingsWindow, current: &str) {
+        let dir = self.path.parent().unwrap_or(std::path::Path::new("."));
+        let ids = bw_config::available_themes(dir);
+        let index = ids.iter().position(|id| id == current).unwrap_or(0);
+        ui.set_themes(ModelRc::new(VecModel::from(
+            ids.iter()
+                .map(|id| SharedString::from(theme_label(id)))
+                .collect::<Vec<_>>(),
+        )));
+        ui.set_theme_index(index as i32);
+    }
+
     /// Langue changée : textes fournis par Rust (les `@tr` suivent seuls).
     pub(super) fn retranslate_settings(&self) {
         if let Some(s) = self.settings.borrow().as_ref() {
@@ -320,6 +339,7 @@ impl Controller {
             s.ui.set_test_status("".into());
             s.ui.set_doctor_report("".into());
             s.ui.set_language_index(language_index(self.config.borrow().general.language));
+            self.fill_themes(&s.ui, &self.config.borrow().theme.name);
         }
     }
 
@@ -370,7 +390,7 @@ impl Controller {
             "autostart" => {
                 let enabled = ui.get_autostart();
                 match platform::set_autostart(enabled) {
-                    Ok(()) => {
+                    Ok(_) => {
                         if let Some(tray) = self.tray.borrow().as_ref() {
                             tray.set_autostart_checked(enabled);
                         }
@@ -487,6 +507,33 @@ impl Controller {
         }
     }
 
+    /// Thème choisi : il remplace les couleurs écrites dans `[theme]`.
+    fn pick_theme(&self) {
+        // Les réglages en attente d'abord, pour ne pas les perdre ni les
+        // réécrire par-dessus le thème.
+        self.flush_settings();
+        let settings = self.settings.borrow();
+        let Some(s) = settings.as_ref() else { return };
+        let dir = self.path.parent().unwrap_or(std::path::Path::new("."));
+        let ids = bw_config::available_themes(dir);
+        let Some(id) = ids.get(s.ui.get_theme_index() as usize) else {
+            return;
+        };
+        let result = self.edit_now(|e| {
+            e.set(&["theme", "name"], Value::Str(id.clone()));
+            for key in bw_config::THEME_KEYS {
+                e.remove(&["theme", key]);
+            }
+        });
+        match result {
+            Ok(config) => {
+                fill_appearance(&s.ui, &config.theme);
+                status(&s.ui, &saved(), false);
+            }
+            Err(e) => status(&s.ui, &e, true),
+        }
+    }
+
     /// Écrit les modifications en attente.
     fn flush_settings(&self) {
         let changes = match self.settings.borrow().as_ref() {
@@ -503,7 +550,7 @@ impl Controller {
         });
         if let Some(s) = self.settings.borrow().as_ref() {
             match result {
-                Ok(()) => status(&s.ui, &saved(), false),
+                Ok(_) => status(&s.ui, &saved(), false),
                 Err(e) => status(&s.ui, &e, true),
             }
         }
@@ -511,17 +558,36 @@ impl Controller {
 
     /// Relit config.toml, applique `f`, vérifie le tout (modules compris)
     /// et enregistre. Le rechargement à chaud applique ensuite les réglages.
-    fn edit_now(&self, f: impl FnOnce(&mut ConfigEditor)) -> Result<(), String> {
+    fn edit_now(&self, f: impl FnOnce(&mut ConfigEditor)) -> Result<Config, String> {
         let mut editor = ConfigEditor::open(&self.path).map_err(|e| e.to_string())?;
         f(&mut editor);
-        let config = Config::from_toml_str(&editor.text()).map_err(|e| e.to_string())?;
+        let config = editor.config().map_err(|e| e.to_string())?;
         let (_, errors) = build_modules(&config);
         if let Some(e) = errors.into_iter().next() {
             return Err(e);
         }
         editor.save().map_err(|e| e.to_string())?;
-        Ok(())
+        Ok(config)
     }
+}
+
+/// Nom affiché d'un thème : traduit pour ceux fournis, nom du fichier sinon.
+fn theme_label(id: &str) -> String {
+    match id {
+        "default" => tr!("Black (default)", "Noir (par défaut)"),
+        "light" => tr!("Light", "Clair"),
+        "midnight" => tr!("Midnight", "Minuit"),
+        "glass" => tr!("Smoked glass", "Verre fumé"),
+        other => other.to_owned(),
+    }
+}
+
+fn fill_appearance(ui: &SettingsWindow, t: &bw_config::Theme) {
+    ui.set_accent(hex(t.accent).into());
+    ui.set_accent_preview(super::color(t.accent));
+    ui.set_background_color(hex(t.background).into());
+    ui.set_animation_ms(t.animation_ms as i32);
+    ui.set_corner_radius(t.corner_radius.round() as i32);
 }
 
 fn language_index(language: bw_config::Language) -> i32 {

@@ -17,6 +17,7 @@
   - [iCloud](agenda/icloud.md)
   - [Proton Calendar](agenda/proton.md)
   - [Autres calendriers et fichiers .ics](agenda/autres.md)
+- [Thèmes](themes.md)
 
 # Référence
 

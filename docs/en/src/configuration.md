@@ -42,10 +42,13 @@ name = "Work"
 
 | Option | Default | Values | Role |
 |---|---|---|---|
-| `background` | `"#000000"` | `"#RRGGBB"` or `"#RRGGBBAA"` | island background |
-| `foreground` | `"#FFFFFF"` | same | text |
-| `accent` | `"#FF8A3D"` | same | accent colour (urgent, buttons); replaced by the artwork colour while music plays (see `[modules.media]`) |
-| `corner_radius` | `22.0` | 0 to 500 | corner rounding of the open island |
+| `name` | `"default"` | `"default"`, `"light"`, `"midnight"`, `"glass"` or a custom theme | base theme (see [Themes](themes.md)); the keys below take precedence |
+| `background` | from the theme | `"#RRGGBB"` or `"#RRGGBBAA"` | island background |
+| `foreground` | from the theme | same | text |
+| `accent` | from the theme | same | accent colour (urgent, buttons); replaced by the artwork colour while music plays (see `[modules.media]`) |
+| `border` | from the theme | same | island border (`"#00000000"`: none) |
+| `font` | `""` | name of an installed font | island font (empty: system font) |
+| `corner_radius` | from the theme | 0 to 500 | corner rounding of the open island |
 | `animation_ms` | `240` | 0 to 2000 | animation duration, `0` for none |
 | `top_offset` | `0.0` | 0 to 500 | offset from the top of the screen; above 0, the top corners are rounded too |
 

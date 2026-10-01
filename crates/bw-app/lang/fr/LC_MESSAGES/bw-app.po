@@ -54,8 +54,8 @@ msgstr "Parcourir…"
 msgid "Calendar"
 msgstr "Agenda"
 
-msgid "Changes apply to the island right away. The accent color is replaced by the album art color while music plays (Music tab)."
-msgstr "Les changements s'appliquent tout de suite sur l'île. La couleur d'accent est remplacée par celle de la pochette quand la musique joue (onglet Musique)."
+msgid "Changes apply to the island right away. Picking a theme replaces the colors above with the theme's; your own themes go in the themes folder (one .toml file each, see the documentation). The accent color is replaced by the album art color while music plays (Music tab)."
+msgstr "Les changements s'appliquent tout de suite sur l'île. Choisir un thème remplace les couleurs ci-dessus par les siennes ; tes propres thèmes vont dans le dossier des thèmes (un fichier .toml chacun, voir la documentation). La couleur d'accent est remplacée par celle de la pochette quand la musique joue (onglet Musique)."
 
 msgid "Corner radius of the open island"
 msgstr "Arrondi de l'île ouverte"
@@ -191,3 +191,9 @@ msgstr "écran de la souris (au lancement)"
 
 msgid "{} wants to use {}"
 msgstr "{} veut utiliser {}"
+
+msgid "Theme"
+msgstr "Thème"
+
+msgid "Themes folder"
+msgstr "Dossier des thèmes"

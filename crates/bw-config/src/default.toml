@@ -14,12 +14,17 @@ open_on = "hover"
 collapse_delay_ms = 350
 
 [theme]
+# Thème : "default" (noir), "light" (clair), "midnight" (bleu nuit), "glass"
+# (verre fumé), ou le nom d'un fichier themes/<nom>.toml placé à côté de ce fichier.
+name = "default"
+# Les clés suivantes remplacent celles du thème : décommente pour personnaliser.
 # Couleurs au format "#RRGGBB" ou "#RRGGBBAA".
-background = "#000000"
-foreground = "#FFFFFF"
-accent = "#FF8A3D"
-# Rayon des coins de l'île ouverte (la pilule compacte est toujours arrondie au max).
-corner_radius = 22.0
+# background = "#000000"
+# foreground = "#FFFFFF"
+# accent = "#FF8A3D"
+# border = "#00000000"        # contour de l'île (transparent : aucun)
+# font = "Segoe UI"           # police (par défaut : celle du système)
+# corner_radius = 22.0        # coins de l'île ouverte (la pilule reste ronde)
 # Durée des animations (ms). 0 = pas d'animation.
 animation_ms = 240
 # Décalage depuis le haut de l'écran (px).

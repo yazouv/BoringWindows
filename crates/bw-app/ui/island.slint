@@ -134,6 +134,10 @@ export component Island inherits Window {
     in property <color> bg: black;
     in property <color> fg: white;
     in property <color> accent: #ff8a3d;
+    in property <color> border: transparent;
+    // Police ; vide : celle du système.
+    in property <string> font;
+    default-font-family: root.font;
 
     // --- État ---
     in property <bool> expanded;
@@ -176,6 +180,8 @@ export component Island inherits Window {
         height: root.expanded ? root.expanded-height
             : root.has-attention ? root.attention-height : root.compact-height;
         background: root.bg;
+        border-width: root.border.alpha > 0 ? 1px : 0px;
+        border-color: root.border;
         clip: true;
         border-top-left-radius: self.top-radius;
         border-top-right-radius: self.top-radius;

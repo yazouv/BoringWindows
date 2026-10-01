@@ -55,6 +55,8 @@ export component SettingsWindow inherits Window {
     in-out property <bool> hide-fullscreen;
     in-out property <bool> autostart;
     // --- Apparence ---
+    in property <[string]> themes;
+    in-out property <int> theme-index;
     in-out property <string> accent;
     in property <color> accent-preview;
     in-out property <string> background-color;
@@ -90,6 +92,8 @@ export component SettingsWindow inherits Window {
     in property <bool> status-error;
 
     callback changed(string);
+    callback theme-picked(int);
+    callback open-themes-folder();
     callback provider-changed(int);
     callback open-guide();
     callback browse-file();
@@ -159,6 +163,19 @@ export component SettingsWindow inherits Window {
                     alignment: start;
 
                     Row {
+                        label: @tr("Theme");
+                        ComboBox {
+                            model: root.themes;
+                            current-index <=> root.theme-index;
+                            selected => { root.theme-picked(self.current-index); }
+                        }
+                        Button {
+                            text: @tr("Themes folder");
+                            clicked => { root.open-themes-folder(); }
+                        }
+                    }
+
+                    Row {
                         label: @tr("Accent color");
                         LineEdit {
                             text <=> root.accent;
@@ -216,7 +233,7 @@ export component SettingsWindow inherits Window {
                     }
 
                     Hint {
-                        text: @tr("Changes apply to the island right away. The accent color is replaced by the album art color while music plays (Music tab).");
+                        text: @tr("Changes apply to the island right away. Picking a theme replaces the colors above with the theme's; your own themes go in the themes folder (one .toml file each, see the documentation). The accent color is replaced by the album art color while music plays (Music tab).");
                     }
                 }
             }

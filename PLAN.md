@@ -337,7 +337,9 @@ Ordre conseillé : la doc d'abord (rapide, utile tout de suite, et elle sert
 de texte aux écrans de l'assistant), puis la fenêtre de réglages.
 
 ### Phase 4 — Customisation avancée
-- [ ] Système de thèmes + 2–3 thèmes fournis
+- [x] Thèmes : `theme.name`, 4 fournis (default, light, midnight, glass), thèmes perso
+      `themes/<nom>.toml` rechargés à chaud, clés de `[theme]` prioritaires, contour et police,
+      choix dans Réglages › Apparence, page de doc FR + EN
 - [ ] Layouts `.slint` au runtime + doc de l'API de données
 
 ### Phase 5 — Extensions

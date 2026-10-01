@@ -1,0 +1,6 @@
+# Bleu nuit, accent lavande.
+background = "#0F1426"
+foreground = "#E6E9F5"
+accent = "#8C9EFF"
+border = "#FFFFFF14"
+corner_radius = 24.0

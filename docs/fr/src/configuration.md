@@ -43,10 +43,13 @@ name = "Pro"
 
 | Option | Défaut | Valeurs | Rôle |
 |---|---|---|---|
-| `background` | `"#000000"` | `"#RRGGBB"` ou `"#RRGGBBAA"` | fond de l'île |
-| `foreground` | `"#FFFFFF"` | idem | texte |
-| `accent` | `"#FF8A3D"` | idem | couleur d'accent (urgent, boutons) ; remplacée par la couleur de la pochette quand la musique joue (voir `[modules.media]`) |
-| `corner_radius` | `22.0` | 0 à 500 | arrondi des coins de l'île ouverte |
+| `name` | `"default"` | `"default"`, `"light"`, `"midnight"`, `"glass"` ou un thème perso | thème de base (voir [Thèmes](themes.md)) ; les clés ci-dessous passent devant |
+| `background` | selon le thème | `"#RRGGBB"` ou `"#RRGGBBAA"` | fond de l'île |
+| `foreground` | selon le thème | idem | texte |
+| `accent` | selon le thème | idem | couleur d'accent (urgent, boutons) ; remplacée par la couleur de la pochette quand la musique joue (voir `[modules.media]`) |
+| `border` | selon le thème | idem | contour de l'île (`"#00000000"` : aucun) |
+| `font` | `""` | nom d'une police installée | police de l'île (vide : celle du système) |
+| `corner_radius` | selon le thème | 0 à 500 | arrondi des coins de l'île ouverte |
 | `animation_ms` | `240` | 0 à 2000 | durée des animations, `0` pour aucune |
 | `top_offset` | `0.0` | 0 à 500 | décalage depuis le haut de l'écran ; au-delà de 0, les coins du haut s'arrondissent aussi |
 

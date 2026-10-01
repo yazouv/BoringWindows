@@ -29,6 +29,8 @@ Sources dans [`docs/`](docs/).
 - **Phase 3.5** (réglages) : fenêtre de réglages (clic droit sur l'icône ›
   **Réglages…**) : plus besoin d'éditer `config.toml`, assistant d'ajout de
   calendrier avec bouton **Tester**, hooks et diagnostic Claude Code.
+- **Phase 4** (en cours) : thèmes (`default`, `light`, `midnight`, `glass` ou
+  les tiens dans `themes/<nom>.toml`), au choix dans Réglages › Apparence.
 - **Langues** : l'app est en français ou en anglais (celle de Windows par
   défaut, `general.language` pour forcer), changement à chaud.
 

@@ -408,6 +408,8 @@ impl Controller {
         ui.set_anim(t.animation_ms.into());
         ui.set_bg(color(t.background));
         ui.set_fg(color(t.foreground));
+        ui.set_border(color(t.border));
+        ui.set_font(t.font.as_str().into());
         drop(config);
         self.apply_accent();
     }
