@@ -22,7 +22,17 @@ fn main() -> anyhow::Result<()> {
 
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
-    let Some(_instance) = platform::single_instance() else {
+    // Après une mise à jour, l'ancienne version peut mettre un instant à se fermer.
+    let restarted = std::env::args().any(|a| a == "--restarted");
+    let mut instance = platform::single_instance();
+    for _ in 0..50 {
+        if instance.is_some() || !restarted {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        instance = platform::single_instance();
+    }
+    let Some(_instance) = instance else {
         log::info!("BoringWindows est déjà lancé");
         return Ok(());
     };

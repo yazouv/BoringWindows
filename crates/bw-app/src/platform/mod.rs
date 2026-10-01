@@ -39,5 +39,7 @@ pub enum TrayCommand {
     Pause(bool),
     /// Installer ou retirer les hooks Claude Code.
     ClaudeHooks,
+    /// Rechercher une mise à jour, ou redémarrer si elle est installée.
+    Update,
     Quit,
 }

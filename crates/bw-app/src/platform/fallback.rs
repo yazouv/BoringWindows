@@ -74,6 +74,7 @@ impl Tray {
     pub fn new(
         _autostart: bool,
         _claude_hooks_installed: bool,
+        _update_label: &str,
         _on_command: impl Fn(TrayCommand) + Send + Sync + 'static,
     ) -> anyhow::Result<Self> {
         Ok(Self)
@@ -84,6 +85,8 @@ impl Tray {
     pub fn set_claude_hooks_installed(&self, _installed: bool) {}
 
     pub fn retranslate(&self) {}
+
+    pub fn set_update_label(&self, _label: &str) {}
 }
 
 pub fn autostart_enabled() -> bool {

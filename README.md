@@ -155,13 +155,38 @@ démarrage, masquer l'île, quitter.
 | `bw-media` | musique : contrôles média de Windows (GSMTC), pochette, couleur d'accent |
 | `bw-calendar` | agenda : lecture ICS, récurrences, rappels, liens de visio |
 | `bw-i18n` | langue courante et macro `tr!("anglais", "français")` pour les textes côté Rust |
+| `bw-net` | requêtes HTTP (client de Windows, `curl` ailleurs) |
+| `bw-update` | mises à jour depuis les releases GitHub (empreinte vérifiée) |
 | `bw-app` | binaire : île Slint (`ui/island.slint`), intégration Win32, icône de notification |
 
 Le code Win32 est isolé dans `crates/bw-app/src/platform/win32.rs`. Sur macOS et
 Linux, l'île s'ouvre comme une fenêtre flottante (macOS : icône de barre de menus,
 pas d'icône dans le Dock) ; le port macOS complet est décrit dans le plan.
 
-Pas de CI de build/tests (elle consommait trop de minutes GitHub Actions) :
-avant de pousser, lance `cargo clippy --workspace --all-targets -- -D warnings`
-et `cargo test --workspace`. Seule la doc est publiée automatiquement depuis
-`main`.
+## Versions et CI/CD
+
+- **PR vers `main`** : `ci.yml` vérifie format, clippy (Linux, Windows et macOS)
+  et tests sur un seul runner Linux, le moins cher en minutes.
+- **Push sur `main`** : [release-please](https://github.com/googleapis/release-please)
+  tient à jour une PR « chore: release x.y.z » (version dans `Cargo.toml`,
+  `CHANGELOG.md`). **La fusionner publie la release** : tag `vx.y.z`, puis
+  binaires Windows, macOS et Linux (+ empreintes `.sha256`) attachés à la
+  release, et liens de téléchargement en tête des notes.
+- **Mise à jour automatique** : l'app lit la dernière release et remplace son
+  exécutable (voir la doc, *Installation › Mises à jour*).
+- **Doc** : publiée sur GitHub Pages quand `docs/` change sur `main`.
+
+Les messages de commit (ou titres de PR fusionnées en *squash*) suivent
+[Conventional Commits](https://www.conventionalcommits.org/fr/) : c'est ce qui
+décide de la version et du changelog.
+
+| Préfixe | Effet |
+|---|---|
+| `feat: …` | nouvelle fonction → version mineure (0.1.0 → 0.2.0) |
+| `fix: …` | correction → version corrective (0.2.0 → 0.2.1) |
+| `feat!: …` ou `BREAKING CHANGE:` | changement incompatible |
+| `docs:`, `chore:`, `ci:`, `refactor:` | pas de nouvelle version à eux seuls |
+
+Réglage du dépôt nécessaire une fois : *Settings › Actions › General › Workflow
+permissions* : **Read and write permissions** et **Allow GitHub Actions to
+create and approve pull requests**.

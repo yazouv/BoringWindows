@@ -197,3 +197,18 @@ msgstr "Thème"
 
 msgid "Themes folder"
 msgstr "Dossier des thèmes"
+
+msgid "Install updates automatically"
+msgstr "Installer les mises à jour automatiquement"
+
+msgid "Version {}"
+msgstr "Version {}"
+
+msgid "Restart to update"
+msgstr "Redémarrer pour mettre à jour"
+
+msgid "Checking…"
+msgstr "Recherche…"
+
+msgid "Check for updates"
+msgstr "Rechercher une mise à jour"

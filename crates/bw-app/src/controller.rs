@@ -1,6 +1,7 @@
 //! Orchestration sur le thread UI : config, modules, forme de l'île, système.
 
 mod settings;
+mod update;
 
 use std::cell::{Cell, OnceCell, RefCell};
 use std::path::PathBuf;
@@ -83,6 +84,8 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         calendar: RefCell::new(None),
         settings: RefCell::new(None),
         open_settings_at_start: Cell::new(open_settings),
+        update_state: Cell::new(update::UpdateState::Idle),
+        update_timer: Timer::default(),
         artwork: RefCell::new(None),
         progress_timer: Timer::default(),
     });
@@ -125,6 +128,8 @@ pub struct Controller {
     calendar: RefCell<Option<Arc<CalendarSnapshot>>>,
     settings: RefCell<Option<settings::SettingsState>>,
     open_settings_at_start: Cell<bool>,
+    update_state: Cell<update::UpdateState>,
+    update_timer: Timer,
 }
 
 impl Controller {
@@ -212,12 +217,18 @@ impl Controller {
 
         // Créée boucle d'événements lancée : exigé par macOS.
         let hooks_installed = self.installer.is_installed();
-        match Tray::new(platform::autostart_enabled(), hooks_installed, |cmd| {
-            post(move |c| c.on_tray(cmd));
-        }) {
+        match Tray::new(
+            platform::autostart_enabled(),
+            hooks_installed,
+            &self.update_tray_label(),
+            |cmd| {
+                post(move |c| c.on_tray(cmd));
+            },
+        ) {
             Ok(tray) => *self.tray.borrow_mut() = Some(tray),
             Err(e) => log::error!("icône de notification indisponible : {e:#}"),
         }
+        self.start_updates();
 
         if !hooks_installed && self.module_ids.borrow().contains(&bw_claude::MODULE_ID) {
             self.flash(&tr!(
@@ -458,6 +469,7 @@ impl Controller {
         if let Some(tray) = self.tray.borrow().as_ref() {
             tray.retranslate();
         }
+        self.sync_update_ui();
         self.update_clock();
         self.retranslate_settings();
     }
@@ -905,6 +917,7 @@ impl Controller {
             }
             TrayCommand::Settings => self.open_settings(),
             TrayCommand::ClaudeHooks => self.toggle_claude_hooks(),
+            TrayCommand::Update => self.update_command(),
             TrayCommand::Quit => {
                 let _ = slint::quit_event_loop();
             }

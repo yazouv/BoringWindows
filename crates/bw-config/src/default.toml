@@ -12,6 +12,8 @@ hide_in_fullscreen = true
 open_on = "hover"
 # Délai avant de refermer l'île quand la souris s'en va (ms).
 collapse_delay_ms = 350
+# Installer automatiquement les nouvelles versions (releases GitHub).
+auto_update = true
 
 [theme]
 # Thème : "default" (noir), "light" (clair), "midnight" (bleu nuit), "glass"

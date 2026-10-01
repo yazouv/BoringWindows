@@ -21,6 +21,7 @@ pub struct Tray {
     autostart: CheckMenuItem,
     autostart_state: Arc<AtomicBool>,
     pause: CheckMenuItem,
+    update: MenuItem,
     quit: MenuItem,
 }
 
@@ -30,6 +31,7 @@ impl Tray {
     pub fn new(
         autostart: bool,
         claude_hooks_installed: bool,
+        update_label: &str,
         on_command: impl Fn(TrayCommand) + Send + Sync + 'static,
     ) -> anyhow::Result<Self> {
         let title = MenuItem::new("BoringWindows", false, None);
@@ -39,6 +41,7 @@ impl Tray {
         let autostart_item = CheckMenuItem::new(autostart_label(), true, autostart, None);
         let pause = CheckMenuItem::new(pause_label(), true, false, None);
         let claude_hooks = MenuItem::new(claude_hooks_label(claude_hooks_installed), true, None);
+        let update = MenuItem::new(update_label, true, None);
         let quit = MenuItem::new(quit_label(), true, None);
 
         let menu = Menu::new();
@@ -54,6 +57,7 @@ impl Tray {
             &autostart_item,
             &pause,
             &PredefinedMenuItem::separator(),
+            &update,
             &quit,
         ])?;
 
@@ -68,11 +72,12 @@ impl Tray {
             autostart_item.id().clone(),
             pause.id().clone(),
             claude_hooks.id().clone(),
+            update.id().clone(),
             quit.id().clone(),
         );
         let autostart_flag = autostart_state.clone();
         MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
-            let (settings, open, reload, autostart, pause, claude, quit) = &ids;
+            let (settings, open, reload, autostart, pause, claude, update, quit) = &ids;
             let toggle = |flag: &AtomicBool| !flag.fetch_xor(true, Ordering::Relaxed);
             let command = match &event.id {
                 id if id == settings => TrayCommand::Settings,
@@ -81,6 +86,7 @@ impl Tray {
                 id if id == autostart => TrayCommand::Autostart(toggle(&autostart_flag)),
                 id if id == pause => TrayCommand::Pause(toggle(&pause_state)),
                 id if id == claude => TrayCommand::ClaudeHooks,
+                id if id == update => TrayCommand::Update,
                 id if id == quit => TrayCommand::Quit,
                 _ => return,
             };
@@ -103,6 +109,7 @@ impl Tray {
             autostart: autostart_item,
             autostart_state,
             pause,
+            update,
             quit,
         })
     }
@@ -110,6 +117,10 @@ impl Tray {
     pub fn set_claude_hooks_installed(&self, installed: bool) {
         self.claude_hooks_installed.set(installed);
         self.claude_hooks.set_text(claude_hooks_label(installed));
+    }
+
+    pub fn set_update_label(&self, label: &str) {
+        self.update.set_text(label);
     }
 
     /// Remet les textes du menu dans la langue courante.

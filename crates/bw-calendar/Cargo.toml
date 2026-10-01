@@ -8,6 +8,7 @@ rust-version.workspace = true
 
 [dependencies]
 bw-i18n.workspace = true
+bw-net.workspace = true
 anyhow.workspace = true
 bw-core.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
@@ -17,9 +18,6 @@ rrule = "0.14"
 serde.workspace = true
 tokio.workspace = true
 toml.workspace = true
-
-[target.'cfg(windows)'.dependencies]
-windows = { version = "0.62", features = ["Foundation", "Web_Http"] }
 
 [lints]
 workspace = true

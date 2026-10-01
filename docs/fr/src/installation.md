@@ -2,19 +2,57 @@
 
 ## Télécharger
 
-BoringWindows tient en un seul fichier, `boringwindows.exe`.
+BoringWindows tient en un seul fichier. Va sur la page
+**[Releases](https://github.com/yazouv/BoringWindows/releases/latest)** et
+télécharge celui de ton système :
 
-1. Ouvre l'onglet **[Actions](https://github.com/yazouv/BoringWindows/actions)**
-   du dépôt et clique sur le dernier passage réussi (✅).
-2. En bas de la page, section **Artifacts**, télécharge
-   `boringwindows-windows-x64` (il faut être connecté à GitHub), puis
-   décompresse-le.
-3. Range `boringwindows.exe` où tu veux, par exemple dans
-   `C:\Users\<toi>\Apps\BoringWindows\`.
+| Système | Fichier |
+|---|---|
+| Windows 10/11 | `boringwindows-windows-x64.exe` |
+| macOS (Apple Silicon) | `boringwindows-macos-arm64.tar.gz` |
+| Linux (x64) | `boringwindows-linux-x64.tar.gz` |
+
+Tant que le dépôt est privé, il faut être connecté à GitHub avec un compte qui
+y a accès.
+
+**Windows** : renomme le fichier en `boringwindows.exe` si tu veux et range-le
+où tu veux, par exemple dans `C:\Users\<toi>\Apps\BoringWindows\` (un
+dossier à toi : la mise à jour automatique doit pouvoir le remplacer).
 
 > Windows peut afficher un avertissement SmartScreen (« application non
 > reconnue ») tant que l'exécutable n'est pas signé : *Informations
 > complémentaires* › *Exécuter quand même*.
+
+**macOS** : décompresse l'archive, puis autorise ce binaire non signé :
+
+```sh
+xattr -d com.apple.quarantine boringwindows
+./boringwindows
+```
+
+**Linux** : `tar -xzf boringwindows-linux-x64.tar.gz && ./boringwindows`
+(l'île s'ouvre comme une fenêtre flottante, sans icône de notification).
+
+## Mises à jour
+
+BoringWindows vérifie les nouvelles versions au lancement puis toutes les
+6 heures. Quand il en trouve une, il la télécharge, vérifie son empreinte
+(SHA-256) et remplace son exécutable ; l'île affiche « BoringWindows x.y.z
+installé ». Elle s'applique au prochain lancement, ou tout de suite avec
+clic droit sur l'icône › **Redémarrer pour passer à x.y.z**.
+
+- Désactiver : **Réglages… › Général › Installer les mises à jour
+  automatiquement** (`auto_update = false` dans `[general]`).
+- Vérifier à la main : **Réglages… › Général › Rechercher une mise à jour**, ou
+  le même élément dans le menu de l'icône.
+- Seule requête envoyée : la liste des releases à `api.github.com`, puis le
+  téléchargement du fichier.
+- **Dépôt privé** : GitHub ne montre les releases qu'aux comptes autorisés.
+  Crée un jeton (GitHub › Settings › Developer settings › *Fine-grained
+  tokens*, accès en lecture seule au dépôt, permission *Contents: Read*) et
+  mets-le dans la variable d'environnement utilisateur
+  `BORINGWINDOWS_GITHUB_TOKEN`, puis relance BoringWindows.
+- Une version compilée avec `cargo` ne se met pas à jour toute seule.
 
 ## Ou compiler toi-même
 

@@ -1,0 +1,39 @@
+name: CI
+
+# Vérifications des PR vers main, sur un seul runner Linux (le moins cher en
+# minutes) : format, clippy pour Linux, Windows et macOS (vérification de types,
+# sans édition de liens), tests. Les binaires ne sont construits qu'aux releases.
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dépendances système
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+          targets: x86_64-pc-windows-msvc, aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - run: cargo fmt --all --check
+      - name: clippy (Linux)
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: clippy (Windows)
+        run: cargo clippy --workspace --all-targets --locked --target x86_64-pc-windows-msvc -- -D warnings
+      - name: clippy (macOS)
+        run: cargo clippy --workspace --all-targets --locked --target aarch64-apple-darwin -- -D warnings
+      - run: cargo test --workspace --locked

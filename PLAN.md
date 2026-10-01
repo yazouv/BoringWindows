@@ -363,9 +363,13 @@ Note : sur Mac, boring.notch existe déjà ; l'intérêt est surtout d'avoir la 
 île et la même config sur les deux machines.
 
 ### Phase 6 — Distribution
+- [x] release-please : PR de release (version + CHANGELOG) ; la fusionner publie la release
+- [x] Binaires Windows / macOS / Linux + `.sha256` attachés à chaque release (`release.yml`)
+- [x] CI des PR sur un seul runner Linux (clippy des 3 OS, tests)
+- [x] Mise à jour automatique (GitHub Releases, empreinte vérifiée, jeton facultatif pour un dépôt privé)
 - [ ] Installeur (MSI via `cargo-wix` ou Inno Setup) + package **winget**
 - [ ] Signature de code (ex. SignPath, gratuit pour l'open source) pour éviter SmartScreen
-- [ ] Mise à jour automatique (GitHub Releases)
+- [ ] macOS : bundle `.app` signé + binaire Intel / universel
 - [ ] (opt.) MSIX pour débloquer les API à identité de package (notifications)
 
 ---

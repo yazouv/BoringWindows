@@ -55,6 +55,8 @@ pub struct General {
     pub open_on: OpenOn,
     pub collapse_delay_ms: u32,
     pub language: Language,
+    /// Installer les mises à jour (releases GitHub) automatiquement.
+    pub auto_update: bool,
 }
 
 impl Default for General {
@@ -65,6 +67,7 @@ impl Default for General {
             open_on: OpenOn::Hover,
             collapse_delay_ms: 350,
             language: Language::Auto,
+            auto_update: true,
         }
     }
 }

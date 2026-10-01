@@ -1,0 +1,21 @@
+[package]
+name = "bw-update"
+description = "Mises à jour de BoringWindows depuis les releases GitHub"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+bw-i18n.workspace = true
+bw-net.workspace = true
+serde.workspace = true
+serde_json = "1"
+sha2 = "0.10"
+
+[dev-dependencies]
+tempfile = "3"
+
+[lints]
+workspace = true

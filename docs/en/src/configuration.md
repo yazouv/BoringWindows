@@ -34,6 +34,7 @@ name = "Work"
 |---|---|---|---|
 | `monitor` | `"primary"` | `"primary"`, `"cursor"` | screen of the island: main one, or the one under the mouse at start up |
 | `hide_in_fullscreen` | `true` | `true`, `false` | hide the island when an app is full screen |
+| `auto_update` | `true` | `true`, `false` | install new versions automatically (see [Installation](installation.md#updates)) |
 | `language` | `"auto"` | `"auto"`, `"fr"`, `"en"` | interface language (`auto`: the one of Windows) |
 | `open_on` | `"hover"` | `"hover"`, `"click"` | open the island on hover or on click |
 | `collapse_delay_ms` | `350` | 0 to 10000 | delay before closing when the mouse leaves (ms) |

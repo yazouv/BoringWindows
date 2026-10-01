@@ -50,6 +50,10 @@ export component SettingsWindow inherits Window {
 
     // --- Général ---
     in-out property <int> language-index;
+    in-out property <bool> auto-update;
+    in property <string> app-version;
+    in property <bool> update-checking;
+    in property <bool> update-ready;
     in-out property <int> open-on-index;
     in-out property <int> monitor-index;
     in-out property <bool> hide-fullscreen;
@@ -93,6 +97,7 @@ export component SettingsWindow inherits Window {
 
     callback changed(string);
     callback theme-picked(int);
+    callback update-clicked();
     callback open-themes-folder();
     callback provider-changed(int);
     callback open-guide();
@@ -153,6 +158,23 @@ export component SettingsWindow inherits Window {
                         text: @tr("Start BoringWindows with Windows");
                         checked <=> root.autostart;
                         toggled => { root.changed("autostart"); }
+                    }
+
+                    CheckBox {
+                        text: @tr("Install updates automatically");
+                        checked <=> root.auto-update;
+                        toggled => { root.changed("general.auto_update"); }
+                    }
+
+                    Row {
+                        label: @tr("Version {}", root.app-version);
+                        Button {
+                            text: root.update-ready ? @tr("Restart to update")
+                                : root.update-checking ? @tr("Checking…") : @tr("Check for updates");
+                            enabled: !root.update-checking;
+                            primary: root.update-ready;
+                            clicked => { root.update-clicked(); }
+                        }
                     }
                 }
             }

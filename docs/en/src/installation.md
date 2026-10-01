@@ -2,18 +2,56 @@
 
 ## Download
 
-BoringWindows is a single file, `boringwindows.exe`.
+BoringWindows is a single file. Go to the
+**[Releases](https://github.com/yazouv/BoringWindows/releases/latest)** page and
+download the one for your system:
 
-1. Open the **[Actions](https://github.com/yazouv/BoringWindows/actions)** tab
-   of the repository and click the latest successful run (✅).
-2. At the bottom of the page, under **Artifacts**, download
-   `boringwindows-windows-x64` (you need to be signed in to GitHub), then
-   unzip it.
-3. Put `boringwindows.exe` wherever you like, for instance in
-   `C:\Users\<you>\Apps\BoringWindows\`.
+| System | File |
+|---|---|
+| Windows 10/11 | `boringwindows-windows-x64.exe` |
+| macOS (Apple Silicon) | `boringwindows-macos-arm64.tar.gz` |
+| Linux (x64) | `boringwindows-linux-x64.tar.gz` |
+
+While the repository is private, you need to be signed in to GitHub with an
+account that has access to it.
+
+**Windows**: rename the file to `boringwindows.exe` if you like and put it
+wherever you want, for instance in `C:\Users\<you>\Apps\BoringWindows\` (a
+folder of yours: automatic updates must be able to replace it).
 
 > Windows may show a SmartScreen warning ("unrecognized app") while the
 > executable is not signed: *More info* › *Run anyway*.
+
+**macOS**: extract the archive, then allow this unsigned binary:
+
+```sh
+xattr -d com.apple.quarantine boringwindows
+./boringwindows
+```
+
+**Linux**: `tar -xzf boringwindows-linux-x64.tar.gz && ./boringwindows` (the
+island opens as a floating window, without a tray icon).
+
+## Updates
+
+BoringWindows checks for new versions at startup, then every 6 hours. When it
+finds one, it downloads it, verifies its checksum (SHA-256) and replaces its
+executable; the island shows "BoringWindows x.y.z installed". It applies at
+the next launch, or right away with right-click on the icon › **Restart to
+update to x.y.z**.
+
+- Turn off: **Settings… › General › Install updates automatically**
+  (`auto_update = false` in `[general]`).
+- Check by hand: **Settings… › General › Check for updates**, or the same entry
+  in the icon menu.
+- Only request sent: the list of releases from `api.github.com`, then the file
+  download.
+- **Private repository**: GitHub only shows releases to authorized accounts.
+  Create a token (GitHub › Settings › Developer settings › *Fine-grained
+  tokens*, read-only access to the repository, *Contents: Read* permission),
+  put it in the user environment variable `BORINGWINDOWS_GITHUB_TOKEN`, then
+  restart BoringWindows.
+- A version built with `cargo` doesn't update itself.
 
 ## Or build it yourself
 

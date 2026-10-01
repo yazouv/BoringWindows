@@ -119,6 +119,7 @@ impl Controller {
             pending: RefCell::new(Vec::new()),
             save_timer: Timer::default(),
         });
+        self.sync_settings_update(self.update_state.get());
     }
 
     fn fill_settings(&self, ui: &SettingsWindow) {
@@ -128,6 +129,8 @@ impl Controller {
         ui.set_monitor_index(i32::from(g.monitor == bw_config::MonitorChoice::Cursor));
         ui.set_hide_fullscreen(g.hide_in_fullscreen);
         ui.set_language_index(language_index(g.language));
+        ui.set_auto_update(g.auto_update);
+        ui.set_app_version(super::update::CURRENT.into());
         ui.set_autostart(platform::autostart_enabled());
 
         self.fill_themes(ui, &config.theme.name);
@@ -289,6 +292,7 @@ impl Controller {
                 });
             });
         }));
+        ui.on_update_clicked(move || post(|c| c.update_command()));
         ui.on_theme_picked(move |_| {
             post(|c| c.pick_theme());
         });
@@ -382,6 +386,10 @@ impl Controller {
                     }
                     .into(),
                 ),
+            )),
+            "general.auto_update" => Some((
+                vec!["general", "auto_update"],
+                Value::Bool(ui.get_auto_update()),
             )),
             "general.hide_in_fullscreen" => Some((
                 vec!["general", "hide_in_fullscreen"],
@@ -534,8 +542,22 @@ impl Controller {
         }
     }
 
+    /// Message en bas de la fenêtre de réglages, si elle est ouverte.
+    pub(super) fn settings_status(&self, text: &str, error: bool) {
+        if let Some(s) = self.settings.borrow().as_ref() {
+            status(&s.ui, text, error);
+        }
+    }
+
+    pub(super) fn sync_settings_update(&self, state: super::update::UpdateState) {
+        if let Some(s) = self.settings.borrow().as_ref() {
+            s.ui.set_update_checking(state == super::update::UpdateState::Checking);
+            s.ui.set_update_ready(matches!(state, super::update::UpdateState::Ready(_)));
+        }
+    }
+
     /// Écrit les modifications en attente.
-    fn flush_settings(&self) {
+    pub(super) fn flush_settings(&self) {
         let changes = match self.settings.borrow().as_ref() {
             Some(s) => std::mem::take(&mut *s.pending.borrow_mut()),
             None => return,
