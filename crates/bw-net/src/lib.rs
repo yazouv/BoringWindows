@@ -10,7 +10,17 @@ pub type Headers<'a> = &'a [(&'a str, &'a str)];
 
 /// Corps de la réponse ; erreur si le statut n'est pas 2xx.
 pub fn get(url: &str, headers: Headers) -> anyhow::Result<Vec<u8>> {
-    imp::get(url, headers)
+    imp::request("GET", url, headers, None)
+}
+
+/// Requête avec méthode et corps (PROPFIND, REPORT…) ; corps de la réponse.
+pub fn request(
+    method: &str,
+    url: &str,
+    headers: Headers,
+    body: Option<(&str, &str)>,
+) -> anyhow::Result<Vec<u8>> {
+    imp::request(method, url, headers, body)
 }
 
 /// Corps de la réponse en texte (UTF-8, caractères invalides remplacés).
@@ -28,14 +38,19 @@ fn host(url: &str) -> &str {
 #[cfg(windows)]
 mod imp {
     use windows::Foundation::Uri;
-    use windows::Storage::Streams::DataReader;
+    use windows::Storage::Streams::{DataReader, UnicodeEncoding};
     use windows::Web::Http::Filters::{HttpBaseProtocolFilter, HttpCacheReadBehavior};
-    use windows::Web::Http::{HttpClient, HttpMethod, HttpRequestMessage};
+    use windows::Web::Http::{HttpClient, HttpMethod, HttpRequestMessage, HttpStringContent};
     use windows::core::HSTRING;
 
     use super::{Headers, host};
 
-    pub fn get(url: &str, headers: Headers) -> anyhow::Result<Vec<u8>> {
+    pub fn request(
+        method: &str,
+        url: &str,
+        headers: Headers,
+        body: Option<(&str, &str)>,
+    ) -> anyhow::Result<Vec<u8>> {
         let filter = HttpBaseProtocolFilter::new()?;
         // Redirections suivies à la main, pour ne pas envoyer un jeton ailleurs.
         filter.SetAllowAutoRedirect(false)?;
@@ -47,7 +62,16 @@ mod imp {
         let mut uri = Uri::CreateUri(&HSTRING::from(url))?;
         let mut headers = headers.to_vec();
         for _ in 0..8 {
-            let request = HttpRequestMessage::Create(&HttpMethod::Get()?, &uri)?;
+            let http_method = HttpMethod::Create(&HSTRING::from(method))?;
+            let request = HttpRequestMessage::Create(&http_method, &uri)?;
+            if let Some((content_type, text)) = body {
+                let content = HttpStringContent::CreateFromStringWithEncodingAndMediaType(
+                    &HSTRING::from(text),
+                    UnicodeEncoding::Utf8,
+                    &HSTRING::from(content_type),
+                )?;
+                request.SetContent(&content)?;
+            }
             for (name, value) in &headers {
                 request
                     .Headers()?
@@ -82,14 +106,35 @@ mod imp {
 mod imp {
     use super::Headers;
 
-    pub fn get(url: &str, headers: Headers) -> anyhow::Result<Vec<u8>> {
+    pub fn request(
+        method: &str,
+        url: &str,
+        headers: Headers,
+        body: Option<(&str, &str)>,
+    ) -> anyhow::Result<Vec<u8>> {
+        use std::io::Write;
+        use std::process::Stdio;
+
         // `-L` ne renvoie pas `Authorization` à un autre hôte (curl ≥ 7.58).
         let mut cmd = std::process::Command::new("curl");
-        cmd.args(["-fsSL", "--max-time", "120"]);
+        cmd.args(["-fsSL", "--max-time", "120", "-X", method]);
         for (name, value) in headers {
             cmd.arg("-H").arg(format!("{name}: {value}"));
         }
-        let out = cmd.arg(url).output()?;
+        if let Some((content_type, _)) = body {
+            cmd.arg("-H").arg(format!("Content-Type: {content_type}"));
+            cmd.args(["--data-binary", "@-"]);
+        }
+        let mut child = cmd
+            .arg(url)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
+        if let (Some(mut stdin), Some((_, text))) = (child.stdin.take(), body) {
+            stdin.write_all(text.as_bytes())?;
+        }
+        let out = child.wait_with_output()?;
         anyhow::ensure!(
             out.status.success(),
             "curl : {}",

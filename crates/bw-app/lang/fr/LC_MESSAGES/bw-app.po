@@ -224,3 +224,12 @@ msgstr "Taille de l'île ouverte (px)"
 
 msgid "Priority in the compact island (first wins)"
 msgstr "Priorité dans l'île compacte (le premier gagne)"
+
+msgid "Server address"
+msgstr "Adresse du serveur"
+
+msgid "Login"
+msgstr "Identifiant"
+
+msgid "App password"
+msgstr "Mot de passe d'application"

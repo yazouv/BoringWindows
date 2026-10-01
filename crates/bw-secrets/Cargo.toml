@@ -1,0 +1,19 @@
+[package]
+name = "bw-secrets"
+description = "Secrets de BoringWindows (liens ICS privés, mots de passe CalDAV) dans le gestionnaire d'identifiants du système"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+keyring = { version = "3", default-features = false, features = ["windows-native"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", default-features = false, features = ["apple-native"] }
+
+[lints]
+workspace = true

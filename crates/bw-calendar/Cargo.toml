@@ -9,12 +9,14 @@ rust-version.workspace = true
 [dependencies]
 bw-i18n.workspace = true
 bw-net.workspace = true
+bw-secrets.workspace = true
 anyhow.workspace = true
 bw-core.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 chrono-tz = "0.10"
 log.workspace = true
 rrule = "0.14"
+roxmltree = "0.21"
 serde.workspace = true
 tokio.workspace = true
 toml.workspace = true

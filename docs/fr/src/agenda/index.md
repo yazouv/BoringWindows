@@ -19,6 +19,7 @@ Choisis ton service pour savoir où trouver ce lien :
 - [Outlook et Microsoft 365](outlook.md)
 - [iCloud](icloud.md)
 - [Proton Calendar](proton.md)
+- [CalDAV : iCloud, Fastmail, Nextcloud…](caldav.md)
 - [Autres : emploi du temps, lien ICS quelconque, fichier .ics](autres.md)
 
 ## Ajouter le lien

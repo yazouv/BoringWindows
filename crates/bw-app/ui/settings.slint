@@ -88,6 +88,9 @@ export component SettingsWindow inherits Window {
     in property <[string]> providers;
     in property <string> provider-help;
     in property <bool> provider-is-file;
+    in property <bool> provider-is-caldav;
+    in-out property <string> new-username;
+    in-out property <string> new-password;
     in-out property <string> new-name;
     in-out property <string> new-url;
     in property <string> test-status;
@@ -400,14 +403,30 @@ export component SettingsWindow inherits Window {
                                 }
 
                                 Row {
-                                    label: root.provider-is-file ? @tr(".ics file") : @tr("ICS link");
+                                    label: root.provider-is-file ? @tr(".ics file") : root.provider-is-caldav ? @tr("Server address") : @tr("ICS link");
                                     LineEdit {
                                         text <=> root.new-url;
-                                        placeholder-text: root.provider-is-file ? "C:/Users/…/agenda.ics" : @tr("https://…  or  webcal://…");
+                                        placeholder-text: root.provider-is-file ? "C:/Users/…/agenda.ics" : root.provider-is-caldav ? "https://caldav.icloud.com" : @tr("https://…  or  webcal://…");
                                     }
                                     if root.provider-is-file: Button {
                                         text: @tr("Browse…");
                                         clicked => { root.browse-file(); }
+                                    }
+                                }
+
+                                if root.provider-is-caldav: Row {
+                                    label: @tr("Login");
+                                    LineEdit {
+                                        text <=> root.new-username;
+                                        placeholder-text: "name@icloud.com";
+                                    }
+                                }
+
+                                if root.provider-is-caldav: Row {
+                                    label: @tr("App password");
+                                    LineEdit {
+                                        text <=> root.new-password;
+                                        input-type: password;
                                     }
                                 }
 
@@ -425,14 +444,14 @@ export component SettingsWindow inherits Window {
 
                                     Button {
                                         text: root.testing ? @tr("Testing…") : @tr("Test");
-                                        enabled: !root.testing && root.new-url != "";
+                                        enabled: !root.testing && root.new-url != "" && (!root.provider-is-caldav || (root.new-username != "" && root.new-password != ""));
                                         clicked => { root.test-source(); }
                                     }
 
                                     Button {
                                         text: @tr("Add");
                                         primary: true;
-                                        enabled: root.new-url != "";
+                                        enabled: root.new-url != "" && (!root.provider-is-caldav || (root.new-username != "" && root.new-password != ""));
                                         clicked => { root.add-source(); }
                                     }
                                 }

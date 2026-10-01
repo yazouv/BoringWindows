@@ -260,8 +260,8 @@ pause, suivant, seek, changement de pochette et d'accent, pilule avec pochette.
 - [x] Prochain événement, compte à rebours, rappel avant réunion, bouton « Rejoindre » (Teams, Meet, Zoom, Webex…)
 - [x] Téléchargement via le client HTTP de Windows (proxy et certificats système), réveils calés sur les échéances
 - [ ] OAuth Google + Microsoft Graph, tokens dans le Credential Manager (demande d'enregistrer une app chez chacun)
-- [ ] CalDAV (iCloud avec mot de passe d'application, Fastmail, Nextcloud)
-- [ ] Liens ICS stockés dans le Credential Manager plutôt qu'en clair dans config.toml
+- [x] CalDAV (iCloud avec mot de passe d'application, Fastmail, Nextcloud) : découverte des agendas, REPORT sur la période, assistant dans les réglages, doc FR + EN
+- [x] Liens ICS et mots de passe CalDAV dans le Credential Manager (`secret:<id>` dans config.toml, crate `bw-secrets`)
 
 Vérifié sous Linux : calendrier servi en HTTP, réunion dans 3 min avec lien
 Teams replié sur deux lignes, récurrence Outlook, journée entière, clic sur

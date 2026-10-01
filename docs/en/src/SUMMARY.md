@@ -16,6 +16,7 @@
   - [Outlook and Microsoft 365](agenda/outlook.md)
   - [iCloud](agenda/icloud.md)
   - [Proton Calendar](agenda/proton.md)
+  - [CalDAV (iCloud, Fastmail, Nextcloud)](agenda/caldav.md)
   - [Other calendars and .ics files](agenda/autres.md)
 - [Themes](themes.md)
 

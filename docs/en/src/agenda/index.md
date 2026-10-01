@@ -19,6 +19,7 @@ Pick your service to find that link:
 - [Outlook and Microsoft 365](outlook.md)
 - [iCloud](icloud.md)
 - [Proton Calendar](proton.md)
+- [CalDAV: iCloud, Fastmail, Nextcloud…](caldav.md)
 - [Others: school timetable, any ICS link, .ics file](autres.md)
 
 ## Adding the link

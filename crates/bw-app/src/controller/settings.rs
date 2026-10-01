@@ -27,7 +27,9 @@ fn ignored_list(text: &str) -> Vec<String> {
 }
 
 /// Services proposés par l'assistant, dans l'ordre de la liste.
-const PROVIDERS: usize = 6;
+const PROVIDERS: usize = 7;
+/// CalDAV : serveur + identifiant + mot de passe d'application.
+const CALDAV_PROVIDER: i32 = 6;
 /// Le dernier service est un fichier local.
 const FILE_PROVIDER: i32 = 5;
 
@@ -49,6 +51,7 @@ fn provider_name(index: i32) -> String {
             "School timetable, other ICS link",
             "Emploi du temps, autre lien ICS"
         ),
+        CALDAV_PROVIDER => "CalDAV (iCloud, Fastmail, Nextcloud…)".into(),
         _ => tr!(".ics file on disk", "Fichier .ics sur le disque"),
     }
 }
@@ -61,6 +64,7 @@ fn provider_page(index: i32) -> String {
         2 => "agenda/icloud.html".into(),
         3 => "agenda/proton.html".into(),
         4 => "agenda/autres.html".into(),
+        CALDAV_PROVIDER => "agenda/caldav.html".into(),
         _ => tr!(
             "agenda/autres.html#ics-file-on-your-disk",
             "agenda/autres.html#fichier-ics-sur-ton-disque"
@@ -90,6 +94,10 @@ fn provider_help(index: i32) -> String {
         4 => tr!(
             "Look for \"iCal\", \"ICS\", \"Export\" or \"Subscribe\" on your timetable or service page, and paste the link (often ending in .ics, or webcal://).",
             "Cherche « iCal », « ICS », « Exporter » ou « S'abonner » sur la page de ton emploi du temps ou de ton service : colle le lien (souvent en .ics ou webcal://)."
+        ),
+        CALDAV_PROVIDER => tr!(
+            "Server address of your account (iCloud: https://caldav.icloud.com, Fastmail: https://caldav.fastmail.com, Nextcloud: https://your-server/remote.php/dav) + your login + an app password. All your calendars are read; the password goes to the Windows Credential Manager.",
+            "Adresse du serveur de ton compte (iCloud : https://caldav.icloud.com, Fastmail : https://caldav.fastmail.com, Nextcloud : https://ton-serveur/remote.php/dav) + ton identifiant + un mot de passe d'application. Tous tes agendas sont lus ; le mot de passe va dans le Gestionnaire d'identifiants Windows."
         ),
         _ => tr!(
             "Pick an .ics file you exported or received by email. It is re-read regularly: replace it to update it.",
@@ -235,7 +243,11 @@ impl Controller {
             .into_iter()
             .map(|(name, url)| CalendarSourceRow {
                 name: name.into(),
-                url: url.into(),
+                url: if bw_secrets::is_reference(&url) {
+                    tr!("🔒 Credential Manager", "🔒 Gestionnaire d'identifiants").into()
+                } else {
+                    url.into()
+                },
             })
             .collect();
         ui.set_sources(ModelRc::new(VecModel::from(rows)));
@@ -296,10 +308,21 @@ impl Controller {
         }));
         ui.on_test_source(with(|_, ui| {
             let url = ui.get_new_url().trim().to_owned();
+            let source = bw_calendar::Source {
+                name: String::new(),
+                kind: if ui.get_provider_is_caldav() {
+                    bw_calendar::SourceKind::Caldav
+                } else {
+                    bw_calendar::SourceKind::Ics
+                },
+                url,
+                username: ui.get_new_username().trim().to_owned(),
+                password: ui.get_new_password().to_string(),
+            };
             ui.set_testing(true);
             ui.set_test_status("".into());
             std::thread::spawn(move || {
-                let result = bw_calendar::probe(&url);
+                let result = bw_calendar::probe_source(&source);
                 post(move |c| {
                     if let Some(s) = c.settings.borrow().as_ref() {
                         s.ui.set_testing(false);
@@ -316,10 +339,36 @@ impl Controller {
                 "" => default_name(ui.get_provider_index(), &url),
                 n => n.to_owned(),
             };
-            match c.edit_now(|e| e.add_calendar_source(&name, &url)) {
+            let caldav = ui.get_provider_is_caldav();
+            let username = ui.get_new_username().trim().to_owned();
+            // Liens privés et mots de passe : dans le coffre, pas dans config.toml.
+            let stored_url = if caldav || !is_remote(&url) {
+                url.trim().to_owned()
+            } else {
+                protect("ics", url.trim())
+            };
+            let stored_password = if caldav {
+                protect("caldav", &ui.get_new_password())
+            } else {
+                String::new()
+            };
+            let result = c.edit_now(|e| {
+                let account = caldav.then_some((username.as_str(), stored_password.as_str()));
+                e.add_calendar_account(&name, &stored_url, account);
+            });
+            if result.is_err() {
+                for value in [&stored_url, &stored_password] {
+                    if let Some(id) = bw_secrets::reference_id(value) {
+                        let _ = bw_secrets::delete(id);
+                    }
+                }
+            }
+            match result {
                 Ok(_) => {
                     ui.set_new_name("".into());
                     ui.set_new_url("".into());
+                    ui.set_new_username("".into());
+                    ui.set_new_password("".into());
                     ui.set_test_status("".into());
                     c.refresh_sources(ui);
                     status(
@@ -339,8 +388,16 @@ impl Controller {
             if let Some(c) = weak.upgrade()
                 && let Some(s) = c.settings.borrow().as_ref()
             {
+                let secrets = ConfigEditor::open(&c.path)
+                    .map(|e| e.calendar_source_secrets(i as usize))
+                    .unwrap_or_default();
                 match c.edit_now(|e| e.remove_calendar_source(i as usize)) {
                     Ok(_) => {
+                        for value in secrets {
+                            if let Some(id) = bw_secrets::reference_id(&value) {
+                                let _ = bw_secrets::delete(id);
+                            }
+                        }
                         c.refresh_sources(&s.ui);
                         status(
                             &s.ui,
@@ -745,6 +802,36 @@ fn set_provider(ui: &SettingsWindow, index: i32) {
     ui.set_provider_index(index);
     ui.set_provider_help(provider_help(index).into());
     ui.set_provider_is_file(index == FILE_PROVIDER);
+    ui.set_provider_is_caldav(index == CALDAV_PROVIDER);
+}
+
+fn is_remote(url: &str) -> bool {
+    let u = url.trim().to_ascii_lowercase();
+    u.starts_with("https://") || u.starts_with("http://") || u.starts_with("webcal://")
+}
+
+/// Identifiant de secret unique : `<préfixe>-<horodatage>`.
+fn new_secret_id(prefix: &str) -> String {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos());
+    format!("{prefix}-{nanos:x}")
+}
+
+/// Met `value` dans le coffre et renvoie la référence `secret:<id>` à écrire
+/// dans la config ; sans coffre (ou en cas d'échec), la valeur elle-même.
+fn protect(prefix: &str, value: &str) -> String {
+    if !bw_secrets::available() {
+        return value.to_owned();
+    }
+    let id = new_secret_id(prefix);
+    match bw_secrets::set(&id, value) {
+        Ok(()) => bw_secrets::reference(&id),
+        Err(e) => {
+            log::warn!("coffre à secrets indisponible : {e:#}");
+            value.to_owned()
+        }
+    }
 }
 
 fn saved() -> String {
@@ -759,6 +846,7 @@ fn default_name(provider: i32, url: &str) -> String {
         1 => "Outlook".into(),
         2 => "iCloud".into(),
         3 => "Proton".into(),
+        CALDAV_PROVIDER => "CalDAV".into(),
         _ => {
             let path = url.split(['?', '#']).next().unwrap_or_default();
             let last = path

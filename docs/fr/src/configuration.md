@@ -109,7 +109,10 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 | Option | Obligatoire | Rôle |
 |---|---|---|
 | `name` | non | nom affiché dans les messages |
-| `url` | oui | lien `https://` ou `webcal://`, ou chemin d'un fichier `.ics` |
+| `url` | oui | lien `https://` ou `webcal://`, chemin d'un fichier `.ics`, ou `secret:<id>` (valeur gardée dans le Gestionnaire d'identifiants) ; pour CalDAV, adresse du serveur |
+| `kind` | non | `"ics"` (défaut) ou `"caldav"` — voir [CalDAV](agenda/caldav.md) |
+| `username` | CalDAV | identifiant de connexion |
+| `password` | CalDAV | mot de passe d'application, de préférence `secret:<id>` |
 
 ## `[modules.demo]`
 

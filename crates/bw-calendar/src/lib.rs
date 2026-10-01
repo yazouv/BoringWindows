@@ -2,6 +2,7 @@
 //! réunions, rappel avant le début et lien « Rejoindre ».
 
 mod agenda;
+mod caldav;
 mod config;
 mod fetch;
 pub mod ics;
@@ -11,7 +12,7 @@ mod probe;
 mod tz;
 
 pub use agenda::{AgendaItem, CalendarSnapshot, agenda};
-pub use config::{CalendarConfig, Source};
+pub use config::{CalendarConfig, Source, SourceKind};
 pub use ics::Event;
 pub use module::{CalendarModule, MODULE_ID};
-pub use probe::{Probe, probe};
+pub use probe::{Probe, probe, probe_source};
