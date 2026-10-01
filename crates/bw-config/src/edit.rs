@@ -285,7 +285,10 @@ mod tests {
             e.calendar_source_secrets(0),
             vec!["secret:caldav-1".to_owned()]
         );
-        assert_eq!(e.calendar_source_secrets(1), vec!["secret:ics-2".to_owned()]);
+        assert_eq!(
+            e.calendar_source_secrets(1),
+            vec!["secret:ics-2".to_owned()]
+        );
         assert!(e.calendar_source_secrets(2).is_empty());
         assert!(e.calendar_source_secrets(9).is_empty());
         let text = e.text();

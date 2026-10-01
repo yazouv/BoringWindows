@@ -156,8 +156,8 @@ impl Controller {
         ui.set_volume_enabled(config.module_enabled(bw_volume::MODULE_ID, false));
         ui.set_viz_enabled(config.module_enabled(bw_viz::MODULE_ID, false));
         ui.set_plugins_enabled(config.module_enabled(bw_plugins::MODULE_ID, false));
-        let shelf = crate::shelf::ShelfConfig::from_table(config.modules.get("shelf"))
-            .unwrap_or_default();
+        let shelf =
+            crate::shelf::ShelfConfig::from_table(config.modules.get("shelf")).unwrap_or_default();
         ui.set_shelf_enabled(shelf.enabled);
         ui.set_shelf_max(shelf.max as i32);
 
@@ -714,7 +714,8 @@ impl Controller {
                     .filter_map(|s| s.trim().parse().ok())
                     .collect();
                 // Saisie incomplète (« 5, » ou vide) : on attend la suite.
-                (!minutes.is_empty()).then(|| (vec!["modules", "timer", "presets"], Value::IntList(minutes)))
+                (!minutes.is_empty())
+                    .then(|| (vec!["modules", "timer", "presets"], Value::IntList(minutes)))
             }
             "modules.media.ignore" => Some((
                 vec!["modules", "media", "ignore"],

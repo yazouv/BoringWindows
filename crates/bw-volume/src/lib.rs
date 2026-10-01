@@ -15,7 +15,11 @@ pub fn label(level: f32, muted: bool) -> String {
     if muted || level <= 0.0 {
         bw_i18n::tr!("Muted", "Muet")
     } else {
-        bw_i18n::tr!("Volume {} %", "Volume {} %", (level.clamp(0.0, 1.0) * 100.0).round() as u32)
+        bw_i18n::tr!(
+            "Volume {} %",
+            "Volume {} %",
+            (level.clamp(0.0, 1.0) * 100.0).round() as u32
+        )
     }
 }
 

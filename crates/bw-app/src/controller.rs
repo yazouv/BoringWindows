@@ -27,7 +27,10 @@ use slint::{
 use crate::geometry::{self, Shape};
 use crate::platform::{self, Platform, PlatformEvent, Tray, TrayCommand};
 use crate::shelf::{Shelf, ShelfConfig};
-use crate::{AgendaRow, ClaudePrompt, ClaudeRow, Island, MediaInfo, PluginRow, ShelfRow, TimerInfo, clock, demo};
+use crate::{
+    AgendaRow, ClaudePrompt, ClaudeRow, Island, MediaInfo, PluginRow, ShelfRow, TimerInfo, clock,
+    demo,
+};
 
 /// Pseudo-module utilisé pour signaler une config invalide dans l'île.
 const CONFIG_ERROR: &str = "config";
@@ -507,7 +510,8 @@ impl Controller {
         self.apply_theme();
         let view_changed = {
             let config = self.config.borrow();
-            old.layout.view != config.layout.view || old.layout.view_stamp != config.layout.view_stamp
+            old.layout.view != config.layout.view
+                || old.layout.view_stamp != config.layout.view_stamp
         };
         if view_changed {
             self.reload_custom_view();

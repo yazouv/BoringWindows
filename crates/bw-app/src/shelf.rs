@@ -107,8 +107,10 @@ impl Shelf {
 
 /// Nom affiché d'un chemin (dernier élément).
 pub fn display_name(path: &Path) -> String {
-    path.file_name()
-        .map_or_else(|| path.display().to_string(), |n| n.to_string_lossy().into_owned())
+    path.file_name().map_or_else(
+        || path.display().to_string(),
+        |n| n.to_string_lossy().into_owned(),
+    )
 }
 
 #[cfg(test)]

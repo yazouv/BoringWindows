@@ -24,7 +24,9 @@ impl Analyzer {
         // De 60 Hz à 16 kHz (ou Nyquist), espacement logarithmique.
         let low = 60.0_f32;
         let high = 16_000.0_f32.min(sample_rate / 2.0 - 1.0);
-        let bin = |hz: f32| ((hz * FFT_SIZE as f32 / sample_rate).round() as usize).clamp(1, FFT_SIZE / 2 - 1);
+        let bin = |hz: f32| {
+            ((hz * FFT_SIZE as f32 / sample_rate).round() as usize).clamp(1, FFT_SIZE / 2 - 1)
+        };
         let mut edges: Vec<usize> = (0..=bands)
             .map(|i| bin(low * (high / low).powf(i as f32 / bands as f32)))
             .collect();
@@ -52,7 +54,12 @@ impl Analyzer {
             self.samples[start..].copy_from_slice(mono);
         }
 
-        let mut re: Vec<f32> = self.samples.iter().zip(&self.window).map(|(s, w)| s * w).collect();
+        let mut re: Vec<f32> = self
+            .samples
+            .iter()
+            .zip(&self.window)
+            .map(|(s, w)| s * w)
+            .collect();
         let mut im = vec![0.0_f32; FFT_SIZE];
         fft(&mut re, &mut im);
 
@@ -125,7 +132,9 @@ mod tests {
     use super::*;
 
     fn sine(hz: f32, rate: f32, n: usize) -> Vec<f32> {
-        (0..n).map(|i| 0.8 * (2.0 * PI * hz * i as f32 / rate).sin()).collect()
+        (0..n)
+            .map(|i| 0.8 * (2.0 * PI * hz * i as f32 / rate).sin())
+            .collect()
     }
 
     #[test]

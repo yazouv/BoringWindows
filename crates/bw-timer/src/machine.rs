@@ -26,7 +26,8 @@ pub struct TimerSnapshot {
 impl TimerSnapshot {
     pub fn remaining_now(&self, now: Instant) -> Duration {
         if self.phase == Phase::Running {
-            self.remaining.saturating_sub(now.saturating_duration_since(self.at))
+            self.remaining
+                .saturating_sub(now.saturating_duration_since(self.at))
         } else {
             self.remaining
         }

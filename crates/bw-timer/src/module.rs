@@ -40,7 +40,9 @@ impl Module for TimerModule {
                 let wake = machine.next_wake(now);
                 let sleep = async {
                     match wake {
-                        Some(at) => tokio::time::sleep_until(tokio::time::Instant::from_std(at)).await,
+                        Some(at) => {
+                            tokio::time::sleep_until(tokio::time::Instant::from_std(at)).await
+                        }
                         None => std::future::pending().await,
                     }
                 };

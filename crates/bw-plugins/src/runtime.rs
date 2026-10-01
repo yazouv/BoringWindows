@@ -57,19 +57,35 @@ impl Plugin {
         store.set_fuel(FUEL_PER_CALL)?;
 
         let mut linker = <Linker<Host>>::new(&engine);
-        linker.func_wrap("bw", "set_text", |mut caller: Caller<Host>, ptr: i32, len: i32| {
-            let text = read_str(&mut caller, ptr, len)?;
-            caller.data_mut().output.text = text.chars().take(MAX_TEXT_CHARS).collect();
-            Ok(())
-        })?;
-        linker.func_wrap("bw", "set_attention", |mut caller: Caller<Host>, level: i32| {
-            caller.data_mut().output.attention = level.clamp(0, 2) as u8;
-        })?;
-        linker.func_wrap("bw", "log", |mut caller: Caller<Host>, ptr: i32, len: i32| {
-            let text = read_str(&mut caller, ptr, len)?;
-            log::info!("plugin {} : {}", caller.data().name, text.chars().take(300).collect::<String>());
-            Ok(())
-        })?;
+        linker.func_wrap(
+            "bw",
+            "set_text",
+            |mut caller: Caller<Host>, ptr: i32, len: i32| {
+                let text = read_str(&mut caller, ptr, len)?;
+                caller.data_mut().output.text = text.chars().take(MAX_TEXT_CHARS).collect();
+                Ok(())
+            },
+        )?;
+        linker.func_wrap(
+            "bw",
+            "set_attention",
+            |mut caller: Caller<Host>, level: i32| {
+                caller.data_mut().output.attention = level.clamp(0, 2) as u8;
+            },
+        )?;
+        linker.func_wrap(
+            "bw",
+            "log",
+            |mut caller: Caller<Host>, ptr: i32, len: i32| {
+                let text = read_str(&mut caller, ptr, len)?;
+                log::info!(
+                    "plugin {} : {}",
+                    caller.data().name,
+                    text.chars().take(300).collect::<String>()
+                );
+                Ok(())
+            },
+        )?;
         linker.func_wrap("bw", "now_unix", |_: Caller<Host>| -> i64 {
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -134,7 +150,8 @@ mod tests {
 
     #[test]
     fn shipped_example_plugin_works() {
-        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/plugins/hello");
+        let dir =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/plugins/hello");
         let spec = crate::manifest::discover(dir.parent().unwrap())
             .into_iter()
             .collect::<Result<Vec<_>, _>>()
@@ -142,14 +159,26 @@ mod tests {
         assert_eq!(spec[0].name, "Exemple");
         let mut p = Plugin::load("hello", &std::fs::read(&spec[0].wasm_path).unwrap()).unwrap();
         let out = p.update().unwrap();
-        assert_eq!(out, Output { text: "Bonjour depuis un plugin WASM".into(), attention: 1 });
+        assert_eq!(
+            out,
+            Output {
+                text: "Bonjour depuis un plugin WASM".into(),
+                attention: 1
+            }
+        );
     }
 
     #[test]
     fn publishes_text_and_attention() {
         let mut p = plugin(HELLO).unwrap();
         let out = p.update().unwrap();
-        assert_eq!(out, Output { text: "Hello plugin".into(), attention: 2 });
+        assert_eq!(
+            out,
+            Output {
+                text: "Hello plugin".into(),
+                attention: 2
+            }
+        );
         // Rappelé : même résultat.
         assert_eq!(p.update().unwrap(), out);
     }

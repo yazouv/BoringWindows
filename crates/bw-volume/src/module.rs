@@ -68,7 +68,12 @@ impl Module for VolumeModule {
 
     #[cfg(not(windows))]
     fn start(&mut self, _ctx: ModuleCtx) -> anyhow::Result<()> {
-        let _ = (&self.config, unbounded_channel::<()>, Attention::None, Instant::now);
+        let _ = (
+            &self.config,
+            unbounded_channel::<()>,
+            Attention::None,
+            Instant::now,
+        );
         Ok(())
     }
 }

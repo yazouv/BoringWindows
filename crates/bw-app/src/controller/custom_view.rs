@@ -35,7 +35,9 @@ pub(super) fn compile(path: &Path) -> Result<Compiled, String> {
     compiler.set_style("fluent".into());
     let result = block_on(compiler.build_from_source(source, path.to_path_buf()))
         .ok_or_else(|| "compilation sans fin".to_owned())?;
-    let file = path.file_name().map_or_else(String::new, |n| n.to_string_lossy().into_owned());
+    let file = path
+        .file_name()
+        .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
     let errors: Vec<String> = result
         .diagnostics()
         .filter(|d| d.level() == DiagnosticLevel::Error)
@@ -114,7 +116,10 @@ impl Controller {
             let config = self.config.borrow();
             (
                 config.layout.view.clone(),
-                self.path.parent().map(Path::to_path_buf).unwrap_or_default(),
+                self.path
+                    .parent()
+                    .map(Path::to_path_buf)
+                    .unwrap_or_default(),
             )
         };
         if name.is_empty() {
@@ -166,7 +171,9 @@ impl Controller {
         let view = self.custom_view.borrow();
         let Some(view) = view.as_ref() else { return };
         let instance = view.instance.borrow();
-        let Some(instance) = instance.as_ref() else { return };
+        let Some(instance) = instance.as_ref() else {
+            return;
+        };
         let ui = &self.ui;
         let set = |name: &str, value: Value| {
             if view.properties.contains(name) {
@@ -381,7 +388,10 @@ export component View inherits Window {
 
     #[test]
     fn reports_errors_with_file_and_line() {
-        let path = temp_file("bad", "export component View inherits Window {\n  Foo { }\n}");
+        let path = temp_file(
+            "bad",
+            "export component View inherits Window {\n  Foo { }\n}",
+        );
         let err = compile(&path).err().expect("erreur attendue");
         assert!(err.starts_with("view.slint:2"), "{err}");
 

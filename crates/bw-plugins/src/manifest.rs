@@ -71,16 +71,24 @@ fn read_spec(folder: &Path) -> Result<PluginSpec, String> {
         .map_or_else(String::new, |n| n.to_string_lossy().into_owned());
     let fail = |msg: String| format!("plugin {id} : {msg}");
     if !valid_name(&id) {
-        return Err(fail("nom de dossier invalide (lettres, chiffres, - et _)".into()));
+        return Err(fail(
+            "nom de dossier invalide (lettres, chiffres, - et _)".into(),
+        ));
     }
-    let text = std::fs::read_to_string(folder.join("plugin.toml")).map_err(|e| fail(e.to_string()))?;
+    let text =
+        std::fs::read_to_string(folder.join("plugin.toml")).map_err(|e| fail(e.to_string()))?;
     let manifest: Manifest = toml::from_str(&text).map_err(|e| fail(e.message().to_owned()))?;
     if !(5..=3600).contains(&manifest.interval_secs) {
         return Err(fail("interval_secs doit être entre 5 et 3600".into()));
     }
     // Le .wasm reste dans le dossier du plugin : pas de chemin qui en sorte.
-    if manifest.wasm.contains(['/', '\\']) || manifest.wasm.contains("..") || manifest.wasm.is_empty() {
-        return Err(fail("`wasm` doit être un nom de fichier du dossier du plugin".into()));
+    if manifest.wasm.contains(['/', '\\'])
+        || manifest.wasm.contains("..")
+        || manifest.wasm.is_empty()
+    {
+        return Err(fail(
+            "`wasm` doit être un nom de fichier du dossier du plugin".into(),
+        ));
     }
     let wasm_path = folder.join(&manifest.wasm);
     if !wasm_path.is_file() {
@@ -120,7 +128,12 @@ mod tests {
     #[test]
     fn discovers_valid_and_reports_invalid() {
         let root = dir("discover");
-        plugin(&root, "ok", "name = \"Mon plugin\"\ninterval_secs = 10", true);
+        plugin(
+            &root,
+            "ok",
+            "name = \"Mon plugin\"\ninterval_secs = 10",
+            true,
+        );
         plugin(&root, "defaults", "", true);
         plugin(&root, "no-wasm", "", false);
         plugin(&root, "slow", "interval_secs = 1", true);
@@ -139,9 +152,15 @@ mod tests {
                 .unwrap()
         };
         let ok = by_id("ok").as_ref().unwrap();
-        assert_eq!((ok.name.as_str(), ok.interval), ("Mon plugin", Duration::from_secs(10)));
+        assert_eq!(
+            (ok.name.as_str(), ok.interval),
+            ("Mon plugin", Duration::from_secs(10))
+        );
         let d = by_id("defaults").as_ref().unwrap();
-        assert_eq!((d.name.as_str(), d.interval), ("defaults", Duration::from_secs(30)));
+        assert_eq!(
+            (d.name.as_str(), d.interval),
+            ("defaults", Duration::from_secs(30))
+        );
         for bad in ["no-wasm", "slow", "escape", "typo"] {
             assert!(by_id(bad).is_err(), "{bad}");
         }

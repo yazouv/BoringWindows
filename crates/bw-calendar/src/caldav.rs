@@ -221,7 +221,10 @@ mod tests {
 
     #[test]
     fn base64_matches_rfc() {
-        assert_eq!(base64(b"Aladdin:open sesame"), "QWxhZGRpbjpvcGVuIHNlc2FtZQ==");
+        assert_eq!(
+            base64(b"Aladdin:open sesame"),
+            "QWxhZGRpbjpvcGVuIHNlc2FtZQ=="
+        );
         assert_eq!(base64(b"ab"), "YWI=");
         assert_eq!(base64(b""), "");
     }
@@ -269,9 +272,8 @@ END:VCALENDAR</c:calendar-data></d:prop></d:propstat></d:response></d:multistatu
             if let Some(split) = text.find("\r\n\r\n") {
                 let head = text[..split].to_lowercase();
                 let body = &text[split + 4..];
-                let complete = if let Some(len) = head
-                    .lines()
-                    .find_map(|l| l.strip_prefix("content-length:"))
+                let complete = if let Some(len) =
+                    head.lines().find_map(|l| l.strip_prefix("content-length:"))
                 {
                     body.len() >= len.trim().parse::<usize>().unwrap()
                 } else if head.contains("transfer-encoding: chunked") {
@@ -293,7 +295,10 @@ END:VCALENDAR</c:calendar-data></d:prop></d:propstat></d:response></d:multistatu
             let mut s = stream.unwrap();
             let req = read_request(&mut s);
             let line = req.lines().next().unwrap().to_owned();
-            assert!(req.to_lowercase().contains("authorization: basic "), "{req}");
+            assert!(
+                req.to_lowercase().contains("authorization: basic "),
+                "{req}"
+            );
             let body = if line.starts_with("REPORT") {
                 REPORT
             } else if line.contains(" /cal/ ") {

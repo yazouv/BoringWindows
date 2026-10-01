@@ -51,11 +51,7 @@ fn run(ctx: &ModuleCtx, config: &VizConfig, running: &AtomicBool) -> anyhow::Res
         let format = client.GetMixFormat()?;
         let (channels, rate, bits) = {
             let f = &*format;
-            (
-                usize::from(f.nChannels),
-                f.nSamplesPerSec,
-                f.wBitsPerSample,
-            )
+            (usize::from(f.nChannels), f.nSamplesPerSec, f.wBitsPerSample)
         };
         if bits != 32 || channels == 0 {
             CoTaskMemFree(Some(format.cast()));
@@ -94,7 +90,8 @@ fn run(ctx: &ModuleCtx, config: &VizConfig, running: &AtomicBool) -> anyhow::Res
                 if flags & (AUDCLNT_BUFFERFLAGS_SILENT.0 as u32) != 0 || data.is_null() {
                     mono.extend(std::iter::repeat_n(0.0, frames_n));
                 } else {
-                    let samples = std::slice::from_raw_parts(data.cast::<f32>(), frames_n * channels);
+                    let samples =
+                        std::slice::from_raw_parts(data.cast::<f32>(), frames_n * channels);
                     mono.extend(
                         samples
                             .chunks_exact(channels)

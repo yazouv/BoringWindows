@@ -86,7 +86,11 @@ async fn run_plugin(
             return;
         }
     };
-    log::info!("plugin {} chargé (toutes les {} s)", spec.id, spec.interval.as_secs());
+    log::info!(
+        "plugin {} chargé (toutes les {} s)",
+        spec.id,
+        spec.interval.as_secs()
+    );
 
     let mut failures = 0;
     loop {
@@ -134,7 +138,11 @@ fn publish(
     let top = items.iter().max_by_key(|i| i.attention);
     match top {
         Some(i) if i.attention > 0 => ctx.set_attention(
-            if i.attention >= 2 { Attention::High } else { Attention::Low },
+            if i.attention >= 2 {
+                Attention::High
+            } else {
+                Attention::Low
+            },
             Some(format!("{} : {}", i.name, i.text)),
         ),
         _ => ctx.set_attention(Attention::None, None),

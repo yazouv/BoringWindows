@@ -61,7 +61,8 @@ fn register(
 ) -> anyhow::Result<(IAudioEndpointVolume, IAudioEndpointVolumeCallback)> {
     // SAFETY: appels COM sur un thread initialisé.
     unsafe {
-        let enumerator: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
+        let enumerator: IMMDeviceEnumerator =
+            CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
         let device = enumerator.GetDefaultAudioEndpoint(eRender, eConsole)?;
         let endpoint: IAudioEndpointVolume = device.Activate(CLSCTX_ALL, None)?;
         let callback: IAudioEndpointVolumeCallback = Callback { tx }.into();
