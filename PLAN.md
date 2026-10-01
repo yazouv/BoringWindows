@@ -281,9 +281,9 @@ de vérité (versionnable, partageable), mais une interface l'édite pour nous.
 - [x] Général, Apparence (accent avec pastilles, fond, arrondi, animations),
       Agenda (assistant 6 services, guide détaillé, Parcourir…, Tester, nom par défaut),
       Claude Code (hooks, son, délai, diagnostic dans la fenêtre), Musique
-- [ ] Musique : lecteurs vus récemment à cocher (pour l'instant, liste séparée par des virgules)
+- [x] Musique : lecteurs vus récemment à cocher (liste des lecteurs lus depuis le lancement, plus ceux déjà ignorés)
 - [ ] Captures d'écran par service dans l'assistant
-- [ ] Tailles de l'île (compacte / ouverte) et ordre des modules
+- [x] Tailles de l'île (compacte / ouverte) et ordre des modules (priorité en mode compact)
 
 - Fenêtre Slint séparée, créée à l'ouverture et détruite à la fermeture : coût
   nul en RAM le reste du temps.

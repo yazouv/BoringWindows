@@ -93,31 +93,44 @@ impl MediaSnapshot {
     }
 }
 
+const KNOWN: [(&str, &str); 14] = [
+    ("spotify", "Spotify"),
+    ("applemusic", "Apple Music"),
+    ("itunes", "iTunes"),
+    ("deezer", "Deezer"),
+    ("tidal", "Tidal"),
+    ("chrome", "Chrome"),
+    ("msedge", "Edge"),
+    ("firefox", "Firefox"),
+    // AUMID historique de Firefox.
+    ("308046b0af4a39cb", "Firefox"),
+    ("opera", "Opera"),
+    ("brave", "Brave"),
+    ("vlc", "VLC"),
+    ("foobar2000", "foobar2000"),
+    ("musicbee", "MusicBee"),
+];
+
+/// Morceau de nom à mettre dans `ignore` pour écarter cette source.
+pub fn ignore_token(source_id: &str) -> String {
+    let lower = source_id.to_ascii_lowercase();
+    if lower.contains("zunemusic") || lower.contains("microsoft.media.player") {
+        return "zunemusic".into();
+    }
+    if let Some((key, _)) = KNOWN.iter().find(|(k, _)| lower.contains(k)) {
+        return (*key).to_owned();
+    }
+    display_name(source_id).to_ascii_lowercase()
+}
+
 /// Nom lisible d'une application à partir de son identifiant.
 pub fn display_name(source_id: &str) -> String {
     let lower = source_id.to_ascii_lowercase();
-    let known = [
-        ("spotify", "Spotify"),
-        ("applemusic", "Apple Music"),
-        ("itunes", "iTunes"),
-        ("deezer", "Deezer"),
-        ("tidal", "Tidal"),
-        ("chrome", "Chrome"),
-        ("msedge", "Edge"),
-        ("firefox", "Firefox"),
-        // AUMID historique de Firefox.
-        ("308046b0af4a39cb", "Firefox"),
-        ("opera", "Opera"),
-        ("brave", "Brave"),
-        ("vlc", "VLC"),
-        ("foobar2000", "foobar2000"),
-        ("musicbee", "MusicBee"),
-    ];
     // Lecteur de Windows : seul nom à traduire.
     if lower.contains("zunemusic") || lower.contains("microsoft.media.player") {
         return bw_i18n::tr!("Media Player", "Lecteur multimédia");
     }
-    if let Some((_, name)) = known.iter().find(|(k, _)| lower.contains(k)) {
+    if let Some((_, name)) = KNOWN.iter().find(|(k, _)| lower.contains(k)) {
         return (*name).to_owned();
     }
     // « Editeur.App_hash!App » ou « app.exe » → « App ».
@@ -135,6 +148,18 @@ pub fn display_name(source_id: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ignore_tokens_match_their_source() {
+        let cfg = crate::MediaConfig {
+            ignore: vec![ignore_token("MSEdge"), ignore_token("Foo.Bar_abc!App")],
+            ..Default::default()
+        };
+        assert_eq!(ignore_token("Spotify.exe"), "spotify");
+        assert!(cfg.is_ignored("MSEdge"));
+        assert!(cfg.is_ignored("Foo.Bar_abc!App"));
+        assert!(!cfg.is_ignored("Spotify.exe"));
+    }
 
     fn np(playing: bool) -> NowPlaying {
         NowPlaying {

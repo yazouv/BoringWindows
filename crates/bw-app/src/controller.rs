@@ -4,6 +4,7 @@ mod settings;
 mod update;
 
 use std::cell::{Cell, OnceCell, RefCell};
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
 use std::sync::Arc;
@@ -89,6 +90,7 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         artwork: RefCell::new(None),
         progress_timer: Timer::default(),
         remind_timer: Timer::default(),
+        media_seen: RefCell::new(BTreeSet::new()),
     });
     CONTROLLER.with(|c| {
         let _ = c.set(controller.clone());
@@ -127,6 +129,8 @@ pub struct Controller {
     artwork: RefCell<Option<(Arc<Vec<u8>>, Image)>>,
     progress_timer: Timer,
     remind_timer: Timer,
+    /// Lecteurs vus depuis le lancement (jetons `ignore`), pour les réglages.
+    media_seen: RefCell<BTreeSet<String>>,
     calendar: RefCell<Option<Arc<CalendarSnapshot>>>,
     settings: RefCell<Option<settings::SettingsState>>,
     open_settings_at_start: Cell<bool>,
@@ -616,6 +620,11 @@ impl Controller {
 
     fn apply_media(&self, owner: &'static str, snapshot: Arc<MediaSnapshot>) {
         let np = snapshot.now_playing.as_ref();
+        if let Some(n) = np {
+            self.media_seen
+                .borrow_mut()
+                .insert(bw_media::ignore_token(&n.source_id));
+        }
 
         // Pochette : conversion seulement quand elle change.
         let art = np.and_then(|n| n.artwork.as_ref());

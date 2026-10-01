@@ -16,7 +16,15 @@ use slint::{ComponentHandle, ModelRc, SharedString, Timer, TimerMode, VecModel};
 
 use super::{Controller, build_modules, post};
 use crate::platform;
-use crate::{CalendarSourceRow, SettingsWindow};
+use crate::{CalendarSourceRow, PlayerRow, SettingsWindow};
+
+fn ignored_list(text: &str) -> Vec<String> {
+    text.split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
 
 /// Services proposés par l'assistant, dans l'ordre de la liste.
 const PROVIDERS: usize = 6;
@@ -135,6 +143,7 @@ impl Controller {
 
         self.fill_themes(ui, &config.theme.name);
         fill_appearance(ui, &config.theme);
+        fill_layout(ui, &config.layout.compact);
 
         let cal = CalendarConfig::from_table(config.modules.get(bw_calendar::MODULE_ID))
             .unwrap_or_default();
@@ -159,6 +168,64 @@ impl Controller {
         drop(config);
 
         self.refresh_sources(ui);
+        self.refresh_players(ui);
+    }
+
+    /// Lecteurs vus depuis le lancement, plus ceux déjà ignorés (qui ne
+    /// remontent plus), avec leur état coché.
+    fn refresh_players(&self, ui: &SettingsWindow) {
+        let ignored = ignored_list(&ui.get_media_ignore());
+        let mut tokens: Vec<String> = self.media_seen.borrow().iter().cloned().collect();
+        for i in &ignored {
+            if !tokens.iter().any(|t| t.eq_ignore_ascii_case(i)) {
+                tokens.push(i.to_ascii_lowercase());
+            }
+        }
+        let rows: Vec<PlayerRow> = tokens
+            .into_iter()
+            .map(|t| PlayerRow {
+                name: bw_media::display_name(&t).into(),
+                ignored: ignored.iter().any(|i| i.eq_ignore_ascii_case(&t)),
+                token: t.into(),
+            })
+            .collect();
+        ui.set_players(ModelRc::new(VecModel::from(rows)));
+    }
+
+    fn move_layout(self: &Rc<Self>, index: usize, delta: i32) {
+        self.flush_settings();
+        let mut order = self.config.borrow().layout.compact.clone();
+        let Some(target) = index.checked_add_signed(delta as isize) else {
+            return;
+        };
+        if index >= order.len() || target >= order.len() {
+            return;
+        }
+        order.swap(index, target);
+        let result = self.edit_now(|e| e.set(&["layout", "compact"], Value::StrList(order)));
+        let settings = self.settings.borrow();
+        let Some(s) = settings.as_ref() else { return };
+        match result {
+            Ok(config) => {
+                fill_layout(&s.ui, &config.layout.compact);
+                status(&s.ui, &saved(), false);
+            }
+            Err(e) => status(&s.ui, &e, true),
+        }
+    }
+
+    fn toggle_player(self: &Rc<Self>, token: &str, ignored: bool) {
+        {
+            let settings = self.settings.borrow();
+            let Some(s) = settings.as_ref() else { return };
+            let mut list = ignored_list(&s.ui.get_media_ignore());
+            list.retain(|i| !i.eq_ignore_ascii_case(token));
+            if ignored {
+                list.push(token.to_owned());
+            }
+            s.ui.set_media_ignore(list.join(", ").into());
+        }
+        self.settings_changed("modules.media.ignore");
     }
 
     fn refresh_sources(&self, ui: &SettingsWindow) {
@@ -187,6 +254,18 @@ impl Controller {
             }
         };
 
+        let weak = Rc::downgrade(self);
+        ui.on_module_moved(move |index, delta| {
+            if let Some(c) = weak.upgrade() {
+                c.move_layout(index as usize, delta);
+            }
+        });
+        let weak = Rc::downgrade(self);
+        ui.on_player_toggled(move |token, ignored| {
+            if let Some(c) = weak.upgrade() {
+                c.toggle_player(&token, ignored);
+            }
+        });
         let weak = Rc::downgrade(self);
         ui.on_changed(move |key| {
             if let Some(c) = weak.upgrade() {
@@ -454,6 +533,18 @@ impl Controller {
                 vec!["theme", "corner_radius"],
                 Value::Float(ui.get_corner_radius().into()),
             )),
+            "theme.compact" | "theme.expanded" => {
+                let (table, w, h) = if key == "theme.compact" {
+                    ("compact", ui.get_compact_w(), ui.get_compact_h())
+                } else {
+                    ("expanded", ui.get_expanded_w(), ui.get_expanded_h())
+                };
+                let mut pending = s.pending.borrow_mut();
+                let width_path = vec!["theme", table, "width"];
+                pending.retain(|(k, _)| *k != width_path);
+                pending.push((width_path, Value::Int(w.into())));
+                Some((vec!["theme", table, "height"], Value::Int(h.into())))
+            }
             "modules.calendar.remind_minutes" => Some((
                 vec!["modules", "calendar", "remind_minutes"],
                 Value::Int(ui.get_remind_minutes().into()),
@@ -610,6 +701,28 @@ fn fill_appearance(ui: &SettingsWindow, t: &bw_config::Theme) {
     ui.set_background_color(hex(t.background).into());
     ui.set_animation_ms(t.animation_ms as i32);
     ui.set_corner_radius(t.corner_radius.round() as i32);
+    ui.set_compact_w(t.compact.width.round() as i32);
+    ui.set_compact_h(t.compact.height.round() as i32);
+    ui.set_expanded_w(t.expanded.width.round() as i32);
+    ui.set_expanded_h(t.expanded.height.round() as i32);
+}
+
+fn module_label(id: &str) -> String {
+    match id {
+        "claude" => "Claude Code".into(),
+        "media" => tr!("Music", "Musique"),
+        "calendar" => tr!("Calendar", "Agenda"),
+        other => other.to_owned(),
+    }
+}
+
+fn fill_layout(ui: &SettingsWindow, order: &[String]) {
+    ui.set_module_order(ModelRc::new(VecModel::from(
+        order
+            .iter()
+            .map(|id| SharedString::from(module_label(id)))
+            .collect::<Vec<_>>(),
+    )));
 }
 
 fn language_index(language: bw_config::Language) -> i32 {

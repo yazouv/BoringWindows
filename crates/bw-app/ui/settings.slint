@@ -9,6 +9,12 @@ export struct CalendarSourceRow {
     url: string,
 }
 
+export struct PlayerRow {
+    token: string,
+    name: string,
+    ignored: bool,
+}
+
 component Hint inherits Text {
     font-size: 12px;
     opacity: 0.7;
@@ -66,6 +72,12 @@ export component SettingsWindow inherits Window {
     in-out property <string> background-color;
     in-out property <int> animation-ms;
     in-out property <int> corner-radius;
+    in-out property <int> compact-w;
+    in-out property <int> compact-h;
+    in-out property <int> expanded-w;
+    in-out property <int> expanded-h;
+    in property <[string]> module-order;
+    callback module-moved(int, int);
     // --- Agenda ---
     in property <[CalendarSourceRow]> sources;
     in-out property <int> remind-minutes;
@@ -95,6 +107,8 @@ export component SettingsWindow inherits Window {
     in property <string> status;
     in property <bool> status-error;
 
+    in property <[PlayerRow]> players;
+    callback player-toggled(string, bool);
     callback changed(string);
     callback theme-picked(int);
     callback update-clicked();
@@ -251,6 +265,60 @@ export component SettingsWindow inherits Window {
                             maximum: 100;
                             value <=> root.corner-radius;
                             edited => { root.changed("theme.corner_radius"); }
+                        }
+                    }
+
+                    Row {
+                        label: @tr("Compact island size (px)");
+                        SpinBox {
+                            minimum: 16;
+                            maximum: 4000;
+                            value <=> root.compact-w;
+                            edited => { root.changed("theme.compact"); }
+                        }
+                        SpinBox {
+                            minimum: 8;
+                            maximum: 2000;
+                            value <=> root.compact-h;
+                            edited => { root.changed("theme.compact"); }
+                        }
+                    }
+
+                    Row {
+                        label: @tr("Open island size (px)");
+                        SpinBox {
+                            minimum: 16;
+                            maximum: 4000;
+                            value <=> root.expanded-w;
+                            edited => { root.changed("theme.expanded"); }
+                        }
+                        SpinBox {
+                            minimum: 8;
+                            maximum: 2000;
+                            value <=> root.expanded-h;
+                            edited => { root.changed("theme.expanded"); }
+                        }
+                    }
+
+                    Text {
+                        text: @tr("Priority in the compact island (first wins)");
+                    }
+                    for name[i] in root.module-order: HorizontalLayout {
+                        spacing: 8px;
+                        Text {
+                            text: name;
+                            min-width: 220px;
+                            vertical-alignment: center;
+                        }
+                        Button {
+                            text: "↑";
+                            enabled: i > 0;
+                            clicked => { root.module-moved(i, -1); }
+                        }
+                        Button {
+                            text: "↓";
+                            enabled: i < root.module-order.length - 1;
+                            clicked => { root.module-moved(i, 1); }
                         }
                     }
 
@@ -486,6 +554,15 @@ export component SettingsWindow inherits Window {
                         text: @tr("Tint the island with the album art color");
                         checked <=> root.media-accent;
                         toggled => { root.changed("modules.media.accent_from_artwork"); }
+                    }
+
+                    if root.players.length > 0: Text {
+                        text: @tr("Players seen recently (tick to ignore)");
+                    }
+                    for player in root.players: CheckBox {
+                        text: player.name;
+                        checked: player.ignored;
+                        toggled => { root.player-toggled(player.token, self.checked); }
                     }
 
                     Row {

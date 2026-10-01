@@ -212,3 +212,15 @@ msgstr "Recherche…"
 
 msgid "Check for updates"
 msgstr "Rechercher une mise à jour"
+
+msgid "Players seen recently (tick to ignore)"
+msgstr "Lecteurs vus récemment (cocher pour ignorer)"
+
+msgid "Compact island size (px)"
+msgstr "Taille de l'île compacte (px)"
+
+msgid "Open island size (px)"
+msgstr "Taille de l'île ouverte (px)"
+
+msgid "Priority in the compact island (first wins)"
+msgstr "Priorité dans l'île compacte (le premier gagne)"
