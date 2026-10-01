@@ -348,7 +348,7 @@ de texte aux écrans de l'assistant), puis la fenêtre de réglages.
 - [x] Étagère de fichiers (glisser-déposer sur l'île, `[modules.shelf]`, doc FR + EN)
 - [x] Volume (module `bw-volume`, callback WASAPI sans polling, doc FR + EN)
 - [ ] Luminosité (WMI, écrans intégrés seulement : non testable sur un PC fixe)
-- [ ] Plugins WASM
+- [x] Plugins WASM (`bw-plugins`, wasmi : bac à sable, budget de calcul, mémoire plafonnée ; texte + attention ; doc FR + EN)
 
 ### Port macOS (en parallèle, sans bloquer Windows)
 

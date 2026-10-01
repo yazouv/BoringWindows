@@ -155,6 +155,7 @@ impl Controller {
         ui.set_view_name(config.layout.view.as_str().into());
         ui.set_volume_enabled(config.module_enabled(bw_volume::MODULE_ID, false));
         ui.set_viz_enabled(config.module_enabled(bw_viz::MODULE_ID, false));
+        ui.set_plugins_enabled(config.module_enabled(bw_plugins::MODULE_ID, false));
         let shelf = crate::shelf::ShelfConfig::from_table(config.modules.get("shelf"))
             .unwrap_or_default();
         ui.set_shelf_enabled(shelf.enabled);
@@ -460,6 +461,13 @@ impl Controller {
             }
             platform::open_path(&dir);
         }));
+        ui.on_open_plugins_folder(with(|_, _| {
+            let dir = bw_plugins::plugins_dir(&bw_config::config_dir());
+            if let Err(e) = std::fs::create_dir_all(&dir) {
+                log::warn!("dossier des plugins : {e}");
+            }
+            platform::open_path(&dir);
+        }));
         ui.on_shelf_clear(with(|c, _| {
             c.shelf.borrow_mut().clear();
             c.shelf.borrow().save(&c.shelf_file);
@@ -666,6 +674,10 @@ impl Controller {
             "modules.media.accent_from_artwork" => Some((
                 vec!["modules", "media", "accent_from_artwork"],
                 Value::Bool(ui.get_media_accent()),
+            )),
+            "modules.plugins.enabled" => Some((
+                vec!["modules", "plugins", "enabled"],
+                Value::Bool(ui.get_plugins_enabled()),
             )),
             "modules.visualizer.enabled" => Some((
                 vec!["modules", "visualizer", "enabled"],

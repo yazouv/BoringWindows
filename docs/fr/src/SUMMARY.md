@@ -14,6 +14,7 @@
 - [Minuteur](minuteur.md)
 - [Étagère](etagere.md)
 - [Volume](volume.md)
+- [Plugins (WASM)](plugins.md)
 - [Agenda](agenda/index.md)
   - [Google Agenda](agenda/google.md)
   - [Outlook et Microsoft 365](agenda/outlook.md)

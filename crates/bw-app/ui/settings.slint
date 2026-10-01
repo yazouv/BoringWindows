@@ -66,6 +66,8 @@ export component SettingsWindow inherits Window {
     in-out property <bool> autostart;
     in-out property <bool> volume-enabled;
     in-out property <bool> viz-enabled;
+    in-out property <bool> plugins-enabled;
+    callback open-plugins-folder();
     // --- Apparence ---
     in property <[string]> themes;
     in-out property <int> theme-index;
@@ -191,6 +193,19 @@ export component SettingsWindow inherits Window {
                         text: @tr("Show volume changes in the island");
                         checked <=> root.volume-enabled;
                         toggled => { root.changed("modules.volume.enabled"); }
+                    }
+
+                    Row {
+                        label: "";
+                        CheckBox {
+                            text: @tr("Run WASM plugins (third-party code, sandboxed)");
+                            checked <=> root.plugins-enabled;
+                            toggled => { root.changed("modules.plugins.enabled"); }
+                        }
+                        Button {
+                            text: @tr("Plugins folder");
+                            clicked => { root.open-plugins-folder(); }
+                        }
                     }
 
                     CheckBox {

@@ -145,6 +145,13 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 | `bands` | `12` | 4 to 32 | number of bars |
 | `fps` | `30` | 10 to 60 | frames per second |
 
+## `[modules.plugins]`
+
+| Option | Default | Purpose |
+|---|---|---|
+| `enabled` | `false` | run the [WASM plugins](plugins.md) in the `plugins/` folder |
+| `only` | `[]` | run only these folders (empty = all) |
+
 ## `[modules.demo]`
 
 | Option | Default | Role |

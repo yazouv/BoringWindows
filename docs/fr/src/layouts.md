@@ -47,6 +47,9 @@ que tu ne déclares pas sont ignorés.
 | `has-prompt`, `prompt-id`, `prompt-project`, `prompt-tool`, `prompt-detail` | bool, string | demande d'autorisation de Claude Code |
 | `claude-rows` | `[{ id, project, status: string, urgent, active: bool }]` | sessions Claude Code |
 | `agenda-rows` | `[{ title, time, location, relative, join-url: string, has-join, soon: bool }]` | prochains événements |
+| `viz-bars` | `[float]` | niveaux 0 à 1 du visualiseur (vide si éteint) |
+| `shelf-rows`, `shelf-more` | `[{ name, path: string }]`, string | fichiers de l'étagère (4 au plus), « +n » |
+| `plugin-rows` | `[{ name, text: string, attention: int }]` | lignes des plugins WASM (2 au plus) |
 | `has-timer`, `timer-phase`, `timer-time`, `timer-progress`, `timer-presets` | bool, int, string, float, `[string]` | minuteur (phase : 0 prêt, 1 en cours, 2 pause, 3 terminé) |
 
 ## Actions (callbacks)
@@ -58,6 +61,7 @@ que tu ne déclares pas sont ignorés.
 | `claude-decide(string, string)` | `(prompt-id, "allow" \| "deny" \| "ask")` |
 | `claude-focus(string)` | amène au premier plan le terminal de la session (`id`) |
 | `open-url(string)` | ouvre un lien `https://` (ex. `join-url`) |
+| `shelf-open(int)`, `shelf-remove(int)` | ouvre / retire le fichier d'index donné |
 | `timer-action(string)` | `"start:<minutes>"`, `"pause"`, `"resume"`, `"reset"` |
 
 ## Exemple

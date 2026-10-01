@@ -27,7 +27,7 @@ use slint::{
 use crate::geometry::{self, Shape};
 use crate::platform::{self, Platform, PlatformEvent, Tray, TrayCommand};
 use crate::shelf::{Shelf, ShelfConfig};
-use crate::{AgendaRow, ClaudePrompt, ClaudeRow, Island, MediaInfo, ShelfRow, TimerInfo, clock, demo};
+use crate::{AgendaRow, ClaudePrompt, ClaudeRow, Island, MediaInfo, PluginRow, ShelfRow, TimerInfo, clock, demo};
 
 /// Pseudo-module utilisé pour signaler une config invalide dans l'île.
 const CONFIG_ERROR: &str = "config";
@@ -568,6 +568,7 @@ impl Controller {
         *self.calendar.borrow_mut() = None;
         *self.timer.borrow_mut() = None;
         self.viz_active.set(false);
+        self.ui.set_plugin_rows(ModelRc::default());
         self.ui.set_viz_bars(ModelRc::default());
         self.timer_tick.stop();
         self.ui.set_has_timer(false);
@@ -611,6 +612,8 @@ impl Controller {
             ModuleEventKind::State(state) => {
                 if let Some(snapshot) = state.downcast_ref::<MediaSnapshot>() {
                     self.apply_media(event.module, Arc::new(snapshot.clone()));
+                } else if let Some(snapshot) = state.downcast_ref::<bw_plugins::PluginsSnapshot>() {
+                    self.apply_plugins(snapshot);
                 } else if let Some(snapshot) = state.downcast_ref::<bw_viz::VizSnapshot>() {
                     self.apply_viz(snapshot);
                 } else if let Some(snapshot) = state.downcast_ref::<TimerSnapshot>() {
@@ -625,6 +628,24 @@ impl Controller {
                 }
             }
         }
+    }
+
+    // --- Plugins WASM -------------------------------------------------------
+
+    fn apply_plugins(&self, snapshot: &bw_plugins::PluginsSnapshot) {
+        // Deux lignes au plus : la place est comptée.
+        let rows: Vec<PluginRow> = snapshot
+            .items
+            .iter()
+            .take(2)
+            .map(|i| PluginRow {
+                name: i.name.as_str().into(),
+                text: i.text.as_str().into(),
+                attention: i32::from(i.attention),
+            })
+            .collect();
+        self.ui.set_plugin_rows(ModelRc::new(VecModel::from(rows)));
+        self.layout_rows();
     }
 
     // --- Visualiseur --------------------------------------------------------
@@ -827,7 +848,8 @@ impl Controller {
         // Les lignes du minuteur et de l'étagère prennent une place chacune,
         // sans jamais vider le reste.
         let extra = usize::from(self.ui.get_has_timer())
-            + usize::from(slint::Model::row_count(&self.ui.get_shelf_rows()) > 0);
+            + usize::from(slint::Model::row_count(&self.ui.get_shelf_rows()) > 0)
+            + slint::Model::row_count(&self.ui.get_plugin_rows());
         let budget = budget.saturating_sub(extra).max(1);
 
         let mut agenda: Vec<AgendaRow> = Vec::new();
@@ -1265,6 +1287,15 @@ fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
         match bw_viz::VizConfig::from_table(config.modules.get(bw_viz::MODULE_ID)) {
             Ok(c) => modules.push(Box::new(bw_viz::VizModule::new(c))),
             Err(e) => errors.push(format!("modules.visualizer : {e:#}")),
+        }
+    }
+    if config.module_enabled(bw_plugins::MODULE_ID, false) {
+        match bw_plugins::PluginsConfig::from_table(config.modules.get(bw_plugins::MODULE_ID)) {
+            Ok(c) => modules.push(Box::new(bw_plugins::PluginsModule::new(
+                c,
+                bw_plugins::plugins_dir(&bw_config::config_dir()),
+            ))),
+            Err(e) => errors.push(format!("modules.plugins : {e:#}")),
         }
     }
     if config.module_enabled("demo", false) {

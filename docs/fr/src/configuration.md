@@ -146,6 +146,13 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 | `bands` | `12` | 4 à 32 | nombre de barres |
 | `fps` | `30` | 10 à 60 | images par seconde |
 
+## `[modules.plugins]`
+
+| Option | Défaut | Rôle |
+|---|---|---|
+| `enabled` | `false` | lancer les [plugins WASM](plugins.md) du dossier `plugins/` |
+| `only` | `[]` | ne lancer que ces dossiers (vide = tous) |
+
 ## `[modules.demo]`
 
 | Option | Défaut | Rôle |

@@ -261,6 +261,21 @@ impl Controller {
             ),
         );
         set("shelf-more", s(ui.get_shelf_more()));
+        set(
+            "plugin-rows",
+            model(
+                ui.get_plugin_rows()
+                    .iter()
+                    .map(|r| {
+                        row([
+                            ("name", s(&r.name)),
+                            ("text", s(&r.text)),
+                            ("attention", Value::Number(f64::from(r.attention))),
+                        ])
+                    })
+                    .collect(),
+            ),
+        );
 
         let timer = ui.get_timer();
         set("has-timer", Value::Bool(ui.get_has_timer()));

@@ -47,6 +47,9 @@ declare are ignored.
 | `has-prompt`, `prompt-id`, `prompt-project`, `prompt-tool`, `prompt-detail` | bool, string | Claude Code permission request |
 | `claude-rows` | `[{ id, project, status: string, urgent, active: bool }]` | Claude Code sessions |
 | `agenda-rows` | `[{ title, time, location, relative, join-url: string, has-join, soon: bool }]` | upcoming events |
+| `viz-bars` | `[float]` | visualizer levels 0 to 1 (empty when off) |
+| `shelf-rows`, `shelf-more` | `[{ name, path: string }]`, string | shelf files (at most 4), "+n" |
+| `plugin-rows` | `[{ name, text: string, attention: int }]` | WASM plugin lines (at most 2) |
 | `has-timer`, `timer-phase`, `timer-time`, `timer-progress`, `timer-presets` | bool, int, string, float, `[string]` | timer (phase: 0 ready, 1 running, 2 paused, 3 done) |
 
 ## Actions (callbacks)
@@ -58,6 +61,7 @@ declare are ignored.
 | `claude-decide(string, string)` | `(prompt-id, "allow" \| "deny" \| "ask")` |
 | `claude-focus(string)` | brings the session's terminal to the front (`id`) |
 | `open-url(string)` | opens an `https://` link (e.g. `join-url`) |
+| `shelf-open(int)`, `shelf-remove(int)` | opens / removes the file at the given index |
 | `timer-action(string)` | `"start:<minutes>"`, `"pause"`, `"resume"`, `"reset"` |
 
 ## Example

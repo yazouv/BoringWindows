@@ -296,3 +296,9 @@ msgstr "Afficher les changements de volume dans l'île"
 
 msgid "Audio visualizer (uses some CPU while the island is open and music plays)"
 msgstr "Visualiseur audio (consomme un peu de CPU tant que l'île est ouverte et que la musique joue)"
+
+msgid "Run WASM plugins (third-party code, sandboxed)"
+msgstr "Lancer les plugins WASM (code tiers, dans un bac à sable)"
+
+msgid "Plugins folder"
+msgstr "Dossier des plugins"

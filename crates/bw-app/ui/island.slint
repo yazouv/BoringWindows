@@ -30,6 +30,12 @@ export struct AgendaRow {
     soon: bool,
 }
 
+export struct PluginRow {
+    name: string,
+    text: string,
+    attention: int,
+}
+
 export struct ShelfRow {
     name: string,
     path: string,
@@ -166,6 +172,7 @@ export component Island inherits Window {
     in property <MediaInfo> media;
     in property <[AgendaRow]> agenda-rows;
     in property <[float]> viz-bars;
+    in property <[PluginRow]> plugin-rows;
     in property <[ShelfRow]> shelf-rows;
     in property <string> shelf-more;
     callback shelf-open(int);
@@ -572,6 +579,38 @@ export component Island inherits Window {
                         fill: root.accent;
                         ink: root.bg;
                         clicked => { root.timer-action("reset"); }
+                    }
+                }
+
+                // Plugins WASM : une ligne de texte par plugin.
+                if !root.has-prompt && root.plugin-rows.length > 0: VerticalLayout {
+                    spacing: 2px;
+
+                    for plugin in root.plugin-rows: Rectangle {
+                        height: 22px;
+
+                        HorizontalLayout {
+                            padding-left: 6px;
+                            spacing: 8px;
+
+                            Text {
+                                text: plugin.name;
+                                color: root.fg.with-alpha(0.55);
+                                font-size: 12px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                                min-width: 64px;
+                            }
+
+                            Text {
+                                text: plugin.text;
+                                color: plugin.attention > 0 ? root.accent : root.fg;
+                                font-size: 12px;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+                        }
                     }
                 }
 

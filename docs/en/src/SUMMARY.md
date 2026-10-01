@@ -14,6 +14,7 @@
 - [Timer](minuteur.md)
 - [Shelf](etagere.md)
 - [Volume](volume.md)
+- [Plugins (WASM)](plugins.md)
 - [Calendar](agenda/index.md)
   - [Google Calendar](agenda/google.md)
   - [Outlook and Microsoft 365](agenda/outlook.md)
