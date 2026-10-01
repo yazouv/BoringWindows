@@ -6,6 +6,7 @@
 /// Préfixe d'une valeur de config qui renvoie à un secret : `secret:<id>`.
 pub const PREFIX: &str = "secret:";
 
+#[cfg(any(windows, target_os = "macos"))]
 const SERVICE: &str = "BoringWindows";
 
 /// Un coffre existe sur cette plateforme.
