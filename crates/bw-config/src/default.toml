@@ -52,7 +52,7 @@ permissions = true
 permission_wait_secs = 60
 # Durée d'affichage de « terminé » (s).
 done_secs = 8
-# Son système quand une demande de permission attend dans l'île.
+# Son système quand Claude se met à t'attendre (question, plan, permission).
 sound = true
 
 [modules.media]

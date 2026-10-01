@@ -54,8 +54,9 @@ Ce que montre l'île :
 Dans l'île ouverte, un clic sur une session ramène son terminal au premier plan.
 Sans réponse dans l'île au bout de `permission_wait_secs` (60 s par défaut), la
 question repasse dans le terminal. Une demande réglée ailleurs (terminal, Échap)
-disparaît de l'île dès que Claude passe à la suite. Un son système signale
-chaque nouvelle demande (`sound = false` pour le couper).
+disparaît de l'île dès que Claude passe à la suite (Échap compris). Un son
+système signale chaque fois que Claude se met à t'attendre : question, plan,
+permission (`sound = false` pour le couper).
 
 **Rien ne s'affiche ?** Lance le diagnostic (BoringWindows ouvert) :
 

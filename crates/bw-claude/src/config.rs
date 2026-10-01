@@ -11,7 +11,7 @@ pub struct ClaudeConfig {
     pub permissions: bool,
     pub permission_wait_secs: u32,
     pub done_secs: u32,
-    /// Son système quand une demande de permission attend dans l'île.
+    /// Son système quand une session se met à t'attendre (question, permission…).
     pub sound: bool,
 }
 

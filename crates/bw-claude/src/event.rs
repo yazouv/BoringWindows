@@ -22,6 +22,9 @@ pub struct HookEvent {
     /// Résumé lisible de l'appel d'outil (commande, fichier, URL…).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_detail: Option<String>,
+    /// `PostToolUseFailure` : l'outil a été interrompu par l'utilisateur (Échap).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interrupted: Option<bool>,
 }
 
 const MAX_DETAIL: usize = 200;
@@ -46,6 +49,7 @@ impl HookEvent {
             message: str_field("message").map(|m| truncate(&m, MAX_MESSAGE)),
             tool_name,
             tool_detail,
+            interrupted: v.get("is_interrupt").and_then(Value::as_bool),
         })
     }
 
@@ -137,6 +141,15 @@ mod tests {
         .unwrap();
         assert_eq!(e.notification_type.as_deref(), Some("idle_prompt"));
         assert_eq!(e.project(), "b");
+    }
+
+    #[test]
+    fn interrupt_flag_is_kept() {
+        let e = HookEvent::from_hook_input(
+            r#"{"session_id":"s","hook_event_name":"PostToolUseFailure","tool_name":"AskUserQuestion","is_interrupt":true}"#,
+        )
+        .unwrap();
+        assert_eq!(e.interrupted, Some(true));
     }
 
     #[test]

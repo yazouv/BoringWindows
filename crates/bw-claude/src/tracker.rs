@@ -130,6 +130,9 @@ impl Tracker {
             ("UserPromptSubmit", _) => (SessionKind::Working, None),
             ("PreToolUse", _) => (SessionKind::Working, e.tool_name.clone()),
             ("PostToolUse", _) => (SessionKind::Working, None),
+            // Échap : Claude s'arrête et attend un nouveau message.
+            ("PostToolUseFailure", _) if e.interrupted == Some(true) => (SessionKind::Idle, None),
+            ("PostToolUseFailure", _) => (SessionKind::Working, None),
             // Sans réponse possible dans l'île, Claude demandera dans le terminal.
             ("PermissionRequest", _) => (SessionKind::NeedsYou, Some(permission_label(e))),
             ("Notification", Some("permission_prompt")) => {
@@ -162,7 +165,9 @@ impl Tracker {
         let settles = |p: &Prompt| {
             p.session_id == e.session_id
                 && match e.kind.as_str() {
-                    "PostToolUse" => e.tool_name.as_deref() == Some(p.tool.as_str()),
+                    "PostToolUse" | "PostToolUseFailure" => {
+                        e.tool_name.as_deref() == Some(p.tool.as_str())
+                    }
                     "UserPromptSubmit" | "Stop" | "SessionEnd" => true,
                     _ => false,
                 }
@@ -476,6 +481,35 @@ mod tests {
         t.add_prompt(5, &req, now + Duration::from_secs(60));
         assert_eq!(t.on_event(&ev("a", "Stop"), &[], None, now), vec![5]);
         assert_eq!(t.snapshot().sessions[0].kind, SessionKind::Done);
+    }
+
+    #[test]
+    fn escape_on_a_question_clears_it() {
+        let (mut t, now) = tracker();
+        t.on_event(
+            &tool("a", "PermissionRequest", "AskUserQuestion", "?"),
+            &[],
+            None,
+            now,
+        );
+        assert_eq!(t.snapshot().attention, Attention::Urgent);
+        let esc = HookEvent {
+            interrupted: Some(true),
+            ..tool("a", "PostToolUseFailure", "AskUserQuestion", "?")
+        };
+        t.on_event(&esc, &[], None, now);
+        let s = t.snapshot();
+        assert_eq!(s.attention, Attention::None);
+        assert_eq!(s.sessions[0].kind, SessionKind::Idle);
+
+        // Échec ordinaire d'un outil : Claude continue.
+        t.on_event(
+            &tool("a", "PostToolUseFailure", "Bash", "x"),
+            &[],
+            None,
+            now,
+        );
+        assert_eq!(t.snapshot().sessions[0].kind, SessionKind::Working);
     }
 
     #[test]

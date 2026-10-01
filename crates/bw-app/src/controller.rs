@@ -637,16 +637,21 @@ impl Controller {
         self.ui.set_claude_rows(ModelRc::new(VecModel::from(rows)));
 
         let prompt = snapshot.as_ref().and_then(|s| s.prompt.as_ref());
-        // Nouvelle demande : on prévient au son, comme le ferait le terminal.
-        let previous = self
-            .claude
-            .borrow()
-            .as_ref()
-            .and_then(|s| s.prompt.as_ref().map(|p| p.id));
-        if let Some(p) = prompt
-            && previous != Some(p.id)
-            && self.claude_config().sound
-        {
+        // Une session se met à t'attendre (question, plan, permission…) :
+        // on prévient au son, Claude ne le fait plus quand nos hooks sont là.
+        let waiting = |s: Option<&Snapshot>| -> Vec<(String, String)> {
+            s.map(|s| {
+                s.sessions
+                    .iter()
+                    .filter(|v| matches!(v.kind, SessionKind::Permission | SessionKind::NeedsYou))
+                    .map(|v| (v.id.clone(), v.status.clone()))
+                    .collect()
+            })
+            .unwrap_or_default()
+        };
+        let before = waiting(self.claude.borrow().as_deref());
+        let now_waiting = waiting(snapshot.as_deref());
+        if now_waiting.iter().any(|w| !before.contains(w)) && self.claude_config().sound {
             platform::alert_sound();
         }
         self.ui.set_has_prompt(prompt.is_some());

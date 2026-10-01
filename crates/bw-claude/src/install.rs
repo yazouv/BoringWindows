@@ -11,18 +11,24 @@ use anyhow::Context as _;
 use serde_json::{Map, Value, json};
 
 /// Événements écoutés.
-pub const HOOK_EVENTS: [&str; 8] = [
+pub const HOOK_EVENTS: [&str; 9] = [
     "SessionStart",
     "SessionEnd",
     "UserPromptSubmit",
     "PreToolUse",
     "PostToolUse",
+    "PostToolUseFailure",
     "PermissionRequest",
     "Notification",
     "Stop",
 ];
 /// Événements filtrés par outil : `matcher` à `*`.
-const TOOL_EVENTS: [&str; 3] = ["PreToolUse", "PostToolUse", "PermissionRequest"];
+const TOOL_EVENTS: [&str; 4] = [
+    "PreToolUse",
+    "PostToolUse",
+    "PostToolUseFailure",
+    "PermissionRequest",
+];
 /// Marqueur de nos entrées.
 const MARKER: &str = "bw-hook";
 /// Timeouts (s) posés dans settings.json. Le relais se limite à 300 ms pour
