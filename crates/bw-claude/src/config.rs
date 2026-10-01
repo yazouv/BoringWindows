@@ -13,6 +13,8 @@ pub struct ClaudeConfig {
     pub done_secs: u32,
     /// Son système quand une session se met à t'attendre (question, permission…).
     pub sound: bool,
+    /// Rejoue le son toutes les N secondes tant qu'une session attend (0 = jamais).
+    pub remind_secs: u32,
 }
 
 impl Default for ClaudeConfig {
@@ -23,6 +25,7 @@ impl Default for ClaudeConfig {
             permission_wait_secs: 60,
             done_secs: 8,
             sound: true,
+            remind_secs: 30,
         }
     }
 }
@@ -45,6 +48,13 @@ impl ClaudeConfig {
             bw_i18n::tr!(
                 "modules.claude.done_secs must be ≤ 600",
                 "modules.claude.done_secs doit être ≤ 600"
+            )
+        );
+        anyhow::ensure!(
+            config.remind_secs == 0 || (5..=3600).contains(&config.remind_secs),
+            bw_i18n::tr!(
+                "modules.claude.remind_secs must be 0 (off) or between 5 and 3600",
+                "modules.claude.remind_secs doit être 0 (désactivé) ou entre 5 et 3600"
             )
         );
         Ok(config)

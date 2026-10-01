@@ -88,6 +88,7 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         update_timer: Timer::default(),
         artwork: RefCell::new(None),
         progress_timer: Timer::default(),
+        remind_timer: Timer::default(),
     });
     CONTROLLER.with(|c| {
         let _ = c.set(controller.clone());
@@ -125,6 +126,7 @@ pub struct Controller {
     /// Pochette convertie pour Slint, gardée tant que le morceau ne change pas.
     artwork: RefCell<Option<(Arc<Vec<u8>>, Image)>>,
     progress_timer: Timer,
+    remind_timer: Timer,
     calendar: RefCell<Option<Arc<CalendarSnapshot>>>,
     settings: RefCell<Option<settings::SettingsState>>,
     open_settings_at_start: Cell<bool>,
@@ -750,8 +752,18 @@ impl Controller {
         };
         let before = waiting(self.claude.borrow().as_deref());
         let now_waiting = waiting(snapshot.as_deref());
-        if now_waiting.iter().any(|w| !before.contains(w)) && self.claude_config().sound {
+        let config = self.claude_config();
+        if now_waiting.iter().any(|w| !before.contains(w)) && config.sound {
             platform::alert_sound();
+        }
+        if now_waiting.is_empty() || !config.sound || config.remind_secs == 0 {
+            self.remind_timer.stop();
+        } else if !self.remind_timer.running() {
+            self.remind_timer.start(
+                TimerMode::Repeated,
+                Duration::from_secs(config.remind_secs.into()),
+                || post(|c| c.remind_claude()),
+            );
         }
         self.ui.set_has_prompt(prompt.is_some());
         if let Some(p) = prompt {
@@ -764,6 +776,19 @@ impl Controller {
         }
         *self.claude.borrow_mut() = snapshot;
         self.layout_rows();
+    }
+
+    fn remind_claude(&self) {
+        let still_waiting = self.claude.borrow().as_ref().is_some_and(|s| {
+            s.sessions
+                .iter()
+                .any(|v| matches!(v.kind, SessionKind::Permission | SessionKind::NeedsYou))
+        });
+        if still_waiting && self.claude_config().sound {
+            platform::alert_sound();
+        } else {
+            self.remind_timer.stop();
+        }
     }
 
     fn claude_config(&self) -> ClaudeConfig {

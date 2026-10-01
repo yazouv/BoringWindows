@@ -234,7 +234,7 @@ masquage en plein écran. Reste à relever les chiffres RAM/CPU sur un vrai GPU.
 - [x] Répondre à `PermissionRequest` depuis l'île (Autoriser / Refuser / Terminal), repli sur le terminal après délai
 - [x] Clic sur une session → focus du terminal (console du relais, sinon processus parents)
 - [ ] Test WSL (Claude Code dans WSL qui appelle `bw-hook.exe` par l'interop)
-- [ ] Son / rappel si Claude attend depuis longtemps
+- [x] Son / rappel si Claude attend depuis longtemps (`modules.claude.remind_secs`, 30 s par défaut, 0 = désactivé)
 
 Vérifié sous Linux (Xvfb) de bout en bout : événements reçus, clic sur
 « Autoriser » → le relais renvoie `behavior: allow` à Claude ; ~6 ms par
