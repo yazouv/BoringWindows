@@ -23,6 +23,23 @@ Pick your service to find that link:
 
 ## Adding the link
 
+### With the settings window (easiest)
+
+1. Right-click the BoringWindows icon › **Réglages…** (settings) › **Agenda**
+   tab.
+2. Pick your **service** (*Service*): the window reminds you where to find the
+   link, and **Guide détaillé** opens the matching page of this guide.
+3. Paste the **ICS link** (*Lien ICS*) — or **Parcourir…** to pick an `.ics`
+   file — optionally give it a name, then **Tester** (test): the window
+   downloads the calendar and shows how many events it found and the next one.
+4. **Ajouter** (add). The calendar shows up in the island within a few seconds.
+
+![Agenda tab of the settings window](../images/reglages.png)
+
+To remove a calendar: the **Supprimer** (remove) button next to its name.
+
+### By hand, in config.toml
+
 1. Right-click the BoringWindows icon › **Ouvrir la configuration** (open the
    configuration).
 2. Paste at **the end of the file** one block per calendar:
@@ -70,6 +87,8 @@ events, time zones (including Outlook's). If the network drops, the last
 downloaded version stays on screen.
 
 ## Settings
+
+In **Réglages… › Agenda › Affichage** (display), or in `config.toml`:
 
 ```toml
 [modules.calendar]

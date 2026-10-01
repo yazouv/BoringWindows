@@ -34,6 +34,7 @@ Clic droit sur l'icône BoringWindows dans la zone de notification :
 
 | Entrée | Effet |
 |---|---|
+| Réglages… | ouvre la fenêtre de réglages (voir plus bas) |
 | Ouvrir la configuration | ouvre `config.toml` dans ton éditeur |
 | Recharger la configuration | relit le fichier (utile seulement si le rechargement automatique a raté) |
 | Claude Code : installer / retirer les hooks… | branche Claude Code (voir [Claude Code](claude-code.md)) |
@@ -48,6 +49,18 @@ le même écran, l'île se cache, puis revient à la sortie du plein écran.
 Désactivable avec `hide_in_fullscreen = false`.
 
 ## Modifier la configuration
+
+Le plus simple : clic droit sur l'icône › **Réglages…**. Une fenêtre à onglets
+(Général, Apparence, Agenda, Claude Code, Musique) modifie les réglages
+courants ; **chaque changement est enregistré et appliqué tout de suite**, pas
+de bouton « Valider ». C'est aussi là qu'on ajoute un calendrier (assistant par
+service, bouton **Tester**), qu'on installe les hooks Claude Code et qu'on
+lance le diagnostic. La fenêtre peut aussi s'ouvrir au lancement :
+`boringwindows.exe --settings`.
+
+La fenêtre écrit dans `config.toml` en gardant tes commentaires et l'ordre du
+fichier. Pour le reste (tailles de l'île, ordre des modules…), édite le
+fichier directement.
 
 Tout se règle dans `%APPDATA%\BoringWindows\config.toml`. **Enregistre le
 fichier : l'île se met à jour aussitôt**, sans redémarrage. Si le fichier

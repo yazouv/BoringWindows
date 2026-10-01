@@ -1,5 +1,7 @@
 //! Orchestration sur le thread UI : config, modules, forme de l'île, système.
 
+mod settings;
+
 use std::cell::{Cell, OnceCell, RefCell};
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
@@ -45,7 +47,8 @@ fn post(f: impl FnOnce(&Rc<Controller>) + Send + 'static) {
     });
 }
 
-pub fn run() -> anyhow::Result<()> {
+/// `open_settings` : ouvrir la fenêtre de réglages dès le démarrage (`--settings`).
+pub fn run(open_settings: bool) -> anyhow::Result<()> {
     let path = bw_config::config_path();
     let (config, config_error) = match Config::load_or_create(&path) {
         Ok(config) => (config, None),
@@ -53,7 +56,9 @@ pub fn run() -> anyhow::Result<()> {
     };
 
     let controller = Rc::new(Controller {
-        ui: Island::new()?,
+        // Seule l'île reçoit les attributs de fenêtre spéciaux (pas de focus,
+        // transparente…) ; les autres fenêtres restent normales.
+        ui: platform::creating_island(Island::new)?,
         arbiter: RefCell::new(Arbiter::new(config.layout.compact.clone())),
         config: RefCell::new(config),
         path,
@@ -74,6 +79,8 @@ pub fn run() -> anyhow::Result<()> {
         installer: Installer::default(),
         media: RefCell::new(None),
         calendar: RefCell::new(None),
+        settings: RefCell::new(None),
+        open_settings_at_start: Cell::new(open_settings),
         artwork: RefCell::new(None),
         progress_timer: Timer::default(),
     });
@@ -114,6 +121,8 @@ pub struct Controller {
     artwork: RefCell<Option<(Arc<Vec<u8>>, Image)>>,
     progress_timer: Timer,
     calendar: RefCell<Option<Arc<CalendarSnapshot>>>,
+    settings: RefCell<Option<settings::SettingsState>>,
+    open_settings_at_start: Cell<bool>,
 }
 
 impl Controller {
@@ -190,6 +199,9 @@ impl Controller {
 
     fn on_platform_ready(self: &Rc<Self>, platform: Platform) {
         log::info!("intégration système prête");
+        if self.open_settings_at_start.get() {
+            self.open_settings();
+        }
         self.fullscreen.set(platform.fullscreen_now());
         *self.platform.borrow_mut() = Some(platform);
         self.update_visibility();
@@ -859,6 +871,7 @@ impl Controller {
                 self.paused.set(paused);
                 self.update_visibility();
             }
+            TrayCommand::Settings => self.open_settings(),
             TrayCommand::ClaudeHooks => self.toggle_claude_hooks(),
             TrayCommand::Quit => {
                 let _ = slint::quit_event_loop();

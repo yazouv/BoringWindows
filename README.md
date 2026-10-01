@@ -26,6 +26,9 @@ Sources dans [`docs/`](docs/).
   barre de progression cliquable, île teintée à la couleur de la pochette.
 - **Phase 3** (agenda) : prochaines réunions depuis tes calendriers ICS, rappel
   avant le début, bouton « Rejoindre » (Teams, Meet, Zoom, Webex…).
+- **Phase 3.5** (réglages) : fenêtre de réglages (clic droit sur l'icône ›
+  **Réglages…**) : plus besoin d'éditer `config.toml`, assistant d'ajout de
+  calendrier avec bouton **Tester**, hooks et diagnostic Claude Code.
 
 ## Musique
 
@@ -42,7 +45,9 @@ l'overlay de volume. Ça couvre Spotify, Apple Music, Deezer, les navigateurs
 
 ## Agenda
 
-Ajoute le lien ICS privé de chaque calendrier dans `config.toml` :
+Le plus simple : clic droit sur l'icône › **Réglages…** › **Agenda**, choisis
+ton service, colle le lien, **Tester**, **Ajouter**. Ou, à la main, ajoute le
+lien ICS privé de chaque calendrier dans `config.toml` :
 
 ```toml
 [[modules.calendar.sources]]
@@ -133,7 +138,7 @@ animations sans vrais modules :
 enabled = true
 ```
 
-Clic droit sur l'icône de la zone de notification : ouvrir la config, lancer au
+Clic droit sur l'icône de la zone de notification : réglages, ouvrir la config, lancer au
 démarrage, masquer l'île, quitter.
 
 ## Structure

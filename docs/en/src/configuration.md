@@ -2,7 +2,8 @@
 
 The file lives in `%APPDATA%\BoringWindows\config.toml` (right-click the icon ›
 **Ouvrir la configuration**). It is created on first launch with every option
-commented.
+commented. The common settings can also be changed without touching the
+file: right-click › **Réglages…** (settings).
 
 - **Save: it applies immediately**, no restart.
 - A missing option takes its default value: you can keep only what you change.

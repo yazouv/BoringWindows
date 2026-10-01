@@ -105,6 +105,15 @@ pub fn focus_terminal(_ancestors: &[u32], _console_window: Option<i64>) -> bool 
 
 pub fn attach_parent_console() {}
 
+pub fn creating_island<R>(f: impl FnOnce() -> R) -> R {
+    f()
+}
+
+/// Pas de sélecteur de fichier natif ici : le chemin se tape à la main.
+pub fn pick_ics_file() -> Option<std::path::PathBuf> {
+    None
+}
+
 pub fn alert_sound() {}
 
 /// Ouvre un fichier avec l'application associée.

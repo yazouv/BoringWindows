@@ -4,6 +4,7 @@
 //! au chargement, et surveillé pour être rechargé à chaud.
 
 mod color;
+mod edit;
 mod watch;
 
 use std::collections::BTreeMap;
@@ -12,6 +13,7 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 
 pub use color::Color;
+pub use edit::{ConfigEditor, Value};
 pub use watch::{ConfigWatcher, watch};
 
 /// Modèle du fichier créé au premier lancement. Il doit rester équivalent à

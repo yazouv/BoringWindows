@@ -30,7 +30,7 @@ fn main() -> anyhow::Result<()> {
         .renderer_name("femtovg".into());
     platform::configure_backend(selector).select()?;
 
-    controller::run()
+    controller::run(std::env::args().any(|a| a == "--settings"))
 }
 
 /// `boringwindows doctor` : diagnostic Claude Code, affiché et enregistré.

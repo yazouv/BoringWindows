@@ -9,7 +9,8 @@ montre ce que fait Claude, te prévient quand il t'attend, et te laisse
 ## Brancher Claude Code
 
 1. Lance BoringWindows.
-2. Clic droit sur son icône › **Claude Code : installer les hooks…**
+2. Clic droit sur son icône › **Claude Code : installer les hooks…** (ou
+   **Réglages…** › onglet **Claude Code** › **Installer les hooks**).
 3. La fenêtre qui s'ouvre liste exactement ce qui sera ajouté à
    `~/.claude/settings.json`. Réponds **Oui**.
 4. **Relance tes sessions Claude Code** : elles ne lisent leurs hooks qu'au

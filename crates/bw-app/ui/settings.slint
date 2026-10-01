@@ -1,0 +1,479 @@
+// Fenêtre de réglages : édite config.toml sans avoir à l'ouvrir.
+// Créée à l'ouverture, détruite à la fermeture. Chaque modification appelle
+// `changed(clé)` ; Rust lit la propriété correspondante et l'enregistre.
+
+import { Button, CheckBox, ComboBox, GroupBox, LineEdit, ScrollView, SpinBox, TabWidget, TextEdit, VerticalBox, HorizontalBox } from "std-widgets.slint";
+
+export struct CalendarSourceRow {
+    name: string,
+    url: string,
+}
+
+component Hint inherits Text {
+    font-size: 12px;
+    opacity: 0.7;
+    wrap: word-wrap;
+}
+
+component Row inherits HorizontalLayout {
+    in property <string> label;
+    spacing: 12px;
+
+    Text {
+        text: root.label;
+        min-width: 220px;
+        vertical-alignment: center;
+    }
+}
+
+component Swatch inherits Rectangle {
+    in property <color> swatch;
+    callback picked;
+    width: 22px;
+    height: 22px;
+    border-radius: 11px;
+    background: root.swatch;
+    border-width: ta.has-hover ? 2px : 0px;
+    border-color: white;
+
+    ta := TouchArea {
+        clicked => { root.picked(); }
+    }
+}
+
+export component SettingsWindow inherits Window {
+    title: "BoringWindows · Réglages";
+    preferred-width: 760px;
+    preferred-height: 580px;
+    min-width: 640px;
+    min-height: 480px;
+
+    // --- Général ---
+    in-out property <int> open-on-index;
+    in-out property <int> monitor-index;
+    in-out property <bool> hide-fullscreen;
+    in-out property <bool> autostart;
+    // --- Apparence ---
+    in-out property <string> accent;
+    in property <color> accent-preview;
+    in-out property <string> background-color;
+    in-out property <int> animation-ms;
+    in-out property <int> corner-radius;
+    // --- Agenda ---
+    in property <[CalendarSourceRow]> sources;
+    in-out property <int> remind-minutes;
+    in-out property <int> lookahead-hours;
+    in-out property <int> refresh-minutes;
+    in-out property <bool> show-all-day;
+    in-out property <int> provider-index;
+    in property <[string]> providers;
+    in property <string> provider-help;
+    in property <bool> provider-is-file;
+    in-out property <string> new-name;
+    in-out property <string> new-url;
+    in property <string> test-status;
+    in property <bool> test-ok;
+    in property <bool> testing;
+    // --- Claude ---
+    in property <bool> hooks-installed;
+    in-out property <bool> claude-permissions;
+    in-out property <bool> claude-sound;
+    in-out property <int> claude-wait;
+    in property <string> doctor-report;
+    in property <bool> doctor-running;
+    // --- Musique ---
+    in-out property <bool> media-accent;
+    in-out property <string> media-ignore;
+    // --- Pied de page ---
+    in property <string> status;
+    in property <bool> status-error;
+
+    callback changed(string);
+    callback provider-changed(int);
+    callback open-guide();
+    callback browse-file();
+    callback test-source();
+    callback add-source();
+    callback remove-source(int);
+    callback toggle-hooks();
+    callback run-doctor();
+    callback open-config-file();
+    callback open-docs();
+
+    VerticalLayout {
+        padding: 12px;
+        spacing: 8px;
+
+        TabWidget {
+            Tab {
+                title: "Général";
+                VerticalBox {
+                    alignment: start;
+
+                    Row {
+                        label: "Ouvrir l'île";
+                        ComboBox {
+                            model: ["au survol", "au clic"];
+                            current-index <=> root.open-on-index;
+                            selected => { root.changed("general.open_on"); }
+                        }
+                    }
+
+                    Row {
+                        label: "Écran";
+                        ComboBox {
+                            model: ["écran principal", "écran de la souris (au lancement)"];
+                            current-index <=> root.monitor-index;
+                            selected => { root.changed("general.monitor"); }
+                        }
+                    }
+
+                    CheckBox {
+                        text: "Cacher l'île quand une application est en plein écran";
+                        checked <=> root.hide-fullscreen;
+                        toggled => { root.changed("general.hide_in_fullscreen"); }
+                    }
+
+                    CheckBox {
+                        text: "Lancer BoringWindows au démarrage de Windows";
+                        checked <=> root.autostart;
+                        toggled => { root.changed("autostart"); }
+                    }
+                }
+            }
+
+            Tab {
+                title: "Apparence";
+                VerticalBox {
+                    alignment: start;
+
+                    Row {
+                        label: "Couleur d'accent";
+                        LineEdit {
+                            text <=> root.accent;
+                            placeholder-text: "#FF8A3D";
+                            edited => { root.changed("theme.accent"); }
+                        }
+                        Rectangle {
+                            width: 28px;
+                            height: 28px;
+                            border-radius: 6px;
+                            background: root.accent-preview;
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        padding-left: 232px;
+                        for c[i] in [#FF8A3D, #FF453A, #FFD60A, #30D158, #5AC8FA, #0A84FF, #BF5AF2, #FF375F]: Swatch {
+                            swatch: c;
+                            picked => {
+                                root.accent = ["#FF8A3D", "#FF453A", "#FFD60A", "#30D158", "#5AC8FA", "#0A84FF", "#BF5AF2", "#FF375F"][i];
+                                root.changed("theme.accent");
+                            }
+                        }
+                    }
+
+                    Row {
+                        label: "Couleur de fond";
+                        LineEdit {
+                            text <=> root.background-color;
+                            placeholder-text: "#000000";
+                            edited => { root.changed("theme.background"); }
+                        }
+                    }
+
+                    Row {
+                        label: "Durée des animations (ms)";
+                        SpinBox {
+                            minimum: 0;
+                            maximum: 2000;
+                            step-size: 20;
+                            value <=> root.animation-ms;
+                            edited => { root.changed("theme.animation_ms"); }
+                        }
+                    }
+
+                    Row {
+                        label: "Arrondi de l'île ouverte";
+                        SpinBox {
+                            minimum: 0;
+                            maximum: 100;
+                            value <=> root.corner-radius;
+                            edited => { root.changed("theme.corner_radius"); }
+                        }
+                    }
+
+                    Hint {
+                        text: "Les changements s'appliquent tout de suite sur l'île. La couleur d'accent est remplacée par celle de la pochette quand la musique joue (onglet Musique).";
+                    }
+                }
+            }
+
+            Tab {
+                title: "Agenda";
+                ScrollView {
+                    VerticalBox {
+                        alignment: start;
+
+                        GroupBox {
+                            title: "Mes calendriers";
+                            VerticalLayout {
+                                spacing: 6px;
+
+                                if root.sources.length == 0: Hint {
+                                    text: "Aucun calendrier pour l'instant : ajoute-en un ci-dessous.";
+                                }
+
+                                for source[i] in root.sources: HorizontalLayout {
+                                    spacing: 8px;
+
+                                    Text {
+                                        text: source.name != "" ? source.name : "(sans nom)";
+                                        font-weight: 600;
+                                        min-width: 120px;
+                                        vertical-alignment: center;
+                                    }
+
+                                    Text {
+                                        text: source.url;
+                                        opacity: 0.7;
+                                        overflow: elide;
+                                        horizontal-stretch: 1;
+                                        vertical-alignment: center;
+                                    }
+
+                                    Button {
+                                        text: "Supprimer";
+                                        clicked => { root.remove-source(i); }
+                                    }
+                                }
+                            }
+                        }
+
+                        GroupBox {
+                            title: "Ajouter un calendrier";
+                            VerticalLayout {
+                                spacing: 8px;
+
+                                Row {
+                                    label: "Service";
+                                    ComboBox {
+                                        model: root.providers;
+                                        current-index <=> root.provider-index;
+                                        selected => { root.provider-changed(self.current-index); }
+                                    }
+                                    Button {
+                                        text: "Guide détaillé";
+                                        clicked => { root.open-guide(); }
+                                    }
+                                }
+
+                                Hint {
+                                    text: root.provider-help;
+                                }
+
+                                Row {
+                                    label: "Nom (facultatif)";
+                                    LineEdit {
+                                        text <=> root.new-name;
+                                        placeholder-text: "Pro, Cours, Perso…";
+                                    }
+                                }
+
+                                Row {
+                                    label: root.provider-is-file ? "Fichier .ics" : "Lien ICS";
+                                    LineEdit {
+                                        text <=> root.new-url;
+                                        placeholder-text: root.provider-is-file ? "C:/Users/…/agenda.ics" : "https://…  ou  webcal://…";
+                                    }
+                                    if root.provider-is-file: Button {
+                                        text: "Parcourir…";
+                                        clicked => { root.browse-file(); }
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    alignment: end;
+
+                                    Text {
+                                        text: root.test-status;
+                                        color: root.test-ok ? #30D158 : #FF453A;
+                                        wrap: word-wrap;
+                                        horizontal-stretch: 1;
+                                        vertical-alignment: center;
+                                    }
+
+                                    Button {
+                                        text: root.testing ? "Test…" : "Tester";
+                                        enabled: !root.testing && root.new-url != "";
+                                        clicked => { root.test-source(); }
+                                    }
+
+                                    Button {
+                                        text: "Ajouter";
+                                        primary: true;
+                                        enabled: root.new-url != "";
+                                        clicked => { root.add-source(); }
+                                    }
+                                }
+                            }
+                        }
+
+                        GroupBox {
+                            title: "Affichage";
+                            VerticalLayout {
+                                spacing: 6px;
+
+                                Row {
+                                    label: "Rappel avant le début (min)";
+                                    SpinBox {
+                                        minimum: 0;
+                                        maximum: 120;
+                                        value <=> root.remind-minutes;
+                                        edited => { root.changed("modules.calendar.remind_minutes"); }
+                                    }
+                                }
+
+                                Row {
+                                    label: "Horizon affiché (heures)";
+                                    SpinBox {
+                                        minimum: 1;
+                                        maximum: 168;
+                                        value <=> root.lookahead-hours;
+                                        edited => { root.changed("modules.calendar.lookahead_hours"); }
+                                    }
+                                }
+
+                                Row {
+                                    label: "Mise à jour toutes les (min)";
+                                    SpinBox {
+                                        minimum: 2;
+                                        maximum: 1440;
+                                        value <=> root.refresh-minutes;
+                                        edited => { root.changed("modules.calendar.refresh_minutes"); }
+                                    }
+                                }
+
+                                CheckBox {
+                                    text: "Afficher les événements « toute la journée »";
+                                    checked <=> root.show-all-day;
+                                    toggled => { root.changed("modules.calendar.show_all_day"); }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Tab {
+                title: "Claude Code";
+                VerticalBox {
+                    Row {
+                        label: root.hooks-installed ? "Hooks installés ✓" : "Hooks non installés";
+                        Button {
+                            text: root.hooks-installed ? "Retirer les hooks" : "Installer les hooks";
+                            primary: !root.hooks-installed;
+                            clicked => { root.toggle-hooks(); }
+                        }
+                    }
+
+                    Hint {
+                        text: "Après une installation, relance tes sessions Claude Code : elles ne lisent leurs hooks qu'au démarrage.";
+                    }
+
+                    CheckBox {
+                        text: "Répondre aux demandes de permission depuis l'île";
+                        checked <=> root.claude-permissions;
+                        toggled => { root.changed("modules.claude.permissions"); }
+                    }
+
+                    CheckBox {
+                        text: "Son quand Claude t'attend (question, plan, permission)";
+                        checked <=> root.claude-sound;
+                        toggled => { root.changed("modules.claude.sound"); }
+                    }
+
+                    Row {
+                        label: "Délai de réponse dans l'île (s)";
+                        SpinBox {
+                            minimum: 5;
+                            maximum: 280;
+                            value <=> root.claude-wait;
+                            edited => { root.changed("modules.claude.permission_wait_secs"); }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        alignment: start;
+                        Button {
+                            text: root.doctor-running ? "Diagnostic en cours…" : "Lancer le diagnostic";
+                            enabled: !root.doctor-running;
+                            clicked => { root.run-doctor(); }
+                        }
+                    }
+
+                    if root.doctor-report != "": TextEdit {
+                        text: root.doctor-report;
+                        read-only: true;
+                        font-size: 11px;
+                        vertical-stretch: 1;
+                    }
+                    // Sans rapport, l'espace libre reste en bas.
+                    if root.doctor-report == "": Rectangle {
+                        vertical-stretch: 1;
+                    }
+                }
+            }
+
+            Tab {
+                title: "Musique";
+                VerticalBox {
+                    alignment: start;
+
+                    CheckBox {
+                        text: "Teinter l'île avec la couleur de la pochette";
+                        checked <=> root.media-accent;
+                        toggled => { root.changed("modules.media.accent_from_artwork"); }
+                    }
+
+                    Row {
+                        label: "Lecteurs à ignorer";
+                        LineEdit {
+                            text <=> root.media-ignore;
+                            placeholder-text: "msedge, chrome";
+                            edited => { root.changed("modules.media.ignore"); }
+                        }
+                    }
+
+                    Hint {
+                        text: "Sépare les noms par des virgules ; un morceau du nom suffit. Spotify, Apple Music, navigateurs, VLC… sont détectés automatiquement.";
+                    }
+                }
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 8px;
+
+            Text {
+                text: root.status;
+                color: root.status-error ? #FF453A : #30D158;
+                overflow: elide;
+                horizontal-stretch: 1;
+                vertical-alignment: center;
+            }
+
+            Button {
+                text: "Documentation";
+                clicked => { root.open-docs(); }
+            }
+
+            Button {
+                text: "Ouvrir config.toml";
+                clicked => { root.open-config-file(); }
+            }
+        }
+    }
+}

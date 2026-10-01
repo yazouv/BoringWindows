@@ -24,6 +24,7 @@ impl Tray {
         on_command: impl Fn(TrayCommand) + Send + Sync + 'static,
     ) -> anyhow::Result<Self> {
         let title = MenuItem::new("BoringWindows", false, None);
+        let settings = MenuItem::new("Réglages…", true, None);
         let open = MenuItem::new("Ouvrir la configuration", true, None);
         let reload = MenuItem::new("Recharger la configuration", true, None);
         let autostart_item = CheckMenuItem::new("Lancer au démarrage", true, autostart, None);
@@ -35,6 +36,7 @@ impl Tray {
         menu.append_items(&[
             &title,
             &PredefinedMenuItem::separator(),
+            &settings,
             &open,
             &reload,
             &PredefinedMenuItem::separator(),
@@ -51,6 +53,7 @@ impl Tray {
         let autostart_state = Arc::new(AtomicBool::new(autostart));
         let pause_state = AtomicBool::new(false);
         let ids = (
+            settings.id().clone(),
             open.id().clone(),
             reload.id().clone(),
             autostart_item.id().clone(),
@@ -60,9 +63,10 @@ impl Tray {
         );
         let autostart_flag = autostart_state.clone();
         MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
-            let (open, reload, autostart, pause, claude, quit) = &ids;
+            let (settings, open, reload, autostart, pause, claude, quit) = &ids;
             let toggle = |flag: &AtomicBool| !flag.fetch_xor(true, Ordering::Relaxed);
             let command = match &event.id {
+                id if id == settings => TrayCommand::Settings,
                 id if id == open => TrayCommand::OpenConfig,
                 id if id == reload => TrayCommand::ReloadConfig,
                 id if id == autostart => TrayCommand::Autostart(toggle(&autostart_flag)),

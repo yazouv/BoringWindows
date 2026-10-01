@@ -36,6 +36,7 @@ French for now):
 
 | Entry | Effect |
 |---|---|
+| Réglages… | opens the settings window (see below) |
 | Ouvrir la configuration | opens `config.toml` in your editor |
 | Recharger la configuration | re-reads the file (only needed if automatic reload failed) |
 | Claude Code : installer / retirer les hooks… | connects Claude Code (see [Claude Code](claude-code.md)) |
@@ -50,6 +51,18 @@ same screen, the island hides, then comes back when full screen ends. Turn this
 off with `hide_in_fullscreen = false`.
 
 ## Changing the configuration
+
+The easiest way: right-click the icon › **Réglages…** (settings). A tabbed
+window (Général, Apparence, Agenda, Claude Code, Musique — general, appearance,
+calendar, Claude Code, music) edits the common settings; **every change is
+saved and applied immediately**, there is no "OK" button. That's also where you
+add a calendar (per-service assistant, **Tester** button), install the Claude
+Code hooks and run the diagnostic. The window can also open at startup:
+`boringwindows.exe --settings`. Like the menu, it is in French for now.
+
+The window writes to `config.toml` and keeps your comments and the order of
+the file. For everything else (island sizes, module order…), edit the file
+directly.
 
 Everything is set in `%APPDATA%\BoringWindows\config.toml`. **Save the file: the
 island updates immediately**, no restart needed. If the file contains an error,

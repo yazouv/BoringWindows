@@ -25,7 +25,11 @@ lookahead_hours = 48
 
 ## .ics file on your disk
 
-An exported file, or one received by email, works too: give its path.
+An exported file, or one received by email, works too. Easiest: **Réglages…**
+› **Agenda** › service « Fichier .ics sur le disque » (.ics file on disk) ›
+**Parcourir…** (browse), then **Tester** and **Ajouter**.
+
+By hand, give its path:
 
 ```toml
 [[modules.calendar.sources]]

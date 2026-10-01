@@ -23,6 +23,9 @@ where
     let dir = path.parent().unwrap_or(Path::new(".")).to_owned();
     let target: PathBuf = path.to_owned();
     let file_name = path.file_name().map(ToOwned::to_owned);
+    // Certains systèmes (inotify) signalent aussi les lectures : sans ce
+    // filtre, chaque rechargement en déclencherait un autre.
+    let mut last = std::fs::read_to_string(path).ok();
 
     let io_err = |e: notify_debouncer_mini::notify::Error| ConfigError::Io {
         path: dir.clone(),
@@ -37,6 +40,11 @@ where
                     .iter()
                     .any(|e| e.path.file_name() == file_name.as_deref())
                 {
+                    let text = std::fs::read_to_string(&target).ok();
+                    if text.is_some() && text == last {
+                        return;
+                    }
+                    last.clone_from(&text);
                     on_change(load(&target));
                 }
             }

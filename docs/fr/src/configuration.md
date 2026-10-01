@@ -2,7 +2,8 @@
 
 Le fichier se trouve dans `%APPDATA%\BoringWindows\config.toml` (clic droit
 sur l'icône › **Ouvrir la configuration**). Il est créé au premier lancement
-avec toutes les options commentées.
+avec toutes les options commentées. Les réglages courants se changent aussi
+sans toucher au fichier : clic droit › **Réglages…**.
 
 - **Enregistre : c'est appliqué aussitôt**, sans redémarrage.
 - Une option absente prend sa valeur par défaut : tu peux ne garder que ce que

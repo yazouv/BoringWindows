@@ -274,7 +274,17 @@ Teams replié sur deux lignes, récurrence Outlook, journée entière, clic sur
 Objectif : qu'on n'ait jamais besoin d'ouvrir `config.toml`. Il reste la source
 de vérité (versionnable, partageable), mais une interface l'édite pour nous.
 
-**Fenêtre de réglages** (clic droit sur l'icône › « Réglages… »)
+**Fenêtre de réglages** (clic droit sur l'icône › « Réglages… ») ✅
+- [x] Fenêtre Slint (style Fluent), `boringwindows --settings` pour l'ouvrir au lancement
+- [x] Écriture `toml_edit` (`bw-config::ConfigEditor`) : commentaires conservés,
+      validation complète (modules compris) avant d'écrire, écriture atomique
+- [x] Général, Apparence (accent avec pastilles, fond, arrondi, animations),
+      Agenda (assistant 6 services, guide détaillé, Parcourir…, Tester, nom par défaut),
+      Claude Code (hooks, son, délai, diagnostic dans la fenêtre), Musique
+- [ ] Musique : lecteurs vus récemment à cocher (pour l'instant, liste séparée par des virgules)
+- [ ] Captures d'écran par service dans l'assistant
+- [ ] Tailles de l'île (compacte / ouverte) et ordre des modules
+
 - Fenêtre Slint séparée, créée à l'ouverture et détruite à la fermeture : coût
   nul en RAM le reste du temps.
 - Écriture via `toml_edit` : les commentaires et l'ordre du fichier sont
