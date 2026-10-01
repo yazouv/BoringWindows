@@ -269,10 +269,50 @@ Teams replié sur deux lignes, récurrence Outlook, journée entière, clic sur
 
 ➡️ **v0.3**
 
+### Phase 3.5 — Réglages sans toucher au TOML
+
+Objectif : qu'on n'ait jamais besoin d'ouvrir `config.toml`. Il reste la source
+de vérité (versionnable, partageable), mais une interface l'édite pour nous.
+
+**Fenêtre de réglages** (clic droit sur l'icône › « Réglages… »)
+- Fenêtre Slint séparée, créée à l'ouverture et détruite à la fermeture : coût
+  nul en RAM le reste du temps.
+- Écriture via `toml_edit` : les commentaires et l'ordre du fichier sont
+  conservés ; le rechargement à chaud applique tout immédiatement.
+- Onglets :
+  - **Général** : écran, ouverture au survol/clic, masquage en plein écran,
+    lancement au démarrage.
+  - **Apparence** : couleurs (sélecteur), tailles, coins, animations, avec
+    aperçu en direct sur l'île.
+  - **Agenda** : liste des calendriers + assistant « Ajouter un calendrier » :
+    1. choisir : Google, Outlook / Microsoft 365, iCloud, Proton, autre lien,
+       fichier `.ics` ;
+    2. instructions pas à pas propres au service (où trouver le lien ICS),
+       avec captures ;
+    3. coller le lien (ou parcourir un fichier) → bouton **Tester** qui
+       télécharge et affiche « 42 événements, prochain : … » avant d'enregistrer.
+  - **Claude Code** : installer / retirer les hooks, son, délai de réponse,
+    bouton « Diagnostic » (le `doctor` actuel, affiché dans la fenêtre).
+  - **Musique** : couleur de pochette, sources ignorées (liste des lecteurs
+    vus récemment, à cocher).
+- Plus tard : connexion Google / Microsoft (OAuth) directement depuis
+  l'assistant, pour les agendas pro dont la publication ICS est interdite.
+
+**Documentation en ligne (GitHub Pages)**
+- Site statique généré depuis `docs/` (mdBook ou page simple) et publié par une
+  GitHub Action à chaque push sur la branche principale.
+- Pages : installation, premier lancement, un guide par source d'agenda
+  (captures à l'appui), Claude Code (installation des hooks, diagnostic),
+  référence complète de `config.toml`, FAQ / dépannage.
+- L'assistant de la fenêtre de réglages renvoie vers la page du service
+  choisi.
+
+Ordre conseillé : la doc d'abord (rapide, utile tout de suite, et elle sert
+de texte aux écrans de l'assistant), puis la fenêtre de réglages.
+
 ### Phase 4 — Customisation avancée
 - [ ] Système de thèmes + 2–3 thèmes fournis
 - [ ] Layouts `.slint` au runtime + doc de l'API de données
-- [ ] UI de réglages (fenêtre Slint séparée, chargée à la demande)
 
 ### Phase 5 — Extensions
 - [ ] Spotify Web API (like, queue, Connect)
