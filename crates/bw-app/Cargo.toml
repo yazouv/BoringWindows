@@ -12,6 +12,7 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
+bw-calendar.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 bw-claude.workspace = true
 bw-config.workspace = true

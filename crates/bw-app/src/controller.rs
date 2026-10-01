@@ -6,6 +6,7 @@ use std::rc::{Rc, Weak};
 use std::sync::Arc;
 use std::time::Duration;
 
+use bw_calendar::{CalendarConfig, CalendarModule, CalendarSnapshot};
 use bw_claude::install::Installer;
 use bw_claude::{ClaudeConfig, ClaudeModule, SessionKind, Snapshot};
 use bw_config::{Config, ConfigError, ConfigWatcher, OpenOn};
@@ -18,15 +19,16 @@ use slint::{
 
 use crate::geometry::{self, Shape};
 use crate::platform::{self, Platform, PlatformEvent, Tray, TrayCommand};
-use crate::{ClaudePrompt, ClaudeRow, Island, MediaInfo, clock, demo};
+use crate::{AgendaRow, ClaudePrompt, ClaudeRow, Island, MediaInfo, clock, demo};
 
 /// Pseudo-module utilisé pour signaler une config invalide dans l'île.
 const CONFIG_ERROR: &str = "config";
 /// Pseudo-module des messages brefs de l'app (« hooks installés »…).
 const FLASH: &str = "app";
-/// Sessions Claude affichées dans l'île ouverte (moins quand le lecteur est là).
-const MAX_CLAUDE_ROWS: usize = 3;
-const MAX_CLAUDE_ROWS_WITH_MEDIA: usize = 2;
+/// Lignes (agenda + sessions Claude) qui tiennent dans l'île ouverte, avec ou
+/// sans la carte du lecteur.
+const MAX_ROWS: usize = 4;
+const MAX_ROWS_WITH_MEDIA: usize = 2;
 
 thread_local! {
     static CONTROLLER: OnceCell<Rc<Controller>> = const { OnceCell::new() };
@@ -71,6 +73,7 @@ pub fn run() -> anyhow::Result<()> {
         claude: RefCell::new(None),
         installer: Installer::default(),
         media: RefCell::new(None),
+        calendar: RefCell::new(None),
         artwork: RefCell::new(None),
         progress_timer: Timer::default(),
     });
@@ -110,6 +113,7 @@ pub struct Controller {
     /// Pochette convertie pour Slint, gardée tant que le morceau ne change pas.
     artwork: RefCell<Option<(Arc<Vec<u8>>, Image)>>,
     progress_timer: Timer,
+    calendar: RefCell<Option<Arc<CalendarSnapshot>>>,
 }
 
 impl Controller {
@@ -163,6 +167,13 @@ impl Controller {
             }));
         self.ui
             .on_media_seek(with(&weak, |c, fraction: f32| c.media_seek(fraction)));
+        self.ui.on_open_url(|url| {
+            // Uniquement des liens web : jamais de chemin ou de commande venus d'un ICS.
+            if url.starts_with("https://") {
+                log::info!("ouverture : {url}");
+                platform::open_path(std::path::Path::new(url.as_str()));
+            }
+        });
         self.update_clock();
 
         match bw_config::watch(&self.path, |res| post(move |c| c.on_config(res))) {
@@ -436,6 +447,7 @@ impl Controller {
             }
         }
 
+        *self.calendar.borrow_mut() = None;
         self.apply_claude(None);
         *self.media.borrow_mut() = None;
         *self.artwork.borrow_mut() = None;
@@ -476,6 +488,9 @@ impl Controller {
             ModuleEventKind::State(state) => {
                 if let Some(snapshot) = state.downcast_ref::<MediaSnapshot>() {
                     self.apply_media(event.module, Arc::new(snapshot.clone()));
+                } else if let Ok(snapshot) = state.clone().downcast::<CalendarSnapshot>() {
+                    *self.calendar.borrow_mut() = Some(snapshot);
+                    self.layout_rows();
                 } else if event.module == bw_claude::MODULE_ID
                     && let Ok(snapshot) = state.downcast::<Snapshot>()
                 {
@@ -483,6 +498,64 @@ impl Controller {
                 }
             }
         }
+    }
+
+    // --- Lignes : agenda et sessions Claude ---------------------------------
+
+    /// Répartit les lignes disponibles entre l'agenda et les sessions Claude.
+    fn layout_rows(&self) {
+        let budget = if self.ui.get_has_media() {
+            MAX_ROWS_WITH_MEDIA
+        } else {
+            MAX_ROWS
+        };
+
+        let mut agenda: Vec<AgendaRow> = Vec::new();
+        if let Some(cal) = self.calendar.borrow().as_ref() {
+            agenda.extend(cal.items.iter().map(|i| AgendaRow {
+                title: i.title.as_str().into(),
+                time: i.time.as_str().into(),
+                relative: i.relative.clone().unwrap_or_default().into(),
+                join_url: i.join_url.clone().unwrap_or_default().into(),
+                has_join: i.join_url.is_some(),
+                soon: i.soon,
+            }));
+            if agenda.is_empty()
+                && let Some(err) = &cal.error
+            {
+                agenda.push(AgendaRow {
+                    title: err.as_str().into(),
+                    time: "⚠".into(),
+                    ..AgendaRow::default()
+                });
+            }
+        }
+
+        let mut claude: Vec<ClaudeRow> = Vec::new();
+        if let Some(s) = self.claude.borrow().as_ref() {
+            let rank = |k: SessionKind| match k {
+                SessionKind::Permission | SessionKind::NeedsYou => 0,
+                SessionKind::Done | SessionKind::Working => 1,
+                SessionKind::Idle => 2,
+            };
+            let mut sessions: Vec<_> = s.sessions.iter().collect();
+            sessions.sort_by_key(|s| rank(s.kind));
+            claude.extend(sessions.into_iter().map(|s| ClaudeRow {
+                id: s.id.as_str().into(),
+                project: s.project.as_str().into(),
+                status: s.status.as_str().into(),
+                urgent: rank(s.kind) == 0,
+                active: s.kind != SessionKind::Idle,
+            }));
+        }
+
+        let (agenda_rows, claude_rows) = split_rows(agenda.len(), claude.len(), budget);
+        agenda.truncate(agenda_rows);
+        claude.truncate(claude_rows);
+        self.ui
+            .set_agenda_rows(ModelRc::new(VecModel::from(agenda)));
+        self.ui
+            .set_claude_rows(ModelRc::new(VecModel::from(claude)));
     }
 
     // --- Musique ------------------------------------------------------------
@@ -532,6 +605,7 @@ impl Controller {
         }
 
         *self.media.borrow_mut() = np.is_some().then_some((owner, snapshot));
+        self.layout_rows();
         self.apply_accent();
         self.update_progress();
         self.refresh_shape();
@@ -609,33 +683,6 @@ impl Controller {
     // --- Claude Code -------------------------------------------------------
 
     fn apply_claude(&self, snapshot: Option<Arc<Snapshot>>) {
-        let max_rows = if self.ui.get_has_media() {
-            MAX_CLAUDE_ROWS_WITH_MEDIA
-        } else {
-            MAX_CLAUDE_ROWS
-        };
-        let rows: Vec<ClaudeRow> = snapshot.as_ref().map_or_else(Vec::new, |s| {
-            let rank = |k: SessionKind| match k {
-                SessionKind::Permission | SessionKind::NeedsYou => 0,
-                SessionKind::Done | SessionKind::Working => 1,
-                SessionKind::Idle => 2,
-            };
-            let mut sessions: Vec<_> = s.sessions.iter().collect();
-            sessions.sort_by_key(|s| rank(s.kind));
-            sessions
-                .into_iter()
-                .take(max_rows)
-                .map(|s| ClaudeRow {
-                    id: s.id.as_str().into(),
-                    project: s.project.as_str().into(),
-                    status: s.status.as_str().into(),
-                    urgent: rank(s.kind) == 0,
-                    active: s.kind != SessionKind::Idle,
-                })
-                .collect()
-        });
-        self.ui.set_claude_rows(ModelRc::new(VecModel::from(rows)));
-
         let prompt = snapshot.as_ref().and_then(|s| s.prompt.as_ref());
         // Une session se met à t'attendre (question, plan, permission…) :
         // on prévient au son, Claude ne le fait plus quand nos hooks sont là.
@@ -664,6 +711,7 @@ impl Controller {
             });
         }
         *self.claude.borrow_mut() = snapshot;
+        self.layout_rows();
     }
 
     fn claude_config(&self) -> ClaudeConfig {
@@ -834,10 +882,29 @@ fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
             Err(e) => errors.push(format!("modules.media : {e:#}")),
         }
     }
+    if config.module_enabled(bw_calendar::MODULE_ID, true) {
+        match CalendarConfig::from_table(config.modules.get(bw_calendar::MODULE_ID)) {
+            Ok(c) => modules.push(Box::new(CalendarModule::new(c))),
+            Err(e) => errors.push(format!("modules.calendar : {e:#}")),
+        }
+    }
     if config.module_enabled("demo", false) {
         modules.push(Box::new(demo::Demo::default()));
     }
     (modules, errors)
+}
+
+/// Partage `budget` lignes entre l'agenda et Claude : chacun garde au moins
+/// la moitié s'il en a besoin, l'autre récupère le reste.
+fn split_rows(agenda: usize, claude: usize, budget: usize) -> (usize, usize) {
+    let half = budget.div_ceil(2);
+    let a = agenda.min(if claude == 0 {
+        budget
+    } else {
+        half.max(budget - claude.min(budget))
+    });
+    let c = claude.min(budget - a);
+    (a, c)
 }
 
 /// « 3:07 », « 1:02:45 ».
@@ -864,5 +931,21 @@ fn with<A>(
         if let Some(c) = weak.upgrade() {
             f(&c, arg);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_rows;
+
+    #[test]
+    fn rows_are_shared() {
+        assert_eq!(split_rows(5, 0, 4), (4, 0));
+        assert_eq!(split_rows(0, 5, 4), (0, 4));
+        assert_eq!(split_rows(5, 5, 4), (2, 2));
+        assert_eq!(split_rows(1, 5, 4), (1, 3));
+        assert_eq!(split_rows(5, 1, 4), (3, 1));
+        assert_eq!(split_rows(3, 3, 2), (1, 1));
+        assert_eq!(split_rows(0, 0, 2), (0, 0));
     }
 }

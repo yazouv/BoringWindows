@@ -14,6 +14,7 @@ bw-core = { path = "crates/bw-core" }
 bw-config = { path = "crates/bw-config" }
 bw-claude = { path = "crates/bw-claude" }
 bw-media = { path = "crates/bw-media" }
+bw-calendar = { path = "crates/bw-calendar" }
 anyhow = "1"
 log = "0.4"
 serde = { version = "1", features = ["derive"] }

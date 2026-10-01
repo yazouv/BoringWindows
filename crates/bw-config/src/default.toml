@@ -63,6 +63,22 @@ accent_from_artwork = true
 # Sources à ignorer (morceau de nom, ex. ["chrome", "msedge"]).
 ignore = []
 
+[modules.calendar]
+# Prochaines réunions, rappel avant le début et bouton « Rejoindre » (Teams, Meet, Zoom…).
+enabled = true
+# Prévenir combien de minutes avant le début.
+remind_minutes = 5
+# Rafraîchissement (minutes).
+refresh_minutes = 10
+show_all_day = true
+# Ajoute un bloc par calendrier, avec son lien ICS privé :
+#  - Google : Paramètres › (ton agenda) › « Adresse secrète au format iCal »
+#  - Outlook / Microsoft 365 : Paramètres › Calendrier › Calendriers partagés › Publier › lien ICS
+#  - iCloud : Partager le calendrier › Calendrier public › copier le lien (webcal://)
+# [[modules.calendar.sources]]
+# name = "Pro"
+# url = "https://outlook.office365.com/owa/calendar/…/calendar.ics"
+
 [modules.demo]
 # Module de démonstration : fait varier l'attention toutes les quelques secondes
 # pour tester les animations. À désactiver une fois les vrais modules en place.

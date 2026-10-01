@@ -19,6 +19,8 @@ Inspiré de [boring.notch](https://github.com/TheBoredTeam/boring.notch) et [cou
   demandes de permission depuis l'île.
 - **Phase 2** (musique) : morceau en cours, pochette, précédent / lecture / suivant,
   barre de progression cliquable, île teintée à la couleur de la pochette.
+- **Phase 3** (agenda) : prochaines réunions depuis tes calendriers ICS, rappel
+  avant le début, bouton « Rejoindre » (Teams, Meet, Zoom, Webex…).
 
 ## Musique
 
@@ -32,6 +34,39 @@ l'overlay de volume. Ça couvre Spotify, Apple Music, Deezer, les navigateurs
 - Plusieurs lecteurs ouverts : celui qui joue est affiché ; clic sur le nom de la
   source (en haut à droite, `⇄`) pour passer au suivant.
 - `[modules.media]` : `accent_from_artwork`, `ignore = ["msedge"]`…
+
+## Agenda
+
+Ajoute le lien ICS privé de chaque calendrier dans `config.toml` :
+
+```toml
+[[modules.calendar.sources]]
+name = "Pro"
+url = "https://outlook.office365.com/owa/calendar/…/calendar.ics"
+
+[[modules.calendar.sources]]
+name = "Perso"
+url = "https://calendar.google.com/calendar/ical/…/basic.ics"
+```
+
+Où trouver ce lien :
+- **Google Agenda** : Paramètres › (ton agenda) › *Intégrer l'agenda* › « Adresse
+  secrète au format iCal ».
+- **Outlook / Microsoft 365** : Paramètres › Calendrier › Calendriers partagés ›
+  *Publier un calendrier* › lien ICS (si ton organisation l'autorise).
+- **iCloud** : Partager le calendrier › Calendrier public › copier le lien
+  (`webcal://` accepté).
+
+Ce lien donne accès à ton agenda : garde `config.toml` pour toi.
+
+- Île ouverte : les prochains événements (24 h), avec compte à rebours dans
+  l'heure qui vient et bouton **Rejoindre** quand l'invitation contient un lien
+  Teams, Meet, Zoom, Webex, Whereby…
+- Pilule : `Réunion à 14:30` dans l'heure, puis `Réunion dans 4 min` (rappel,
+  `remind_minutes`) et `Réunion · a commencé` pendant 10 minutes.
+- Récurrences, exceptions, réunions déplacées ou annulées et fuseaux Outlook
+  (« Romance Standard Time »…) sont gérés. Rafraîchi toutes les 10 min ; en cas
+  de coupure réseau, la dernière version reste affichée.
 
 ## Claude Code
 
@@ -104,6 +139,7 @@ démarrage, masquer l'île, quitter.
 | `bw-config` | `config.toml` : schéma, validation, rechargement à chaud |
 | `bw-claude` | relais de hooks, protocole IPC, suivi des sessions, installation dans `settings.json` |
 | `bw-media` | musique : contrôles média de Windows (GSMTC), pochette, couleur d'accent |
+| `bw-calendar` | agenda : lecture ICS, récurrences, rappels, liens de visio |
 | `bw-app` | binaire : île Slint (`ui/island.slint`), intégration Win32, icône de notification |
 
 Le code Win32 est isolé dans `crates/bw-app/src/platform/win32.rs`. Sur macOS et

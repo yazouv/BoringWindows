@@ -20,6 +20,15 @@ export struct ClaudePrompt {
     detail: string,
 }
 
+export struct AgendaRow {
+    title: string,
+    time: string,
+    relative: string,
+    join-url: string,
+    has-join: bool,
+    soon: bool,
+}
+
 export struct MediaInfo {
     title: string,
     artist: string,
@@ -137,6 +146,7 @@ export component Island inherits Window {
     in property <ClaudePrompt> prompt;
     in property <bool> has-media;
     in property <MediaInfo> media;
+    in property <[AgendaRow]> agenda-rows;
     in property <bool> compact-art-visible;
     in property <image> compact-art;
 
@@ -146,6 +156,7 @@ export component Island inherits Window {
     callback claude-focus(string /* session */);
     callback media-action(string /* toggle | next | prev | source */);
     callback media-seek(float /* 0..1 */);
+    callback open-url(string);
 
     // Taille fixe de la fenêtre : la pilule grandit dedans, la zone cliquable
     // est restreinte à la pilule côté Win32.
@@ -426,6 +437,71 @@ export component Island inherits Window {
                     }
                 }
 
+                // Agenda : prochaines réunions, bouton « Rejoindre ».
+                if !root.has-prompt && root.agenda-rows.length > 0: VerticalLayout {
+                    spacing: 2px;
+
+                    for item in root.agenda-rows: Rectangle {
+                        height: 24px;
+
+                        HorizontalLayout {
+                            padding-left: 6px;
+                            padding-right: 2px;
+                            spacing: 8px;
+
+                            Dot {
+                                y: (parent.height - self.height) / 2;
+                                background: item.soon ? root.accent : root.fg.with-alpha(0.35);
+                            }
+
+                            Text {
+                                text: item.time;
+                                color: item.soon ? root.accent : root.fg.with-alpha(0.7);
+                                font-size: 12px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                            }
+
+                            Text {
+                                text: item.title;
+                                color: root.fg;
+                                font-size: 13px;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+
+                            if item.relative != "": Text {
+                                text: item.relative;
+                                color: item.soon ? root.accent : root.fg.with-alpha(0.55);
+                                font-size: 12px;
+                                vertical-alignment: center;
+                            }
+
+                            if item.has-join: Rectangle {
+                                width: join-label.preferred-width + 16px;
+                                height: 20px;
+                                y: (parent.height - self.height) / 2;
+                                border-radius: 10px;
+                                background: join-ta.has-hover ? root.accent.brighter(0.15) : root.accent;
+
+                                join-label := Text {
+                                    text: "Rejoindre";
+                                    color: root.bg;
+                                    font-size: 11px;
+                                    font-weight: 700;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+
+                                join-ta := TouchArea {
+                                    clicked => { root.open-url(item.join-url); }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Sessions Claude Code en cours (clic : ramène le terminal).
                 if !root.has-prompt && root.claude-rows.length > 0: VerticalLayout {
                     spacing: 2px;
@@ -470,7 +546,7 @@ export component Island inherits Window {
                     }
                 }
 
-                if !root.has-prompt && !root.has-media && root.claude-rows.length == 0: Text {
+                if !root.has-prompt && !root.has-media && root.claude-rows.length == 0 && root.agenda-rows.length == 0: Text {
                     text: root.has-attention ? root.attention-label : "Rien à signaler";
                     color: root.has-attention && root.urgent ? root.accent : root.fg.with-alpha(0.75);
                     font-size: 14px;
