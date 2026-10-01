@@ -298,7 +298,7 @@ de vérité (versionnable, partageable), mais une interface l'édite pour nous.
 - Plus tard : connexion Google / Microsoft (OAuth) directement depuis
   l'assistant, pour les agendas pro dont la publication ICS est interdite.
 
-**Documentation en ligne (GitHub Pages)**
+**Documentation en ligne (GitHub Pages)** ✅ (`docs/`, publiée depuis `main`)
 - Site statique généré depuis `docs/` (mdBook ou page simple) et publié par une
   GitHub Action à chaque push sur la branche principale.
 - Pages : installation, premier lancement, un guide par source d'agenda

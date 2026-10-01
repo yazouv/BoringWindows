@@ -272,6 +272,8 @@ impl<F: Fn(MediaSnapshot)> Worker<F> {
             return;
         }
         self.unsubscribe_all();
+        // Utile pour remplir `ignore` : les noms exacts des lecteurs vus.
+        log::info!("musique : sources {ids:?}");
         for (session, id) in sessions.iter().zip(ids) {
             let tx = &self.tx;
             let tokens = (|| -> windows::core::Result<[i64; 3]> {

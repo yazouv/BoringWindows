@@ -9,6 +9,10 @@ Une « Dynamic Island » pour Windows, écrite en Rust : légère, discrète et 
 
 Inspiré de [boring.notch](https://github.com/TheBoredTeam/boring.notch) et [coucou](https://github.com/Louis-CFM/coucou).
 
+📖 **Documentation : [yazouv.github.io/BoringWindows](https://yazouv.github.io/BoringWindows/)**
+(installation, configuration de l'agenda pour Google / Outlook / iCloud…,
+Claude Code, dépannage). Sources dans [`docs/`](docs/src).
+
 👉 Voir le [plan du projet](PLAN.md).
 
 ## État
