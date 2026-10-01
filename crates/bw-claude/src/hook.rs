@@ -69,7 +69,13 @@ pub fn run() -> i32 {
     let kind = event.kind.clone();
     let message = Message {
         v: ipc::PROTOCOL_VERSION,
-        wants_reply: kind == "PermissionRequest",
+        // Les questions (AskUserQuestion, plan) partent tout de suite au
+        // terminal : l'île les signale sans les retenir.
+        wants_reply: kind == "PermissionRequest"
+            && !event
+                .tool_name
+                .as_deref()
+                .is_some_and(crate::event::is_interactive_tool),
         ancestors: process::ancestors(),
         console_window: process::console_window(),
         event,

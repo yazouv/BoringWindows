@@ -52,6 +52,8 @@ permissions = true
 permission_wait_secs = 60
 # Durée d'affichage de « terminé » (s).
 done_secs = 8
+# Son système quand une demande de permission attend dans l'île.
+sound = true
 
 [modules.media]
 # Musique en cours (Spotify, Apple Music, navigateurs, VLC…) via les contrôles média de Windows.

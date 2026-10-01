@@ -48,11 +48,14 @@ Ce que montre l'île :
 | point gris · `projet · Bash` | Claude travaille |
 | point orange · `projet · autoriser Bash ?` | demande de permission : survole l'île pour **Autoriser / Refuser / Terminal** |
 | point orange · `projet · attend ta réponse` | Claude attend dans le terminal |
+| point orange · `projet · te pose une question` | question ou plan à valider : réponds dans le terminal |
 | `projet · terminé` | fin de tour (quelques secondes) |
 
 Dans l'île ouverte, un clic sur une session ramène son terminal au premier plan.
 Sans réponse dans l'île au bout de `permission_wait_secs` (60 s par défaut), la
-question repasse dans le terminal.
+question repasse dans le terminal. Une demande réglée ailleurs (terminal, Échap)
+disparaît de l'île dès que Claude passe à la suite. Un son système signale
+chaque nouvelle demande (`sound = false` pour le couper).
 
 **Rien ne s'affiche ?** Lance le diagnostic (BoringWindows ouvert) :
 

@@ -88,16 +88,19 @@ impl Tracker {
         }
     }
 
+    /// Applique un événement. Retourne les demandes de l'île devenues sans
+    /// objet (réglées dans le terminal ou annulées) : il faut libérer leur relais.
     pub fn on_event(
         &mut self,
         e: &HookEvent,
         ancestors: &[u32],
         console_window: Option<i64>,
         now: Instant,
-    ) {
+    ) -> Vec<u64> {
+        let closed = self.close_settled_prompts(e);
         if e.kind == "SessionEnd" {
             self.sessions.remove(&e.session_id);
-            return;
+            return closed;
         }
         let session = self
             .sessions
@@ -126,6 +129,7 @@ impl Tracker {
             ("SessionStart", _) => (SessionKind::Idle, None),
             ("UserPromptSubmit", _) => (SessionKind::Working, None),
             ("PreToolUse", _) => (SessionKind::Working, e.tool_name.clone()),
+            ("PostToolUse", _) => (SessionKind::Working, None),
             // Sans réponse possible dans l'île, Claude demandera dans le terminal.
             ("PermissionRequest", _) => (SessionKind::NeedsYou, Some(permission_label(e))),
             ("Notification", Some("permission_prompt")) => {
@@ -138,16 +142,34 @@ impl Tracker {
                 (SessionKind::NeedsYou, Some("a une question".into()))
             }
             ("Stop", _) => (SessionKind::Done, None),
-            _ => return,
+            _ => return closed,
         };
-        // Une demande en cours dans l'île garde la priorité sur un PreToolUse
-        // concurrent (sous-agent) de la même session.
-        if session.kind == SessionKind::Permission && kind == SessionKind::Working {
-            return;
+        // Une demande encore en attente dans l'île garde la priorité sur
+        // l'activité concurrente (sous-agents) de la même session.
+        let still_pending = self.prompts.iter().any(|p| p.session_id == e.session_id);
+        if still_pending && session.kind == SessionKind::Permission {
+            return closed;
         }
         session.kind = kind;
         session.detail = detail;
         session.done_until = (kind == SessionKind::Done).then(|| now + self.done_for);
+        closed
+    }
+
+    /// Un outil terminé, un nouveau prompt, la fin du tour ou de la session :
+    /// les demandes correspondantes ont été réglées ailleurs.
+    fn close_settled_prompts(&mut self, e: &HookEvent) -> Vec<u64> {
+        let settles = |p: &Prompt| {
+            p.session_id == e.session_id
+                && match e.kind.as_str() {
+                    "PostToolUse" => e.tool_name.as_deref() == Some(p.tool.as_str()),
+                    "UserPromptSubmit" | "Stop" | "SessionEnd" => true,
+                    _ => false,
+                }
+        };
+        let (closed, kept): (Vec<_>, Vec<_>) = self.prompts.drain(..).partition(|p| settles(p));
+        self.prompts = kept;
+        closed.into_iter().map(|p| p.id).collect()
     }
 
     /// Enregistre une demande de permission à laquelle l'île peut répondre.
@@ -262,6 +284,11 @@ impl Tracker {
 }
 
 fn permission_label(e: &HookEvent) -> String {
+    match e.tool_name.as_deref() {
+        Some("AskUserQuestion") => return "te pose une question".into(),
+        Some("ExitPlanMode") => return "plan à valider".into(),
+        _ => {}
+    }
     format!(
         "autoriser {} ?",
         e.tool_name.as_deref().unwrap_or("un outil")
@@ -408,6 +435,69 @@ mod tests {
         let s = t.snapshot();
         assert_eq!(s.prompt, None);
         assert_eq!(s.sessions[0].kind, SessionKind::Working);
+    }
+
+    #[test]
+    fn prompt_settled_in_terminal_is_closed_by_post_tool_use() {
+        let (mut t, now) = tracker();
+        let req = tool("a", "PermissionRequest", "Bash", "ls");
+        t.on_event(&req, &[], None, now);
+        t.add_prompt(3, &req, now + Duration::from_secs(60));
+        // Un autre outil terminé ne règle pas la demande.
+        assert!(
+            t.on_event(&tool("a", "PostToolUse", "Read", "x"), &[], None, now)
+                .is_empty()
+        );
+        assert!(t.snapshot().prompt.is_some());
+        // Le Bash terminé (accepté dans le terminal) la règle.
+        assert_eq!(
+            t.on_event(&tool("a", "PostToolUse", "Bash", "ls"), &[], None, now),
+            vec![3]
+        );
+        let s = t.snapshot();
+        assert_eq!(s.prompt, None);
+        assert_eq!(s.sessions[0].kind, SessionKind::Working);
+    }
+
+    #[test]
+    fn new_prompt_or_stop_closes_pending_prompts() {
+        let (mut t, now) = tracker();
+        let req = tool("a", "PermissionRequest", "Edit", "x.rs");
+        t.on_event(&req, &[], None, now);
+        t.add_prompt(4, &req, now + Duration::from_secs(60));
+        // Échap puis nouveau message : la demande est caduque.
+        assert_eq!(
+            t.on_event(&ev("a", "UserPromptSubmit"), &[], None, now),
+            vec![4]
+        );
+        assert_eq!(t.snapshot().attention, Attention::Low);
+
+        t.on_event(&req, &[], None, now);
+        t.add_prompt(5, &req, now + Duration::from_secs(60));
+        assert_eq!(t.on_event(&ev("a", "Stop"), &[], None, now), vec![5]);
+        assert_eq!(t.snapshot().sessions[0].kind, SessionKind::Done);
+    }
+
+    #[test]
+    fn questions_are_labelled_as_questions() {
+        let (mut t, now) = tracker();
+        t.on_event(
+            &tool("a", "PermissionRequest", "AskUserQuestion", "?"),
+            &[],
+            None,
+            now,
+        );
+        let s = t.snapshot();
+        assert_eq!(s.prompt, None);
+        assert_eq!(s.summary.as_deref(), Some("a · te pose une question"));
+        // Réponse donnée dans le terminal : l'outil se termine.
+        t.on_event(
+            &tool("a", "PostToolUse", "AskUserQuestion", "?"),
+            &[],
+            None,
+            now,
+        );
+        assert_eq!(t.snapshot().attention, Attention::Low);
     }
 
     #[test]

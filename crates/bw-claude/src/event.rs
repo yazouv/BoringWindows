@@ -55,6 +55,12 @@ impl HookEvent {
     }
 }
 
+/// Outils « demande de permission » qui sont en fait des questions posées à
+/// l'utilisateur : la réponse se fait dans le terminal, pas par Autoriser/Refuser.
+pub fn is_interactive_tool(tool: &str) -> bool {
+    matches!(tool, "AskUserQuestion" | "ExitPlanMode")
+}
+
 pub fn project_name(cwd: &str) -> String {
     cwd.trim_end_matches(['/', '\\'])
         .rsplit(['/', '\\'])

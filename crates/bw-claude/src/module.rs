@@ -186,12 +186,18 @@ async fn state_loop(mut rx: UnboundedReceiver<Cmd>, ctx: ModuleCtx, config: Clau
         let now = Instant::now();
         match cmd {
             Some(Cmd::Event { message, prompt }) => {
-                tracker.on_event(
+                let settled = tracker.on_event(
                     &message.event,
                     &message.ancestors,
                     message.console_window,
                     now,
                 );
+                // Réglées dans le terminal : on libère les relais en attente.
+                for id in settled {
+                    if let Some(reply) = replies.remove(&id) {
+                        let _ = reply.send(Decision::Ask);
+                    }
+                }
                 if let Some((id, reply)) = prompt {
                     tracker.add_prompt(id, &message.event, now + config.permission_wait());
                     replies.insert(id, reply);

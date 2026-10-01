@@ -497,3 +497,13 @@ pub fn attach_parent_console() {
         let _ = AttachConsole(ATTACH_PARENT_PROCESS);
     }
 }
+
+/// Son système « notification », joué en arrière-plan.
+pub fn alert_sound() {
+    use windows::Win32::System::Diagnostics::Debug::MessageBeep;
+    use windows::Win32::UI::WindowsAndMessaging::MB_ICONASTERISK;
+    // SAFETY: appel sans pointeur, asynchrone.
+    unsafe {
+        let _ = MessageBeep(MB_ICONASTERISK);
+    }
+}

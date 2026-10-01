@@ -197,6 +197,20 @@ impl Controller {
             self.flash("Claude Code : hooks non installés · clic droit sur l'icône");
         }
 
+        // Hooks d'une version précédente : on complète l'installation.
+        if hooks_installed
+            && self.installer.needs_upgrade()
+            && let Ok(exe) = std::env::current_exe()
+        {
+            match self.installer.install(&exe) {
+                Ok(report) => {
+                    log::info!("hooks Claude mis à jour (sauvegarde : {:?})", report.backup);
+                    self.flash("Hooks Claude mis à jour · relance tes sessions Claude");
+                }
+                Err(e) => log::warn!("mise à jour des hooks Claude : {e:#}"),
+            }
+        }
+
         // Relais à jour après une recompilation ou une mise à jour de l'app.
         if hooks_installed && let Ok(exe) = std::env::current_exe() {
             match self.installer.refresh_binary(&exe, false) {
@@ -623,6 +637,18 @@ impl Controller {
         self.ui.set_claude_rows(ModelRc::new(VecModel::from(rows)));
 
         let prompt = snapshot.as_ref().and_then(|s| s.prompt.as_ref());
+        // Nouvelle demande : on prévient au son, comme le ferait le terminal.
+        let previous = self
+            .claude
+            .borrow()
+            .as_ref()
+            .and_then(|s| s.prompt.as_ref().map(|p| p.id));
+        if let Some(p) = prompt
+            && previous != Some(p.id)
+            && self.claude_config().sound
+        {
+            platform::alert_sound();
+        }
         self.ui.set_has_prompt(prompt.is_some());
         if let Some(p) = prompt {
             self.ui.set_prompt(ClaudePrompt {
@@ -633,6 +659,11 @@ impl Controller {
             });
         }
         *self.claude.borrow_mut() = snapshot;
+    }
+
+    fn claude_config(&self) -> ClaudeConfig {
+        ClaudeConfig::from_table(self.config.borrow().modules.get(bw_claude::MODULE_ID))
+            .unwrap_or_default()
     }
 
     fn on_claude_decide(&self, id: &str, decision: &str) {

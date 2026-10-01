@@ -11,6 +11,8 @@ pub struct ClaudeConfig {
     pub permissions: bool,
     pub permission_wait_secs: u32,
     pub done_secs: u32,
+    /// Son système quand une demande de permission attend dans l'île.
+    pub sound: bool,
 }
 
 impl Default for ClaudeConfig {
@@ -20,6 +22,7 @@ impl Default for ClaudeConfig {
             permissions: true,
             permission_wait_secs: 60,
             done_secs: 8,
+            sound: true,
         }
     }
 }

@@ -11,17 +11,18 @@ use anyhow::Context as _;
 use serde_json::{Map, Value, json};
 
 /// Événements écoutés.
-pub const HOOK_EVENTS: [&str; 7] = [
+pub const HOOK_EVENTS: [&str; 8] = [
     "SessionStart",
     "SessionEnd",
     "UserPromptSubmit",
     "PreToolUse",
+    "PostToolUse",
     "PermissionRequest",
     "Notification",
     "Stop",
 ];
 /// Événements filtrés par outil : `matcher` à `*`.
-const TOOL_EVENTS: [&str; 2] = ["PreToolUse", "PermissionRequest"];
+const TOOL_EVENTS: [&str; 3] = ["PreToolUse", "PostToolUse", "PermissionRequest"];
 /// Marqueur de nos entrées.
 const MARKER: &str = "bw-hook";
 /// Timeouts (s) posés dans settings.json. Le relais se limite à 300 ms pour
@@ -68,6 +69,18 @@ fn is_ours(hook: &Value) -> bool {
     hook.get("command")
         .and_then(Value::as_str)
         .is_some_and(|c| c.contains(MARKER))
+}
+
+/// Nos hooks sont présents pour chacun des événements attendus (sinon, une
+/// version précédente de l'app les a installés : à mettre à jour).
+pub fn is_complete(settings: &Value) -> bool {
+    HOOK_EVENTS.iter().all(|event| {
+        entries(&settings["hooks"][*event]).any(|g| {
+            g.get("hooks")
+                .and_then(Value::as_array)
+                .is_some_and(|hs| hs.iter().any(is_ours))
+        })
+    })
 }
 
 pub fn is_installed(settings: &Value) -> bool {
@@ -174,6 +187,12 @@ pub struct Report {
 impl Installer {
     pub fn is_installed(&self) -> bool {
         self.read().is_ok_and(|s| is_installed(&s))
+    }
+
+    /// Installés par une version précédente, avec moins d'événements.
+    pub fn needs_upgrade(&self) -> bool {
+        self.read()
+            .is_ok_and(|s| is_installed(&s) && !is_complete(&s))
     }
 
     /// Copie `source` (l'exécutable courant) comme relais et déclare les hooks.
@@ -291,9 +310,10 @@ mod tests {
             "notify-send done"
         );
         assert_eq!(
-            s["hooks"]["PostToolUse"],
-            user_settings()["hooks"]["PostToolUse"]
+            s["hooks"]["PostToolUse"][0],
+            user_settings()["hooks"]["PostToolUse"][0]
         );
+        assert!(is_complete(&s));
         let keys: Vec<_> = s.as_object().unwrap().keys().collect();
         assert_eq!(keys, ["model", "hooks", "permissions"]);
     }
@@ -304,6 +324,13 @@ mod tests {
         let twice = with_hooks(once.clone(), CMD).unwrap();
         assert_eq!(once, twice);
         assert_eq!(without_hooks(twice), user_settings());
+    }
+
+    #[test]
+    fn older_install_is_detected_as_incomplete() {
+        let mut s = with_hooks(json!({}), CMD).unwrap();
+        s["hooks"].as_object_mut().unwrap().remove("PostToolUse");
+        assert!(is_installed(&s) && !is_complete(&s));
     }
 
     #[test]
