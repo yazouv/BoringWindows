@@ -124,6 +124,13 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 | `sound` | `true` | | son à la fin |
 | `done_secs` | `20` | 1 à 600 | durée de l'alerte « terminé » (s) |
 
+## `[modules.shelf]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `true` | | garder les fichiers déposés sur l'[étagère](etagere.md) |
+| `max` | `8` | 1 à 30 | nombre de fichiers gardés |
+
 ## `[modules.demo]`
 
 | Option | Défaut | Rôle |

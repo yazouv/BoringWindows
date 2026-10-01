@@ -481,10 +481,12 @@ dependencies = [
  "env_logger",
  "log",
  "raw-window-handle",
+ "serde",
  "slint",
  "slint-build",
  "slint-interpreter",
  "tokio",
+ "toml",
  "tray-icon",
  "windows",
 ]

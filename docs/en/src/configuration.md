@@ -123,6 +123,13 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 | `sound` | `true` | | sound when it ends |
 | `done_secs` | `20` | 1 to 600 | how long the "done" alert stays (s) |
 
+## `[modules.shelf]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `true` | | keep files dropped on the [shelf](etagere.md) |
+| `max` | `8` | 1 to 30 | number of files kept |
+
 ## `[modules.demo]`
 
 | Option | Default | Role |

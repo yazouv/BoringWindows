@@ -345,7 +345,8 @@ de texte aux écrans de l'assistant), puis la fenêtre de réglages.
 ### Phase 5 — Extensions
 - [ ] Spotify Web API (like, queue, Connect)
 - [x] Minuteur (module `bw-timer`, durées prédéfinies, doc FR + EN)
-- [ ] Shelf de fichiers, volume/luminosité
+- [x] Étagère de fichiers (glisser-déposer sur l'île, `[modules.shelf]`, doc FR + EN)
+- [ ] Volume/luminosité
 - [ ] Plugins WASM
 
 ### Port macOS (en parallèle, sans bloquer Windows)

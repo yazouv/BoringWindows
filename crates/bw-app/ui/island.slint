@@ -30,6 +30,11 @@ export struct AgendaRow {
     soon: bool,
 }
 
+export struct ShelfRow {
+    name: string,
+    path: string,
+}
+
 export struct TimerInfo {
     /// 0 prêt, 1 en cours, 2 en pause, 3 terminé.
     phase: int,
@@ -160,6 +165,10 @@ export component Island inherits Window {
     in property <bool> has-media;
     in property <MediaInfo> media;
     in property <[AgendaRow]> agenda-rows;
+    in property <[ShelfRow]> shelf-rows;
+    in property <string> shelf-more;
+    callback shelf-open(int);
+    callback shelf-remove(int);
     in property <bool> custom-view;
     in property <component-factory> custom-view-factory;
     in property <bool> has-timer;
@@ -546,6 +555,69 @@ export component Island inherits Window {
                         fill: root.accent;
                         ink: root.bg;
                         clicked => { root.timer-action("reset"); }
+                    }
+                }
+
+                // Étagère : fichiers déposés sur l'île, un clic les ouvre.
+                if !root.has-prompt && root.shelf-rows.length > 0: HorizontalLayout {
+                    height: 28px;
+                    spacing: 6px;
+                    padding-left: 6px;
+
+                    Text {
+                        text: @tr("Shelf");
+                        color: root.fg.with-alpha(0.7);
+                        font-size: 12px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                        min-width: 64px;
+                    }
+
+                    for item[i] in root.shelf-rows: Rectangle {
+                        horizontal-stretch: 1;
+                        height: 24px;
+                        border-radius: 12px;
+                        background: chip-ta.has-hover ? root.fg.with-alpha(0.2) : root.fg.with-alpha(0.12);
+
+                        chip-ta := TouchArea {
+                            clicked => { root.shelf-open(i); }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 2px;
+                            spacing: 2px;
+
+                            Text {
+                                text: item.name;
+                                color: root.fg;
+                                font-size: 12px;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+
+                            Rectangle {
+                                width: 20px;
+                                Text {
+                                    text: "×";
+                                    color: root.fg.with-alpha(0.7);
+                                    font-size: 14px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                                TouchArea {
+                                    clicked => { root.shelf-remove(i); }
+                                }
+                            }
+                        }
+                    }
+
+                    if root.shelf-more != "": Text {
+                        text: root.shelf-more;
+                        color: root.fg.with-alpha(0.6);
+                        font-size: 12px;
+                        vertical-alignment: center;
                     }
                 }
 

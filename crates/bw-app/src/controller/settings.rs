@@ -153,6 +153,10 @@ impl Controller {
         fill_appearance(ui, &config.theme);
         fill_layout(ui, &config.layout.compact);
         ui.set_view_name(config.layout.view.as_str().into());
+        let shelf = crate::shelf::ShelfConfig::from_table(config.modules.get("shelf"))
+            .unwrap_or_default();
+        ui.set_shelf_enabled(shelf.enabled);
+        ui.set_shelf_max(shelf.max as i32);
 
         let cal = CalendarConfig::from_table(config.modules.get(bw_calendar::MODULE_ID))
             .unwrap_or_default();
@@ -454,6 +458,11 @@ impl Controller {
             }
             platform::open_path(&dir);
         }));
+        ui.on_shelf_clear(with(|c, _| {
+            c.shelf.borrow_mut().clear();
+            c.shelf.borrow().save(&c.shelf_file);
+            c.update_shelf_ui();
+        }));
         ui.on_open_layouts_folder(with(|c, _| {
             let dir = bw_config::layouts_dir(c.path.parent().unwrap_or(std::path::Path::new(".")));
             if let Err(e) = std::fs::create_dir_all(&dir) {
@@ -655,6 +664,14 @@ impl Controller {
             "modules.media.accent_from_artwork" => Some((
                 vec!["modules", "media", "accent_from_artwork"],
                 Value::Bool(ui.get_media_accent()),
+            )),
+            "modules.shelf.enabled" => Some((
+                vec!["modules", "shelf", "enabled"],
+                Value::Bool(ui.get_shelf_enabled()),
+            )),
+            "modules.shelf.max" => Some((
+                vec!["modules", "shelf", "max"],
+                Value::Int(ui.get_shelf_max().into()),
             )),
             "layout.view" => Some((
                 vec!["layout", "view"],

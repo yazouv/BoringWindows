@@ -275,3 +275,18 @@ msgstr "Dossier des vues"
 
 msgid "Name of a file in the layouts folder, without .slint. Leave empty for the built-in view; see the documentation for the data you can use."
 msgstr "Nom d'un fichier du dossier des vues, sans .slint. Laisse vide pour la vue fournie ; la documentation liste les données utilisables."
+
+msgid "Shelf"
+msgstr "Étagère"
+
+msgid "Keep files dropped on the island"
+msgstr "Garder les fichiers déposés sur l'île"
+
+msgid "Files kept (max)"
+msgstr "Fichiers gardés (max)"
+
+msgid "Empty the shelf"
+msgstr "Vider l'étagère"
+
+msgid "Drag files onto the island to keep them at hand; click one to open it, × to remove it. Only the path is kept, never a copy."
+msgstr "Glisse des fichiers sur l'île pour les garder sous la main ; un clic les ouvre, × les retire. Seul le chemin est gardé, jamais une copie."

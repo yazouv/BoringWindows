@@ -26,7 +26,8 @@ use slint::{
 
 use crate::geometry::{self, Shape};
 use crate::platform::{self, Platform, PlatformEvent, Tray, TrayCommand};
-use crate::{AgendaRow, ClaudePrompt, ClaudeRow, Island, MediaInfo, TimerInfo, clock, demo};
+use crate::shelf::{Shelf, ShelfConfig};
+use crate::{AgendaRow, ClaudePrompt, ClaudeRow, Island, MediaInfo, ShelfRow, TimerInfo, clock, demo};
 
 /// Pseudo-module utilisé pour signaler une config invalide dans l'île.
 const CONFIG_ERROR: &str = "config";
@@ -60,6 +61,7 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         Err(e) => (Config::default(), Some(e)),
     };
     bw_i18n::set(language(config.general.language));
+    let shelf_file = path.with_file_name("shelf.txt");
 
     let controller = Rc::new(Controller {
         // Seule l'île reçoit les attributs de fenêtre spéciaux (pas de focus,
@@ -94,6 +96,8 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         remind_timer: Timer::default(),
         timer: RefCell::new(None),
         custom_view: RefCell::new(None),
+        shelf: RefCell::new(Shelf::load(&shelf_file)),
+        shelf_file,
         timer_tick: Timer::default(),
         media_seen: RefCell::new(BTreeSet::new()),
     });
@@ -137,6 +141,8 @@ pub struct Controller {
     /// Dernier état du minuteur (absent si le module est désactivé).
     timer: RefCell<Option<Arc<TimerSnapshot>>>,
     custom_view: RefCell<Option<custom_view::CustomView>>,
+    shelf: RefCell<Shelf>,
+    shelf_file: PathBuf,
     timer_tick: Timer,
     /// Lecteurs vus depuis le lancement (jetons `ignore`), pour les réglages.
     media_seen: RefCell<BTreeSet<String>>,
@@ -152,6 +158,7 @@ impl Controller {
         select_ui_language();
         self.apply_theme();
         self.reload_custom_view();
+        self.update_shelf_ui();
         let (choice, size) = self.placement();
         if let Some(pos) = platform::initial_position(choice, size) {
             self.ui.window().set_position(pos);
@@ -200,6 +207,32 @@ impl Controller {
             }));
         self.ui
             .on_media_seek(with(&weak, |c, fraction: f32| c.media_seek(fraction)));
+        self.ui
+            .on_shelf_open(with(&weak, |c, i: i32| c.shelf_open(i as usize)));
+        self.ui
+            .on_shelf_remove(with(&weak, |c, i: i32| c.shelf_remove(i as usize)));
+        self.ui.window().on_winit_window_event(|_, event| {
+            use slint::winit_030::winit::event::WindowEvent;
+            match event {
+                WindowEvent::DroppedFile(path) => {
+                    log::info!("étagère : fichier déposé {}", path.display());
+                    let path = path.clone();
+                    post(move |c| c.shelf_dropped(vec![path]));
+                }
+                WindowEvent::HoveredFile(path) => {
+                    log::info!("étagère : survol de {}", path.display());
+                    post(|c| {
+                        if c.shelf_config().enabled {
+                            c.collapse_timer.stop();
+                            c.set_expanded(true);
+                        }
+                    });
+                }
+                WindowEvent::HoveredFileCancelled => post(|c| c.on_hover(false)),
+                _ => {}
+            }
+            slint::winit_030::EventResult::Propagate
+        });
         self.ui
             .on_timer_action(with(&weak, |c, action: slint::SharedString| {
                 c.timer_action(action.to_string());
@@ -476,6 +509,7 @@ impl Controller {
         if view_changed {
             self.reload_custom_view();
         }
+        self.update_shelf_ui();
         if moved {
             self.place();
         }
@@ -586,6 +620,87 @@ impl Controller {
         }
     }
 
+    // --- Étagère ------------------------------------------------------------
+
+    fn shelf_config(&self) -> ShelfConfig {
+        ShelfConfig::from_table(self.config.borrow().modules.get("shelf")).unwrap_or_default()
+    }
+
+    /// Fichiers déposés sur l'île : on les garde et on montre l'étagère.
+    fn shelf_dropped(self: &Rc<Self>, paths: Vec<PathBuf>) {
+        let config = self.shelf_config();
+        if !config.enabled {
+            return;
+        }
+        {
+            let mut shelf = self.shelf.borrow_mut();
+            shelf.add(paths, config.max);
+            shelf.save(&self.shelf_file);
+        }
+        self.update_shelf_ui();
+        self.collapse_timer.stop();
+        self.set_expanded(true);
+        self.on_hover(false);
+    }
+
+    fn update_shelf_ui(&self) {
+        const SHOWN: usize = 4;
+        let config = self.shelf_config();
+        let items: Vec<PathBuf> = if config.enabled {
+            let mut shelf = self.shelf.borrow_mut();
+            shelf.truncate(config.max);
+            if shelf.prune() {
+                shelf.save(&self.shelf_file);
+            }
+            shelf.items().to_vec()
+        } else {
+            Vec::new()
+        };
+        let rows: Vec<ShelfRow> = items
+            .iter()
+            .take(SHOWN)
+            .map(|p| ShelfRow {
+                name: crate::shelf::display_name(p).into(),
+                path: p.display().to_string().into(),
+            })
+            .collect();
+        self.ui.set_shelf_rows(ModelRc::new(VecModel::from(rows)));
+        self.ui.set_shelf_more(
+            if items.len() > SHOWN {
+                format!("+{}", items.len() - SHOWN)
+            } else {
+                String::new()
+            }
+            .into(),
+        );
+        self.layout_rows();
+    }
+
+    fn shelf_open(&self, index: usize) {
+        let path = self.shelf.borrow().items().get(index).cloned();
+        if let Some(path) = path {
+            if path.exists() {
+                platform::open_path(&path);
+            } else {
+                self.update_shelf_ui();
+            }
+        }
+    }
+
+    fn shelf_remove(&self, index: usize) {
+        let removed = {
+            let mut shelf = self.shelf.borrow_mut();
+            let removed = shelf.remove(index).is_some();
+            if removed {
+                shelf.save(&self.shelf_file);
+            }
+            removed
+        };
+        if removed {
+            self.update_shelf_ui();
+        }
+    }
+
     // --- Minuteur -----------------------------------------------------------
 
     fn apply_timer(&self, snapshot: TimerSnapshot) {
@@ -664,12 +779,11 @@ impl Controller {
         } else {
             MAX_ROWS
         };
-        // La ligne du minuteur prend une place, sans jamais vider le reste.
-        let budget = if self.ui.get_has_timer() && budget > 1 {
-            budget - 1
-        } else {
-            budget
-        };
+        // Les lignes du minuteur et de l'étagère prennent une place chacune,
+        // sans jamais vider le reste.
+        let extra = usize::from(self.ui.get_has_timer())
+            + usize::from(slint::Model::row_count(&self.ui.get_shelf_rows()) > 0);
+        let budget = budget.saturating_sub(extra).max(1);
 
         let mut agenda: Vec<AgendaRow> = Vec::new();
         if let Some(cal) = self.calendar.borrow().as_ref() {

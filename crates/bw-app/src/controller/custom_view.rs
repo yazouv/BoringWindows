@@ -242,6 +242,17 @@ impl Controller {
             ),
         );
 
+        set(
+            "shelf-rows",
+            model(
+                ui.get_shelf_rows()
+                    .iter()
+                    .map(|r| row([("name", s(&r.name)), ("path", s(&r.path))]))
+                    .collect(),
+            ),
+        );
+        set("shelf-more", s(ui.get_shelf_more()));
+
         let timer = ui.get_timer();
         set("has-timer", Value::Bool(ui.get_has_timer()));
         set("timer-phase", Value::Number(f64::from(timer.phase)));
@@ -291,6 +302,22 @@ fn wire_callbacks(inst: &ComponentInstance, declared: &HashSet<String>, ui: &sli
     wire(
         "open-url",
         Box::new(|ui, a| ui.invoke_open_url(text_arg(a, 0))),
+    );
+    wire(
+        "shelf-open",
+        Box::new(|ui, a| {
+            if let Some(Value::Number(n)) = a.first() {
+                ui.invoke_shelf_open(*n as i32);
+            }
+        }),
+    );
+    wire(
+        "shelf-remove",
+        Box::new(|ui, a| {
+            if let Some(Value::Number(n)) = a.first() {
+                ui.invoke_shelf_remove(*n as i32);
+            }
+        }),
     );
     wire(
         "timer-action",

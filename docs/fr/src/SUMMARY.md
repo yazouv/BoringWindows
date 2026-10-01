@@ -12,6 +12,7 @@
 - [Claude Code](claude-code.md)
 - [Musique](musique.md)
 - [Minuteur](minuteur.md)
+- [Étagère](etagere.md)
 - [Agenda](agenda/index.md)
   - [Google Agenda](agenda/google.md)
   - [Outlook et Microsoft 365](agenda/outlook.md)

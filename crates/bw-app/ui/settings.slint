@@ -106,6 +106,9 @@ export component SettingsWindow inherits Window {
     // --- Musique ---
     in-out property <bool> media-accent;
     in-out property <string> media-ignore;
+    in-out property <bool> shelf-enabled;
+    in-out property <int> shelf-max;
+    callback shelf-clear();
     in-out property <bool> timer-enabled;
     in-out property <bool> timer-sound;
     in-out property <string> timer-presets;
@@ -617,6 +620,41 @@ export component SettingsWindow inherits Window {
 
                     Hint {
                         text: @tr("Separate names with commas; part of the name is enough. Spotify, Apple Music, browsers, VLC… are detected automatically.");
+                    }
+                }
+            }
+
+            Tab {
+                title: @tr("Shelf");
+                VerticalBox {
+                    alignment: start;
+
+                    CheckBox {
+                        text: @tr("Keep files dropped on the island");
+                        checked <=> root.shelf-enabled;
+                        toggled => { root.changed("modules.shelf.enabled"); }
+                    }
+
+                    Row {
+                        label: @tr("Files kept (max)");
+                        SpinBox {
+                            minimum: 1;
+                            maximum: 30;
+                            value <=> root.shelf-max;
+                            edited => { root.changed("modules.shelf.max"); }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        alignment: start;
+                        Button {
+                            text: @tr("Empty the shelf");
+                            clicked => { root.shelf-clear(); }
+                        }
+                    }
+
+                    Hint {
+                        text: @tr("Drag files onto the island to keep them at hand; click one to open it, × to remove it. Only the path is kept, never a copy.");
                     }
                 }
             }
