@@ -64,6 +64,7 @@ export component SettingsWindow inherits Window {
     in-out property <int> monitor-index;
     in-out property <bool> hide-fullscreen;
     in-out property <bool> autostart;
+    in-out property <bool> volume-enabled;
     // --- Apparence ---
     in property <[string]> themes;
     in-out property <int> theme-index;
@@ -183,6 +184,12 @@ export component SettingsWindow inherits Window {
                         text: @tr("Start BoringWindows with Windows");
                         checked <=> root.autostart;
                         toggled => { root.changed("autostart"); }
+                    }
+
+                    CheckBox {
+                        text: @tr("Show volume changes in the island");
+                        checked <=> root.volume-enabled;
+                        toggled => { root.changed("modules.volume.enabled"); }
                     }
 
                     CheckBox {

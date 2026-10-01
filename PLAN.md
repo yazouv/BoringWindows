@@ -346,7 +346,8 @@ de texte aux écrans de l'assistant), puis la fenêtre de réglages.
 - [ ] Spotify Web API (like, queue, Connect)
 - [x] Minuteur (module `bw-timer`, durées prédéfinies, doc FR + EN)
 - [x] Étagère de fichiers (glisser-déposer sur l'île, `[modules.shelf]`, doc FR + EN)
-- [ ] Volume/luminosité
+- [x] Volume (module `bw-volume`, callback WASAPI sans polling, doc FR + EN)
+- [ ] Luminosité (WMI, écrans intégrés seulement : non testable sur un PC fixe)
 - [ ] Plugins WASM
 
 ### Port macOS (en parallèle, sans bloquer Windows)

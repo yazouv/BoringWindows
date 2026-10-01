@@ -290,3 +290,6 @@ msgstr "Vider l'étagère"
 
 msgid "Drag files onto the island to keep them at hand; click one to open it, × to remove it. Only the path is kept, never a copy."
 msgstr "Glisse des fichiers sur l'île pour les garder sous la main ; un clic les ouvre, × les retire. Seul le chemin est gardé, jamais une copie."
+
+msgid "Show volume changes in the island"
+msgstr "Afficher les changements de volume dans l'île"

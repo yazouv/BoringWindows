@@ -1208,6 +1208,13 @@ fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
             Err(e) => errors.push(format!("modules.timer : {e:#}")),
         }
     }
+    if bw_volume::VolumeModule::is_supported() && config.module_enabled(bw_volume::MODULE_ID, false)
+    {
+        match bw_volume::VolumeConfig::from_table(config.modules.get(bw_volume::MODULE_ID)) {
+            Ok(c) => modules.push(Box::new(bw_volume::VolumeModule::new(c))),
+            Err(e) => errors.push(format!("modules.volume : {e:#}")),
+        }
+    }
     if config.module_enabled("demo", false) {
         modules.push(Box::new(demo::Demo::default()));
     }

@@ -130,6 +130,13 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 | `enabled` | `true` | | keep files dropped on the [shelf](etagere.md) |
 | `max` | `8` | 1 to 30 | number of files kept |
 
+## `[modules.volume]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `false` | | show [volume](volume.md) changes in the island (Windows) |
+| `show_secs` | `2` | 1 to 10 | how long it shows (s) |
+
 ## `[modules.demo]`
 
 | Option | Default | Role |

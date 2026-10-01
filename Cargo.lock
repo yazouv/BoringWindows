@@ -477,6 +477,7 @@ dependencies = [
  "bw-secrets",
  "bw-timer",
  "bw-update",
+ "bw-volume",
  "chrono",
  "env_logger",
  "log",
@@ -612,6 +613,21 @@ dependencies = [
  "serde_json",
  "sha2",
  "tempfile",
+]
+
+[[package]]
+name = "bw-volume"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bw-core",
+ "bw-i18n",
+ "log",
+ "serde",
+ "tokio",
+ "toml",
+ "windows",
+ "windows-core",
 ]
 
 [[package]]

@@ -131,6 +131,13 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 | `enabled` | `true` | | garder les fichiers déposés sur l'[étagère](etagere.md) |
 | `max` | `8` | 1 à 30 | nombre de fichiers gardés |
 
+## `[modules.volume]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `false` | | afficher les changements de [volume](volume.md) dans l'île (Windows) |
+| `show_secs` | `2` | 1 à 10 | durée d'affichage (s) |
+
 ## `[modules.demo]`
 
 | Option | Défaut | Rôle |
