@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/yazouv/BoringWindows/compare/v0.2.1...v0.3.0) (2026-10-02)
+
+
+### Nouveautés
+
+* binaire macOS Intel et config.toml par défaut dans la langue du système ([c4e712b](https://github.com/yazouv/BoringWindows/commit/c4e712beeebc0ef7e75fdd49f7abc60e37297934))
+
 ## [0.2.1](https://github.com/yazouv/BoringWindows/compare/v0.2.0...v0.2.1) (2026-10-02)
 
 
