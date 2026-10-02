@@ -33,7 +33,7 @@ On Linux, building needs `libfontconfig1-dev libxkbcommon-dev`.
 
 ## CI/CD and versioning
 
-- **`ci.yml`**: runs only on PRs to `main`, on a single Linux runner (fmt, clippy for 3 targets, tests). Keep it on one Linux runner: Windows and macOS runners are slow, and they burned the Actions minutes quota while the repo was private (×2 and ×10).
+- **`ci.yml`**: runs only on PRs to `main`, on a single Linux runner (fmt, clippy for 3 targets, tests). It skips release-please PRs (`release-please--*` branches): they only touch the version, changelog and lockfile. Keep it on one Linux runner: Windows and macOS runners are slow, and they burned the Actions minutes quota while the repo was private (×2 and ×10).
 - **`release.yml`**: release-please runs on every push to `main`. It keeps a "chore: release x.y.z" PR open. Merging that PR tags `vX.Y.Z`, builds the Windows, macOS and Linux binaries, and attaches them with `.sha256` files. The updater depends on the asset names in that workflow and in `bw_update::asset_name()`; keep them in sync. The `installer` job builds `installer/boringwindows.iss` (Inno Setup). The `winget` job updates the `Yazouv.BoringWindows` package; it is skipped when the `WINGET_TOKEN` secret is absent.
 - **Commit messages must follow Conventional Commits** (`feat:`, `fix:`, `docs:`, `chore:`…). release-please derives the version and changelog from them.
 - Never bump versions by hand. release-please owns `[workspace.package] version` in `Cargo.toml`, plus `version.txt`, `CHANGELOG.md` and the manifest.
@@ -94,7 +94,7 @@ The Cargo workspace (edition 2024) has one crate per concern. `bw-app` is the on
 - In `.slint` files, text is `@tr("English text")`. The French translation goes in `crates/bw-app/lang/fr/LC_MESSAGES/bw-app.po`, which is bundled into the binary with no per-component context.
 - A test (`src/translations.rs`) fails if an `@tr` string has no French entry. Add the `.po` entry whenever you add or change a UI string.
 - Changing the language at runtime calls `slint::select_bundled_translation` (`""` means English) and re-renders the Rust-side texts (tray menu, modules, settings window).
-- Tests that assert French strings call `bw_i18n::set(Lang::Fr)` first.
+- Tests that assert French strings call `bw_i18n::set(Lang::Fr)` first. The language is global to the process; `lang()` initializes it with `compare_exchange` so a concurrent `set` is never overwritten.
 
 ## Docs
 
