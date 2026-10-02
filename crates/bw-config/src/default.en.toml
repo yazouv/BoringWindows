@@ -1,0 +1,94 @@
+# BoringWindows configuration.
+# Save this file: the island updates instantly.
+
+[general]
+# Interface language: "auto" (the one of Windows), "fr" or "en".
+language = "auto"
+# Island screen: "primary" (main screen) or "cursor" (screen under the mouse at startup).
+monitor = "primary"
+# Hide the island when an app is full screen (game, video, presentation).
+hide_in_fullscreen = true
+# Opening the island: "hover" or "click".
+open_on = "hover"
+# Delay before closing the island when the mouse leaves (ms).
+collapse_delay_ms = 350
+# Install new versions automatically (GitHub releases).
+auto_update = true
+
+[theme]
+# Theme: "default" (black), "light", "midnight" (midnight blue), "glass"
+# (smoked glass), or the name of a themes/<name>.toml file next to this file.
+name = "default"
+# The following keys override the theme's: uncomment to customize.
+# Colors as "#RRGGBB" or "#RRGGBBAA".
+# background = "#000000"
+# foreground = "#FFFFFF"
+# accent = "#FF8A3D"
+# border = "#00000000"        # island border (transparent: none)
+# font = "Segoe UI"           # font (default: the system font)
+# corner_radius = 22.0        # corners of the open island (the pill stays round)
+# Animation duration (ms). 0 = no animation.
+animation_ms = 240
+# Offset from the top of the screen (px).
+top_offset = 0.0
+
+[theme.compact]
+width = 190.0
+height = 32.0
+
+[theme.attention]
+# Pill size when a module asks for attention.
+width = 300.0
+height = 36.0
+
+[theme.expanded]
+width = 520.0
+height = 170.0
+
+[layout]
+# Priority order of modules when several ask for attention at the same time.
+compact = ["claude", "media", "calendar"]
+
+# Each module is configured in its [modules.<name>] section.
+# A module with enabled = false is not even started.
+
+[modules.claude]
+# Claude Code status. Install the hooks: right-click the notification area icon.
+enabled = true
+# Answer permission requests from the island.
+permissions = true
+# Time left to answer in the island before handing back to the terminal (s, max 280).
+permission_wait_secs = 60
+# How long "done" stays (s).
+done_secs = 8
+# System sound when Claude starts waiting for you (question, plan, permission).
+sound = true
+
+[modules.media]
+# Music now playing (Spotify, Apple Music, browsers, VLC…) through Windows media controls.
+enabled = true
+# Tint the island with the album art color.
+accent_from_artwork = true
+# Sources to ignore (part of a name, e.g. ["chrome", "msedge"]).
+ignore = []
+
+[modules.calendar]
+# Upcoming meetings, reminder before they start and "Join" button (Teams, Meet, Zoom…).
+enabled = true
+# Remind how many minutes before the start.
+remind_minutes = 5
+# Refresh interval (minutes).
+refresh_minutes = 10
+show_all_day = true
+# Add one block per calendar, with its private ICS link:
+#  - Google: Settings › (your calendar) › "Secret address in iCal format"
+#  - Outlook / Microsoft 365: Settings › Calendar › Shared calendars › Publish › ICS link
+#  - iCloud: Share calendar › Public Calendar › copy the link (webcal://)
+# [[modules.calendar.sources]]
+# name = "Work"
+# url = "https://outlook.office365.com/owa/calendar/…/calendar.ics"
+
+[modules.demo]
+# Demo module: changes attention every few seconds to try out the
+# animations. Turn it off once the real modules are set up.
+enabled = false

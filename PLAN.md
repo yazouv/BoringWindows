@@ -313,7 +313,7 @@ de vérité (versionnable, partageable), mais une interface l'édite pour nous.
 - [x] Slint : textes source en anglais `@tr(...)`, français dans `crates/bw-app/lang/fr/LC_MESSAGES/bw-app.po`
       (embarqué), test qui refuse un texte sans traduction
 - [x] Rust : crate `bw-i18n`, macro `tr!("anglais", "français")` (agenda, Claude, diagnostic, menu, erreurs de config)
-- [ ] Commentaires du `config.toml` par défaut (restent en français)
+- [x] `config.toml` par défaut commenté dans la langue du système (`default.toml` / `default.en.toml`, mêmes réglages vérifiés par un test)
 - [ ] Journal du relais et logs (volontairement en français : destinés au débogage)
 
 Prévu à l'origine :
@@ -373,7 +373,8 @@ Note : sur Mac, boring.notch existe déjà ; l'intérêt est surtout d'avoir la 
 - [x] Mise à jour automatique (GitHub Releases, empreinte vérifiée, jeton facultatif pour un dépôt privé)
 - [x] Installeur Inno Setup (job `installer` de la release, par utilisateur) + manifestes **winget** (première soumission à la main, puis `wingetcreate` avec `WINGET_TOKEN`) : voir `packaging/README.md`
 - [ ] Signature de code (ex. SignPath, gratuit pour l'open source) pour éviter SmartScreen
-- [ ] macOS : bundle `.app` signé + binaire Intel / universel
+- [x] macOS : binaire Intel (`boringwindows-macos-x64.tar.gz`, compilé depuis le runner Apple Silicon), mise à jour automatique comprise
+- [ ] macOS : bundle `.app` signé + notarisé
 - [ ] (opt.) MSIX pour débloquer les API à identité de package (notifications)
 
 ---
