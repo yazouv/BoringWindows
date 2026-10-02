@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.1](https://github.com/yazouv/BoringWindows/compare/v0.2.0...v0.2.1) (2026-10-02)
+
+
+### Corrections
+
+* **i18n:** langue initialisée sans écraser un choix concurrent ; CI sautée sur les PR de release ([9f29781](https://github.com/yazouv/BoringWindows/commit/9f29781f8ed42ffc53d847b19d4e6bca7726a1e7))
+* **security:** canal des hooks authentifié et secrets hors de la ligne de commande curl ([ff35c0a](https://github.com/yazouv/BoringWindows/commit/ff35c0abc98c9ec54509fae5f7a57f463631f202))
+
+
+### Documentation
+
+* CLAUDE.md (commandes, CI/CD, architecture) ([9ace3fd](https://github.com/yazouv/BoringWindows/commit/9ace3fd37352840613d5ecf59d309dcc2be5498b))
+
 ## [0.2.0](https://github.com/yazouv/BoringWindows/compare/v0.1.0...v0.2.0) (2026-10-01)
 
 
