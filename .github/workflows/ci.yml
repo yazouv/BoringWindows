@@ -47,10 +47,15 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          if pkg-config --exists fontconfig xkbcommon 2>/dev/null; then exit 0; fi
-          # `-n` : jamais d'invite de mot de passe (le job échouerait au lieu d'attendre).
+          if command -v cc >/dev/null && pkg-config --exists fontconfig xkbcommon 2>/dev/null; then exit 0; fi
+          packages="build-essential pkg-config libfontconfig1-dev libxkbcommon-dev curl ca-certificates git"
+          # `-n` : jamais d'invite de mot de passe (le job échoue au lieu d'attendre).
+          if ! sudo -n true 2>/dev/null; then
+            echo "::error title=Runner incomplet::Il manque des paquets sur le runner et sudo demande un mot de passe. Installe-les une fois, en root sur la machine du runner : apt-get update && apt-get install -y $packages"
+            exit 1
+          fi
           sudo -n apt-get update
-          sudo -n apt-get install -y --no-install-recommends pkg-config libfontconfig1-dev libxkbcommon-dev
+          sudo -n apt-get install -y --no-install-recommends $packages
 
       - uses: dtolnay/rust-toolchain@stable
         with:
