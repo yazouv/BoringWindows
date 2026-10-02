@@ -465,7 +465,7 @@ checksum = "72f5acc6cb2ba439de613abc23857ec3d78374d8ed5ac84e9d11336e87da8649"
 
 [[package]]
 name = "bw-app"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "bw-calendar",
@@ -496,7 +496,7 @@ dependencies = [
 
 [[package]]
 name = "bw-calendar"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "bw-core",
@@ -515,7 +515,7 @@ dependencies = [
 
 [[package]]
 name = "bw-claude"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "bw-core",
@@ -534,7 +534,7 @@ dependencies = [
 
 [[package]]
 name = "bw-config"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "bw-i18n",
  "dirs 7.0.0",
@@ -549,7 +549,7 @@ dependencies = [
 
 [[package]]
 name = "bw-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "log",
@@ -558,14 +558,14 @@ dependencies = [
 
 [[package]]
 name = "bw-i18n"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "sys-locale",
 ]
 
 [[package]]
 name = "bw-media"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "bw-core",
@@ -580,7 +580,7 @@ dependencies = [
 
 [[package]]
 name = "bw-net"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "windows",
@@ -588,7 +588,7 @@ dependencies = [
 
 [[package]]
 name = "bw-plugins"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "bw-core",
@@ -603,7 +603,7 @@ dependencies = [
 
 [[package]]
 name = "bw-secrets"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "keyring",
@@ -611,7 +611,7 @@ dependencies = [
 
 [[package]]
 name = "bw-timer"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "bw-core",
@@ -623,7 +623,7 @@ dependencies = [
 
 [[package]]
 name = "bw-update"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "bw-i18n",
@@ -636,7 +636,7 @@ dependencies = [
 
 [[package]]
 name = "bw-viz"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "bw-core",
@@ -650,7 +650,7 @@ dependencies = [
 
 [[package]]
 name = "bw-volume"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "bw-core",
