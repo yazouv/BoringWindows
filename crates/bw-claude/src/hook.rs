@@ -209,14 +209,98 @@ fn connect(endpoint: &str, deadline: Instant) -> std::io::Result<std::fs::File> 
             Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY) && Instant::now() < deadline => {
                 std::thread::sleep(Duration::from_millis(10));
             }
-            other => return other,
+            Ok(pipe) => {
+                server_identity::check(&pipe)?;
+                return Ok(pipe);
+            }
+            Err(e) => return Err(e),
         }
     }
 }
 
 #[cfg(unix)]
 fn connect(endpoint: &str, _deadline: Instant) -> std::io::Result<std::os::unix::net::UnixStream> {
+    // Socket et dossier à nous seulement : sinon, ce n'est pas l'app qui écoute.
+    let path = std::path::Path::new(endpoint);
+    if let Some(dir) = path.parent() {
+        ipc::check_private(dir)?;
+    }
+    ipc::check_private(path)?;
     std::os::unix::net::UnixStream::connect(endpoint)
+}
+
+/// Le nom du pipe est public : un autre compte de la machine pourrait le créer
+/// avant l'app. On vérifie que le processus qui écoute tourne sous notre compte.
+#[cfg(windows)]
+mod server_identity {
+    use std::os::windows::io::AsRawHandle;
+
+    use windows::Win32::Foundation::{CloseHandle, HANDLE};
+    use windows::Win32::Security::{
+        GetLengthSid, GetTokenInformation, TOKEN_QUERY, TOKEN_USER, TokenUser,
+    };
+    use windows::Win32::System::Pipes::GetNamedPipeServerProcessId;
+    use windows::Win32::System::Threading::{
+        GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+
+    pub fn check(pipe: &std::fs::File) -> std::io::Result<()> {
+        let mut pid = 0u32;
+        // SAFETY: `pipe` est un handle de pipe ouvert ; `pid` est un pointeur valide.
+        unsafe { GetNamedPipeServerProcessId(HANDLE(pipe.as_raw_handle()), &mut pid) }?;
+        // SAFETY: appel sans pointeur ; le handle est fermé juste après usage.
+        let server = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }?;
+        let theirs = user_sid(server);
+        // SAFETY: handle obtenu ci-dessus, fermé une seule fois.
+        unsafe {
+            let _ = CloseHandle(server);
+        }
+        // SAFETY: pseudo-handle du processus courant, rien à fermer.
+        let ours = user_sid(unsafe { GetCurrentProcess() })?;
+        if theirs? != ours {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "le pipe est tenu par un autre compte Windows",
+            ));
+        }
+        Ok(())
+    }
+
+    /// SID (octets) du compte sous lequel tourne `process`.
+    fn user_sid(process: HANDLE) -> std::io::Result<Vec<u8>> {
+        let mut token = HANDLE::default();
+        // SAFETY: `token` est un pointeur valide ; fermé plus bas.
+        unsafe { OpenProcessToken(process, TOKEN_QUERY, &mut token) }?;
+        let mut len = 0u32;
+        // Premier appel : taille nécessaire (échoue volontairement).
+        // SAFETY: aucun tampon fourni, `len` est un pointeur valide.
+        let _ = unsafe { GetTokenInformation(token, TokenUser, None, 0, &mut len) };
+        // Tampon de u64 : aligné pour lire TOKEN_USER.
+        let mut buf = vec![0u64; (len as usize).div_ceil(8)];
+        // SAFETY: `buf` fait au moins `len` octets.
+        let result = unsafe {
+            GetTokenInformation(
+                token,
+                TokenUser,
+                Some(buf.as_mut_ptr().cast()),
+                len,
+                &mut len,
+            )
+        };
+        // SAFETY: handle ouvert ci-dessus, fermé une seule fois.
+        unsafe {
+            let _ = CloseHandle(token);
+        }
+        result?;
+        // SAFETY: GetTokenInformation a rempli `buf` avec un TOKEN_USER valide,
+        // dont le SID pointe dans `buf` (vivant jusqu'à la fin de la fonction).
+        let sid = unsafe {
+            let user = &*buf.as_ptr().cast::<TOKEN_USER>();
+            let n = GetLengthSid(user.User.Sid) as usize;
+            std::slice::from_raw_parts(user.User.Sid.0.cast::<u8>(), n).to_vec()
+        };
+        Ok(sid)
+    }
 }
 
 #[cfg(windows)]

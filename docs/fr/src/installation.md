@@ -12,9 +12,6 @@ télécharge celui de ton système :
 | macOS (Apple Silicon) | `boringwindows-macos-arm64.tar.gz` |
 | Linux (x64) | `boringwindows-linux-x64.tar.gz` |
 
-Tant que le dépôt est privé, il faut être connecté à GitHub avec un compte qui
-y a accès.
-
 **Windows** : renomme le fichier en `boringwindows.exe` si tu veux et range-le
 où tu veux, par exemple dans `C:\Users\<toi>\Apps\BoringWindows\` (un
 dossier à toi : la mise à jour automatique doit pouvoir le remplacer).
@@ -47,11 +44,10 @@ clic droit sur l'icône › **Redémarrer pour passer à x.y.z**.
   le même élément dans le menu de l'icône.
 - Seule requête envoyée : la liste des releases à `api.github.com`, puis le
   téléchargement du fichier.
-- **Dépôt privé** : GitHub ne montre les releases qu'aux comptes autorisés.
-  Crée un jeton (GitHub › Settings › Developer settings › *Fine-grained
-  tokens*, accès en lecture seule au dépôt, permission *Contents: Read*) et
-  mets-le dans la variable d'environnement utilisateur
-  `BORINGWINDOWS_GITHUB_TOKEN`, puis relance BoringWindows.
+- Version compilée depuis un fork **privé** : GitHub ne montre ses releases
+  qu'aux comptes autorisés. Mets un jeton en lecture seule (*Fine-grained
+  token*, permission *Contents: Read*) dans la variable d'environnement
+  `BORINGWINDOWS_GITHUB_TOKEN`. Inutile pour le dépôt public.
 - Une version compilée avec `cargo` ne se met pas à jour toute seule.
 
 ## Ou compiler toi-même

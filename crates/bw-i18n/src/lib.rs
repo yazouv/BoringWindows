@@ -45,24 +45,38 @@ static CURRENT: AtomicU8 = AtomicU8::new(UNSET);
 
 /// Langue courante ; celle du système tant que [`set`] n'a pas été appelé.
 pub fn lang() -> Lang {
-    match CURRENT.load(Ordering::Relaxed) {
-        1 => Lang::En,
-        2 => Lang::Fr,
-        _ => {
+    match decode(CURRENT.load(Ordering::Relaxed)) {
+        Some(l) => l,
+        None => {
+            // Langue du système, sauf si un autre thread a choisi entre-temps :
+            // sans `compare_exchange`, on écraserait un `set` concurrent.
             let l = Lang::system();
-            set(l);
-            l
+            match CURRENT.compare_exchange(UNSET, encode(l), Ordering::Relaxed, Ordering::Relaxed) {
+                Ok(_) => l,
+                Err(actual) => decode(actual).unwrap_or(l),
+            }
         }
     }
 }
 
 /// Change la langue de tout le processus (tous les threads).
 pub fn set(lang: Lang) {
-    let v = match lang {
+    CURRENT.store(encode(lang), Ordering::Relaxed);
+}
+
+fn encode(lang: Lang) -> u8 {
+    match lang {
         Lang::En => 1,
         Lang::Fr => 2,
-    };
-    CURRENT.store(v, Ordering::Relaxed);
+    }
+}
+
+fn decode(v: u8) -> Option<Lang> {
+    match v {
+        1 => Some(Lang::En),
+        2 => Some(Lang::Fr),
+        _ => None,
+    }
 }
 
 /// Texte traduit : `tr!("anglais", "français", args…)`, avec la syntaxe de
