@@ -176,6 +176,7 @@ impl Controller {
         fill_layout(ui, &config.layout.compact);
         ui.set_view_name(config.layout.view.as_str().into());
         ui.set_volume_enabled(config.module_enabled(bw_volume::MODULE_ID, false));
+        ui.set_brightness_enabled(config.module_enabled(bw_volume::BRIGHTNESS_ID, false));
         ui.set_viz_enabled(config.module_enabled(bw_viz::MODULE_ID, false));
         ui.set_plugins_enabled(config.module_enabled(bw_plugins::MODULE_ID, false));
         let activity =
@@ -747,6 +748,10 @@ impl Controller {
             "modules.volume.enabled" => Some((
                 vec!["modules", "volume", "enabled"],
                 Value::Bool(ui.get_volume_enabled()),
+            )),
+            "modules.brightness.enabled" => Some((
+                vec!["modules", "brightness", "enabled"],
+                Value::Bool(ui.get_brightness_enabled()),
             )),
             "modules.shelf.enabled" => Some((
                 vec!["modules", "shelf", "enabled"],

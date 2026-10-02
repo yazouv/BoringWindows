@@ -1,6 +1,6 @@
 [package]
 name = "bw-volume"
-description = "Volume du système dans l'île de BoringWindows (changements en direct)"
+description = "Volume du système et luminosité de l'écran dans l'île de BoringWindows (changements en direct)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -23,7 +23,10 @@ windows = { version = "0.62", features = [
     "Win32_Media_Audio_Endpoints",
     "Win32_System_Com",
     "Win32_System_Com_StructuredStorage",
+    "Win32_System_Ole",
+    "Win32_System_Rpc",
     "Win32_System_Variant",
+    "Win32_System_Wmi",
 ] }
 
 [lints]

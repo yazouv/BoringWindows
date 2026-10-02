@@ -138,6 +138,13 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 | `enabled` | `false` | | afficher les changements de [volume](volume.md) dans l'île (Windows) |
 | `show_secs` | `2` | 1 à 10 | durée d'affichage (s) |
 
+## `[modules.brightness]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `false` | | afficher les changements de [luminosité](volume.md#luminosité) de l'écran intégré (Windows, portables) |
+| `show_secs` | `2` | 1 à 10 | durée d'affichage (s) |
+
 ## `[modules.visualizer]`
 
 | Option | Défaut | Plage | Rôle |

@@ -13,7 +13,7 @@
 - [Musique](musique.md)
 - [Minuteur](minuteur.md)
 - [Étagère](etagere.md)
-- [Volume](volume.md)
+- [Volume et luminosité](volume.md)
 - [Plugins (WASM)](plugins.md)
 - [Agenda](agenda/index.md)
   - [Google Agenda](agenda/google.md)

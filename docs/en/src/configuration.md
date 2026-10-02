@@ -137,6 +137,13 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 | `enabled` | `false` | | show [volume](volume.md) changes in the island (Windows) |
 | `show_secs` | `2` | 1 to 10 | how long it shows (s) |
 
+## `[modules.brightness]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `false` | | show [brightness](volume.md#brightness) changes of the built-in screen (Windows, laptops) |
+| `show_secs` | `2` | 1 to 10 | how long it shows (s) |
+
 ## `[modules.visualizer]`
 
 | Option | Default | Range | Purpose |
