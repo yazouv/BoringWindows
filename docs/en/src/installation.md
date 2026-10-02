@@ -12,9 +12,6 @@ download the one for your system:
 | macOS (Apple Silicon) | `boringwindows-macos-arm64.tar.gz` |
 | Linux (x64) | `boringwindows-linux-x64.tar.gz` |
 
-While the repository is private, you need to be signed in to GitHub with an
-account that has access to it.
-
 **Windows**: rename the file to `boringwindows.exe` if you like and put it
 wherever you want, for instance in `C:\Users\<you>\Apps\BoringWindows\` (a
 folder of yours: automatic updates must be able to replace it).
@@ -46,11 +43,10 @@ update to x.y.z**.
   in the icon menu.
 - Only request sent: the list of releases from `api.github.com`, then the file
   download.
-- **Private repository**: GitHub only shows releases to authorized accounts.
-  Create a token (GitHub › Settings › Developer settings › *Fine-grained
-  tokens*, read-only access to the repository, *Contents: Read* permission),
-  put it in the user environment variable `BORINGWINDOWS_GITHUB_TOKEN`, then
-  restart BoringWindows.
+- Built from a **private** fork: GitHub only shows its releases to authorized
+  accounts. Put a read-only token (*fine-grained token*, *Contents: Read*
+  permission) in the `BORINGWINDOWS_GITHUB_TOKEN` environment variable. Not
+  needed for the public repository.
 - A version built with `cargo` doesn't update itself.
 
 ## Or build it yourself

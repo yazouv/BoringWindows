@@ -8,6 +8,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Lecture seule : les PR venant de forks n'ont accès à rien d'autre.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true

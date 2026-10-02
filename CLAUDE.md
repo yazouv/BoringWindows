@@ -33,8 +33,8 @@ On Linux, building needs `libfontconfig1-dev libxkbcommon-dev`.
 
 ## CI/CD and versioning
 
-- **`ci.yml`**: runs only on PRs to `main`, on a single Linux runner (fmt, clippy for 3 targets, tests). Do not add Windows or macOS runners. The repo is private, and those runners burn the Actions minutes quota (×2 and ×10).
-- **`release.yml`**: release-please runs on every push to `main`. It keeps a "chore: release x.y.z" PR open. Merging that PR tags `vX.Y.Z`, builds the Windows, macOS and Linux binaries, and attaches them with `.sha256` files. The updater depends on the asset names in that workflow and in `bw_update::asset_name()`; keep them in sync.
+- **`ci.yml`**: runs only on PRs to `main`, on a single Linux runner (fmt, clippy for 3 targets, tests). Keep it on one Linux runner: Windows and macOS runners are slow, and they burned the Actions minutes quota while the repo was private (×2 and ×10).
+- **`release.yml`**: release-please runs on every push to `main`. It keeps a "chore: release x.y.z" PR open. Merging that PR tags `vX.Y.Z`, builds the Windows, macOS and Linux binaries, and attaches them with `.sha256` files. The updater depends on the asset names in that workflow and in `bw_update::asset_name()`; keep them in sync. The `installer` job builds `installer/boringwindows.iss` (Inno Setup). The `winget` job updates the `Yazouv.BoringWindows` package; it is skipped when the `WINGET_TOKEN` secret is absent.
 - **Commit messages must follow Conventional Commits** (`feat:`, `fix:`, `docs:`, `chore:`…). release-please derives the version and changelog from them.
 - Never bump versions by hand. release-please owns `[workspace.package] version` in `Cargo.toml`, plus `version.txt`, `CHANGELOG.md` and the manifest.
 - **`docs.yml`**: publishes the mdBook to GitHub Pages when `docs/` changes on `main`.
@@ -51,6 +51,7 @@ The Cargo workspace (edition 2024) has one crate per concern. `bw-app` is the on
 - **Modules**:
   - **`bw-claude`**: Claude Code integration.
     - `boringwindows hook` is a relay that Claude Code runs on each hook event. It forwards a JSON summary over a named pipe (Unix socket elsewhere) and **must print nothing else on stdout**. It exits within about 300 ms if the app is unreachable.
+    - The relay can return "allow" to Claude Code, so the channel is authenticated. On Windows, the relay checks that the pipe's server process runs under the same account (`server_identity` in `hook.rs`). On Unix, the socket and its folder must be ours and not writable by others (`ipc::check_private`, on both the client and the server side). Don't weaken these checks.
     - `install.rs` edits `~/.claude/settings.json`, adding only our entries, with a backup. It also auto-upgrades outdated hooks.
     - `tracker.rs` turns hook events into per-session state.
     - `doctor.rs` runs the end-to-end diagnostic.
@@ -65,11 +66,13 @@ The Cargo workspace (edition 2024) has one crate per concern. `bw-app` is the on
   - `DEFAULT_TOML` (`default.toml`) must stay equivalent to `Config::default()`, and a test enforces it.
   - `ConfigEditor` (toml_edit) writes changes while keeping comments, and validates before an atomic save.
   - `watch.rs` hot-reloads on changes to config.toml or theme files. It notifies only when the resulting config changes, because inotify also reports reads.
+- **More modules**: `bw-timer` (timer), `bw-volume` (system volume changes), `bw-viz` (audio visualizer via WASAPI loopback, active only while the island is open and music plays), `bw-plugins` (third-party WASM plugins on wasmi: only 4 host functions, no file or network access, fuel and memory caps — keep it that way).
+- **`bw-secrets`**: private ICS links and CalDAV passwords live in the OS credential manager. `config.toml` only holds `secret:<id>` references.
 - **`bw-i18n`**: the global language plus the `tr!("English", "Français", args…)` macro, used for every user-facing string on the Rust side. Logs and the hook journal stay in French.
-- **`bw-net`**: blocking HTTP GET. Windows uses the WinRT HttpClient, so system proxy and certificates apply. Elsewhere it shells out to `curl`. Redirects never resend `Authorization` to another host.
+- **`bw-net`**: blocking HTTP requests. Windows uses the WinRT HttpClient, so system proxy and certificates apply. Elsewhere it shells out to `curl`, with the URL, headers and body passed **through stdin (`-K -`), never as arguments**, because other local accounts can read the command line. Redirects never resend `Authorization` to another host.
 - **`bw-update`**: self-update from the GitHub releases of `yazouv/BoringWindows`:
   - it checks the latest release, verifies the SHA-256, and replaces the running executable (on Windows, the old one is renamed to `.old`);
-  - a private repo needs `BORINGWINDOWS_GITHUB_TOKEN`;
+  - `BORINGWINDOWS_GITHUB_TOKEN` is only needed for a private fork;
   - builds run from a cargo `target/` dir never self-update.
 - **`bw-app`**:
   - `controller.rs` is the single-threaded hub. It holds `Rc<Controller>` in a thread-local and owns the Slint windows, arbiter, module host, tray, config watcher and timers.
@@ -83,6 +86,7 @@ The Cargo workspace (edition 2024) has one crate per concern. `bw-app` is the on
 - `ui/main.slint` re-exports `island.slint` (the island) and `settings.slint` (the settings window, std-widgets "fluent" style). `build.rs` compiles them.
 - Only the island gets the special window attributes (transparent, no focus, topmost). That is done by wrapping its creation in `platform::creating_island(...)`.
 - The native winit window exists only once the event loop runs. Use `window().winit_window().await` inside `slint::spawn_local`, as `Controller::start` does.
+- Users can replace the island's views with their own `.slint` files (`layout.view`), loaded at runtime by `slint-interpreter`.
 - All island colors derive from the `bg`, `fg`, `accent` and `border` properties set from the theme. Don't hardcode colors in `island.slint`.
 
 ### i18n
