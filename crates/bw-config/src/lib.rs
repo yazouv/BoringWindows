@@ -20,9 +20,19 @@ pub use edit::{ConfigEditor, Value};
 pub use theme::{BUILTIN_THEMES, THEME_KEYS, available_themes, themes_dir};
 pub use watch::{ConfigWatcher, watch};
 
-/// Modèle du fichier créé au premier lancement. Il doit rester équivalent à
-/// `Config::default()` (vérifié par les tests).
+/// Modèle du fichier créé au premier lancement, commenté en français. Il doit
+/// rester équivalent à `Config::default()` (vérifié par les tests).
 pub const DEFAULT_TOML: &str = include_str!("default.toml");
+/// Le même modèle commenté en anglais : mêmes réglages, ligne à ligne.
+pub const DEFAULT_TOML_EN: &str = include_str!("default.en.toml");
+
+/// Modèle dans la langue de l'interface (celle du système au premier lancement).
+pub fn default_toml() -> &'static str {
+    match bw_i18n::lang() {
+        bw_i18n::Lang::Fr => DEFAULT_TOML,
+        bw_i18n::Lang::En => DEFAULT_TOML_EN,
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
@@ -240,7 +250,7 @@ impl Config {
                 if let Some(dir) = path.parent() {
                     std::fs::create_dir_all(dir).map_err(io_err)?;
                 }
-                std::fs::write(path, DEFAULT_TOML).map_err(io_err)?;
+                std::fs::write(path, default_toml()).map_err(io_err)?;
                 log::info!("config par défaut créée : {}", path.display());
                 Ok(Self::default())
             }
@@ -374,12 +384,33 @@ mod tests {
 
     #[test]
     fn default_template_matches_default_config() {
-        let mut parsed = Config::from_toml_str(DEFAULT_TOML).unwrap();
-        // Le modèle documente le module demo, désactivé.
-        assert!(!parsed.module_enabled("demo", true));
-        assert!(parsed.module_enabled("claude", false));
-        parsed.modules.clear();
-        assert_eq!(parsed, Config::default());
+        for template in [DEFAULT_TOML, DEFAULT_TOML_EN] {
+            let mut parsed = Config::from_toml_str(template).unwrap();
+            // Le modèle documente le module demo, désactivé.
+            assert!(!parsed.module_enabled("demo", true));
+            assert!(parsed.module_enabled("claude", false));
+            parsed.modules.clear();
+            assert_eq!(parsed, Config::default());
+        }
+    }
+
+    /// Les deux modèles ne diffèrent que par leurs commentaires.
+    #[test]
+    fn templates_have_the_same_settings_line_by_line() {
+        let settings = |t: &'static str| -> Vec<&'static str> {
+            t.lines()
+                .map(str::trim)
+                .filter(|l| !l.is_empty() && !l.starts_with('#'))
+                .collect()
+        };
+        assert_eq!(settings(DEFAULT_TOML), settings(DEFAULT_TOML_EN));
+        // Autant de lignes commentées, pour qu'aucune explication ne manque.
+        let comments = |t: &str| {
+            t.lines()
+                .filter(|l| l.trim_start().starts_with('#'))
+                .count()
+        };
+        assert_eq!(comments(DEFAULT_TOML), comments(DEFAULT_TOML_EN));
     }
 
     #[test]
@@ -453,7 +484,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("sub").join("config.toml");
         assert_eq!(Config::load_or_create(&path).unwrap(), Config::default());
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), DEFAULT_TOML);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), default_toml());
 
         std::fs::write(&path, "[general]\nopen_on = \"click\"").unwrap();
         assert_eq!(

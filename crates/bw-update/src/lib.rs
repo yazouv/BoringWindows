@@ -25,6 +25,8 @@ pub fn asset_name() -> Option<&'static str> {
         Some("boringwindows-windows-x64.exe")
     } else if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
         Some("boringwindows-macos-arm64.tar.gz")
+    } else if cfg!(all(target_os = "macos", target_arch = "x86_64")) {
+        Some("boringwindows-macos-x64.tar.gz")
     } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
         Some("boringwindows-linux-x64.tar.gz")
     } else {

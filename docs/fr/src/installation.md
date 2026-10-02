@@ -10,6 +10,7 @@ télécharge celui de ton système :
 |---|---|
 | Windows 10/11 | `boringwindows-windows-x64.exe` |
 | macOS (Apple Silicon) | `boringwindows-macos-arm64.tar.gz` |
+| macOS (Intel) | `boringwindows-macos-x64.tar.gz` |
 | Linux (x64) | `boringwindows-linux-x64.tar.gz` |
 
 **Windows** : renomme le fichier en `boringwindows.exe` si tu veux et range-le
