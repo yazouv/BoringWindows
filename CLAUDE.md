@@ -33,7 +33,11 @@ On Linux, building needs `libfontconfig1-dev libxkbcommon-dev`.
 
 ## CI/CD and versioning
 
-- **`ci.yml`**: runs on PRs to `main` and on pushes to `main`. Only the run on `main` fills the cache that PRs reuse: a PR can only read caches from its own branch and from `main`. It runs parallel jobs, all on Linux runners: `fmt`, `check` (Linux clippy + tests) and `clippy` for the Windows and macOS targets (type-check only). It skips release-please PRs (`release-please--*` branches): they only touch the version, changelog and lockfile. Don't move checks to Windows or macOS runners: they are slower, and they burned the minutes quota while the repo was private.
+- **`ci.yml`**: runs on PRs to `main` and on pushes to `main`, as a single `check` job: fmt, clippy, tests.
+  - **Runner**: the user's `self-hosted` runner for pushes and same-repo PRs. Its build dir (`CARGO_TARGET_DIR`, next to the workspace) persists between runs.
+  - **PRs from forks** run on `ubuntu-latest`, with `rust-cache`. The repo is public: never route fork code to the self-hosted runner.
+  - **Steps depend on the OS**: on Linux, clippy also checks the Windows and macOS targets; on other OSes, only the host.
+  - It skips release-please PRs (`release-please--*` branches): they only touch the version, changelog and lockfile.
 - **`release.yml`**: release-please runs on every push to `main`. It keeps a "chore: release x.y.z" PR open. Merging that PR tags `vX.Y.Z`, builds the Windows, macOS and Linux binaries, and attaches them with `.sha256` files. The updater depends on the asset names in that workflow and in `bw_update::asset_name()`; keep them in sync. The `installer` job builds `installer/boringwindows.iss` (Inno Setup). The `winget` job updates the `Yazouv.BoringWindows` package; it is skipped when the `WINGET_TOKEN` secret is absent.
 - **Commit messages must follow Conventional Commits** (`feat:`, `fix:`, `docs:`, `chore:`…). release-please derives the version and changelog from them.
 - Never bump versions by hand. release-please owns `[workspace.package] version` in `Cargo.toml`, plus `version.txt`, `CHANGELOG.md` and the manifest.
