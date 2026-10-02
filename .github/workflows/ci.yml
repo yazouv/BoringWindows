@@ -1,11 +1,20 @@
 name: CI
 
-# Vérifications des PR vers main, sur un seul runner Linux (le moins cher en
-# minutes) : format, clippy pour Linux, Windows et macOS (vérification de types,
-# sans édition de liens), tests. Les binaires ne sont construits qu'aux releases.
+# Format, clippy (Linux, Windows, macOS) et tests, sur des runners Linux en
+# parallèle. Clippy pour Windows et macOS ne fait que vérifier les types (pas
+# d'édition de liens) : pas besoin de leurs runners, plus lents.
+#
+# Aussi sur main : c'est ce qui remplit le cache que les PR réutilisent (une
+# PR ne peut lire que les caches de sa branche et de main). Sans lui, chaque
+# PR recompilait toutes les dépendances.
 on:
+  # Toujours sur les PR (un check obligatoire doit pouvoir passer) ; sur main,
+  # pas pour la doc seule (rien à remettre en cache).
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
+    paths-ignore: ["docs/**", "**.md"]
   workflow_dispatch:
 
 # Lecture seule : les PR venant de forks n'ont accès à rien d'autre.
@@ -14,34 +23,72 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Sur une PR, un nouveau push remplace le run en cours ; sur main, chaque
+  # run va au bout (il remplit le cache).
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
+  # Pas d'incrémental en CI : rien à réutiliser d'un run à l'autre, et ça
+  # alourdit le cache.
+  CARGO_INCREMENTAL: 0
 
+# Les PR de release-please ne changent que la version, le CHANGELOG et
+# Cargo.lock : le code a déjà été vérifié sur sa propre PR. Jobs sautés
+# (comptés comme réussis si un check est obligatoire).
 jobs:
+  fmt:
+    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+
+  # Nom gardé (`check`) : c'est celui d'un éventuel check obligatoire.
   check:
-    # La PR de release-please ne change que la version, le CHANGELOG et
-    # Cargo.lock : le code a déjà été vérifié sur sa propre PR. Job sauté
-    # (compté comme réussi si le check est obligatoire).
+    name: check (Linux, tests)
     if: ${{ !startsWith(github.head_ref, 'release-please--') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Dépendances système
-        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libfontconfig1-dev libxkbcommon-dev
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy, rustfmt
-          targets: x86_64-pc-windows-msvc, aarch64-apple-darwin
+          components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
+          shared-key: linux
           cache-on-failure: true
-      - run: cargo fmt --all --check
       - name: clippy (Linux)
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - name: clippy (Windows)
-        run: cargo clippy --workspace --all-targets --locked --target x86_64-pc-windows-msvc -- -D warnings
-      - name: clippy (macOS)
-        run: cargo clippy --workspace --all-targets --locked --target aarch64-apple-darwin -- -D warnings
       - run: cargo test --workspace --locked
+
+  clippy:
+    name: clippy (${{ matrix.name }})
+    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            target: x86_64-pc-windows-msvc
+          - name: macOS
+            target: aarch64-apple-darwin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dépendances système
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libfontconfig1-dev libxkbcommon-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ${{ matrix.target }}
+          cache-on-failure: true
+      - run: cargo clippy --workspace --all-targets --locked --target ${{ matrix.target }} -- -D warnings
