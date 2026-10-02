@@ -73,6 +73,27 @@ fn default_endpoint() -> String {
 
 pub use server::Listener;
 
+/// `path` (socket ou dossier) doit nous appartenir et n'être modifiable que par
+/// nous. Sinon, un autre compte de la machine aurait pu le créer avant l'app
+/// pour recevoir les événements et répondre aux demandes de permission.
+#[cfg(unix)]
+pub fn check_private(path: &std::path::Path) -> std::io::Result<()> {
+    use std::os::unix::fs::MetadataExt;
+    let meta = std::fs::symlink_metadata(path)?;
+    // SAFETY: geteuid n'a pas de précondition.
+    let uid = unsafe { libc::geteuid() };
+    if meta.uid() != uid || meta.mode() & 0o022 != 0 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            format!(
+                "{} appartient à un autre compte ou est modifiable par d'autres",
+                path.display()
+            ),
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(windows)]
 mod server {
     use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
@@ -127,6 +148,8 @@ mod server {
                     .recursive(true)
                     .mode(0o700)
                     .create(dir)?;
+                // Un dossier existant n'est pas recréé : il doit déjà être à nous.
+                super::check_private(dir)?;
             }
             // Socket orpheline d'un lancement précédent.
             let _ = std::fs::remove_file(&path);
@@ -148,5 +171,44 @@ mod server {
         fn drop(&mut self) {
             let _ = std::fs::remove_file(&self.path);
         }
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use std::os::unix::fs::PermissionsExt;
+
+    use super::*;
+
+    #[test]
+    fn private_paths_only() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+        assert!(check_private(dir.path()).is_ok());
+
+        // Dossier modifiable par d'autres : un intrus aurait pu y placer la socket.
+        let open = dir.path().join("ouvert");
+        std::fs::create_dir(&open).unwrap();
+        std::fs::set_permissions(&open, std::fs::Permissions::from_mode(0o777)).unwrap();
+        assert!(check_private(&open).is_err());
+        // L'app refuse d'y écouter.
+        let socket = open.join("boringwindows.sock");
+        let err = Listener::bind(socket.to_str().unwrap()).err().unwrap();
+        assert_eq!(err.kind(), std::io::ErrorKind::PermissionDenied);
+    }
+
+    #[test]
+    fn socket_created_by_the_app_passes_the_check() {
+        let dir = tempfile::tempdir().unwrap();
+        let socket = dir.path().join("app").join("boringwindows.sock");
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        rt.block_on(async {
+            let _listener = Listener::bind(socket.to_str().unwrap()).unwrap();
+            assert!(check_private(socket.parent().unwrap()).is_ok());
+            assert!(check_private(&socket).is_ok());
+        });
     }
 }
