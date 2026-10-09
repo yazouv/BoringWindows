@@ -115,6 +115,11 @@ pub fn focus_terminal(_ancestors: &[u32], _console_window: Option<i64>) -> bool 
     false
 }
 
+/// Ouvrir l'application d'une notification : Windows uniquement.
+pub fn open_app(_app_id: &str) -> bool {
+    false
+}
+
 pub fn attach_parent_console() {}
 
 pub fn creating_island<R>(f: impl FnOnce() -> R) -> R {

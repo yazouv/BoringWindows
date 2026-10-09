@@ -11,6 +11,7 @@
 
 - [Claude Code](claude-code.md)
 - [Musique](musique.md)
+- [Notifications](notifications.md)
 - [Minuteur](minuteur.md)
 - [Étagère](etagere.md)
 - [Volume et luminosité](volume.md)

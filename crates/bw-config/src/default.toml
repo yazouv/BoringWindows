@@ -88,6 +88,17 @@ show_all_day = true
 # name = "Pro"
 # url = "https://outlook.office365.com/owa/calendar/…/calendar.ics"
 
+[modules.notifications]
+# Notifications des applications (Discord, Slack, Teams…) : chacune s'annonce
+# dans l'île, et les dernières restent dans l'onglet « Notifs ».
+enabled = true
+# Durée d'affichage d'une nouvelle notification (s).
+show_secs = 5
+# Montrer l'expéditeur et le message ; sinon, seulement le nom de l'application.
+show_content = true
+# Applications à ignorer (morceau de nom, ex. ["docker", "intel"]).
+ignore = []
+
 [modules.demo]
 # Module de démonstration : fait varier l'attention toutes les quelques secondes
 # pour tester les animations. À désactiver une fois les vrais modules en place.

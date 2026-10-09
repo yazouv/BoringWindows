@@ -92,7 +92,7 @@ and does nothing: **Claude is never blocked**.
 
 ## Recent conversations and usage
 
-Open the island and click **Claude ›** (top right): a tab shows
+Open the island and click the **Claude** tab (top right): it shows
 
 - an **estimate of your usage** over the current 5-hour window, with the time
   until it renews (and a gauge if you set a limit);

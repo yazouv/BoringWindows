@@ -1,7 +1,7 @@
 //! Calcul de la forme de l'île en pixels physiques, partagé entre la zone
 //! cliquable Win32 et le placement de la fenêtre.
 
-use bw_config::Theme;
+use bw_config::{Size, Theme};
 
 /// Rectangle en pixels physiques, relatif au coin haut-gauche de la fenêtre.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,7 +31,18 @@ impl PhysRect {
 pub enum Shape {
     Compact,
     Attention,
+    /// Nouvelle notification : plus large et plus haute que l'attention.
+    Notification,
     Expanded,
+}
+
+/// Taille de la pilule qui annonce une notification : dérivée de l'attention,
+/// sans jamais dépasser l'île ouverte (la fenêtre).
+pub fn notification_size(theme: &Theme) -> Size {
+    Size::new(
+        (theme.attention.width + 80.0).min(theme.expanded.width),
+        (theme.attention.height + 22.0).min(theme.expanded.height),
+    )
 }
 
 /// Marge autour de la pilule pour ne pas rogner l'anticrénelage des bords.
@@ -50,6 +61,7 @@ pub fn pill_rect(theme: &Theme, shape: Shape, scale: f32) -> PhysRect {
     let size = match shape {
         Shape::Compact => theme.compact,
         Shape::Attention => theme.attention,
+        Shape::Notification => notification_size(theme),
         Shape::Expanded => theme.expanded,
     };
     let (win_w, win_h) = window_size(theme);
@@ -125,6 +137,17 @@ mod tests {
         let r = pill_rect(&theme, Shape::Attention, 1.0);
         assert_eq!(r.y, 8);
         assert_eq!(r.height, 36 + 4);
+    }
+
+    #[test]
+    fn notification_fits_in_the_window() {
+        let theme = Theme::default();
+        assert_eq!(notification_size(&theme), Size::new(380.0, 58.0));
+        let small = Theme {
+            expanded: Size::new(320.0, 50.0),
+            ..Theme::default()
+        };
+        assert_eq!(notification_size(&small), Size::new(320.0, 50.0));
     }
 
     #[test]

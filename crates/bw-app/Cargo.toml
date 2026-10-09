@@ -19,6 +19,7 @@ bw-claude.workspace = true
 bw-config.workspace = true
 bw-core.workspace = true
 bw-media.workspace = true
+bw-notify.workspace = true
 bw-timer.workspace = true
 bw-volume.workspace = true
 bw-viz.workspace = true

@@ -73,6 +73,16 @@ export struct MediaInfo {
     multi-source: bool,
 }
 
+export struct NotifInfo {
+    id: int,
+    app: string,
+    title: string,
+    body: string,
+    tint: color,
+    initial: string,
+    ago: string,
+}
+
 // Icônes dessinées (pas de police d'icônes à embarquer), viewbox 24x24.
 component IconButton inherits Rectangle {
     in property <string> icon;
@@ -140,6 +150,78 @@ component PillButton inherits Rectangle {
     }
 }
 
+// Pastille ronde à l'initiale de l'application, à sa couleur.
+component Avatar inherits Rectangle {
+    in property <string> initial;
+    in property <color> tint;
+    in property <length> size: 36px;
+
+    width: root.size;
+    height: root.size;
+    border-radius: root.size / 2;
+    background: @radial-gradient(circle, root.tint.brighter(0.35) 0%, root.tint 100%);
+
+    Text {
+        text: root.initial;
+        color: white;
+        font-size: root.size * 0.46;
+        font-weight: 800;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+component TabChip inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    in property <int> badge;
+    in property <color> ink;
+    in property <color> accent;
+    callback clicked;
+
+    width: row.preferred-width;
+    height: 22px;
+    border-radius: 11px;
+    background: root.active ? root.ink.with-alpha(0.16)
+        : ta.has-hover ? root.ink.with-alpha(0.08) : transparent;
+    animate background { duration: 150ms; }
+
+    row := HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 5px;
+
+        Text {
+            text: root.text;
+            color: root.active ? root.ink : root.ink.with-alpha(0.6);
+            font-size: 12px;
+            font-weight: root.active ? 700 : 500;
+            vertical-alignment: center;
+        }
+
+        if root.badge > 0: Rectangle {
+            width: max(14px, count.preferred-width + 8px);
+            height: 14px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 7px;
+            background: root.accent;
+
+            count := Text {
+                text: root.badge > 9 ? "9+" : "\{root.badge}";
+                color: white;
+                font-size: 9px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+
+    ta := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
 export component Island inherits Window {
     title: "BoringWindows";
     no-frame: true;
@@ -153,6 +235,9 @@ export component Island inherits Window {
     in property <length> attention-height: 36px;
     in property <length> expanded-width: 520px;
     in property <length> expanded-height: 170px;
+    // Pilule qui annonce une notification (calculée côté Rust).
+    in property <length> notif-width: 380px;
+    in property <length> notif-height: 58px;
     in property <length> corner-radius: 22px;
     in property <length> top-offset: 0px;
     in property <duration> anim: 240ms;
@@ -203,6 +288,38 @@ export component Island inherits Window {
     callback timer-action(string /* start:<min> | pause | resume | reset */);
     in property <bool> compact-art-visible;
     in property <image> compact-art;
+    // Notifications des applications : celle annoncée, les dernières (onglet),
+    // et les couleurs des non lues (points de la pilule au repos).
+    in property <bool> has-notif;
+    in property <NotifInfo> notif;
+    in property <int> notif-seq;
+    in property <bool> has-notif-tab;
+    in property <[NotifInfo]> notif-rows;
+    in property <int> notif-unread;
+    in property <[color]> unread-colors;
+    callback notif-action(string /* seen | clear | open:<id> | remove:<id> */);
+    // Onglets de l'île ouverte : 0 accueil, 1 Claude, 2 notifications.
+    changed tab => {
+        if self.tab == 2 {
+            root.notif-action("seen");
+        }
+    }
+
+    // Animation d'arrivée : `popped` repasse à faux un instant à chaque
+    // nouvelle notification, puis revient à vrai, ce qui rejoue les transitions.
+    property <bool> popped: true;
+    changed notif-seq => {
+        self.popped = false;
+        pop-timer.running = true;
+    }
+    pop-timer := Timer {
+        interval: 30ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.popped = true;
+        }
+    }
 
     callback hover-changed(bool);
     callback clicked();
@@ -225,8 +342,10 @@ export component Island inherits Window {
         y: root.top-offset;
         x: (root.width - self.width) / 2;
         width: root.expanded ? root.expanded-width
+            : root.has-notif ? root.notif-width
             : root.has-attention ? root.attention-width : root.compact-width;
         height: root.expanded ? root.expanded-height
+            : root.has-notif ? root.notif-height
             : root.has-attention ? root.attention-height : root.compact-height;
         background: root.bg;
         border-width: root.border.alpha > 0 ? 1px : 0px;
@@ -249,12 +368,126 @@ export component Island inherits Window {
                 root.clicked();
             }
 
+            // Nouvelle notification : la couleur de l'application monte du bas.
+            Rectangle {
+                opacity: root.has-notif && !root.expanded ? 1 : 0;
+                visible: self.opacity > 0;
+                animate opacity { duration: root.anim; }
+                background: @linear-gradient(180deg, transparent 35%, root.notif.tint.with-alpha(0.3) 100%);
+            }
+
+            // Trait lumineux qui s'étire le long du bord inférieur.
+            Rectangle {
+                y: parent.height - self.height;
+                height: 2px;
+                width: root.popped && root.has-notif && !root.expanded ? parent.width * 0.7 : 0px;
+                x: (parent.width - self.width) / 2;
+                background: @linear-gradient(90deg, transparent 0%, root.notif.tint 50%, transparent 100%);
+                animate width { duration: root.popped ? 700ms : 0ms; easing: ease-out-quint; }
+            }
+
+            HorizontalLayout {
+                padding-left: 11px;
+                padding-right: 20px;
+                spacing: 10px;
+                opacity: root.has-notif && !root.expanded ? 1 : 0;
+                visible: self.opacity > 0;
+                animate opacity { duration: root.anim / 2; }
+
+                Rectangle {
+                    width: 36px;
+                    height: 36px;
+                    y: (parent.height - self.height) / 2;
+
+                    // Onde qui part de l'avatar.
+                    Rectangle {
+                        width: root.popped ? 62px : 36px;
+                        height: self.width;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: self.width / 2;
+                        border-width: 2px;
+                        border-color: root.notif.tint;
+                        opacity: root.popped ? 0 : 0.9;
+                        animate width, opacity { duration: root.popped ? 800ms : 0ms; easing: ease-out-quad; }
+                    }
+
+                    Avatar {
+                        size: root.popped ? 36px : 10px;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                        initial: root.notif.initial;
+                        tint: root.notif.tint;
+                        animate size { duration: root.popped ? 550ms : 0ms; easing: ease-out-back; }
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 1px;
+                    horizontal-stretch: 1;
+
+                    HorizontalLayout {
+                        spacing: 6px;
+
+                        Text {
+                            text: root.notif.app;
+                            color: root.notif.tint;
+                            font-size: 11px;
+                            font-weight: 700;
+                            overflow: elide;
+                        }
+
+                        Text {
+                            text: @tr("now");
+                            color: root.fg.with-alpha(0.45);
+                            font-size: 11px;
+                            horizontal-stretch: 1;
+                        }
+                    }
+
+                    Text {
+                        text: root.notif.title != "" ? root.notif.title : root.notif.body;
+                        color: root.fg;
+                        font-size: 13px;
+                        font-weight: 600;
+                        overflow: elide;
+                    }
+
+                    if root.notif.title != "" && root.notif.body != "": Text {
+                        text: root.notif.body;
+                        color: root.fg.with-alpha(0.7);
+                        font-size: 12px;
+                        overflow: elide;
+                    }
+                }
+            }
+
+            // Pilule fermée : un point par application aux notifications non lues.
+            HorizontalLayout {
+                alignment: end;
+                padding-right: 14px;
+                spacing: 4px;
+                opacity: !root.expanded && !root.has-notif && root.unread-colors.length > 0 ? 1 : 0;
+                visible: self.opacity > 0;
+                animate opacity { duration: root.anim; }
+
+                for tint in root.unread-colors: Rectangle {
+                    width: 6px;
+                    height: 6px;
+                    y: (parent.height - self.height) / 2;
+                    border-radius: 3px;
+                    background: tint;
+                }
+            }
+
             // Contenu compact : le module qui réclame l'attention.
             HorizontalLayout {
                 padding-left: 14px;
-                padding-right: 14px;
+                // Laisse la place aux points des notifications non lues.
+                padding-right: 14px + root.unread-colors.length * 10px;
                 spacing: 8px;
-                opacity: root.has-attention && !root.expanded ? 1 : 0;
+                opacity: root.has-attention && !root.has-notif && !root.expanded ? 1 : 0;
                 animate opacity { duration: root.anim / 2; }
 
                 if !root.compact-art-visible: Dot {
@@ -301,112 +534,19 @@ export component Island inherits Window {
                 }
             }
 
-            // Onglet Claude : remplace le contenu ouvert tant qu'il est choisi.
-            if !root.custom-view && root.has-claude-tab && root.tab == 1: VerticalLayout {
+            // Contenu ouvert : en-tête commun (heure, onglets), puis l'onglet choisi.
+            if !root.custom-view: VerticalLayout {
                 padding: 16px;
                 padding-top: 10px + root.top-offset / 2;
-                padding-bottom: 8px;
-                spacing: 3px;
+                padding-bottom: 10px;
+                spacing: 8px;
                 opacity: root.expanded ? 1 : 0;
                 visible: self.opacity > 0;
                 animate opacity { duration: root.anim; }
 
                 HorizontalLayout {
                     spacing: 10px;
-                    height: 22px;
-
-                    Text {
-                        text: "‹  " + @tr("Back");
-                        color: back-ta.has-hover ? root.accent : root.fg.with-alpha(0.7);
-                        font-size: 12px;
-                        vertical-alignment: center;
-
-                        back-ta := TouchArea {
-                            clicked => { root.tab = 0; }
-                        }
-                    }
-
-                    Text {
-                        text: "Claude Code";
-                        color: root.fg;
-                        font-size: 14px;
-                        font-weight: 700;
-                        vertical-alignment: center;
-                        horizontal-stretch: 1;
-                    }
-                }
-
-                Text {
-                    text: root.usage-text;
-                    color: root.fg.with-alpha(0.8);
-                    font-size: 12px;
-                    overflow: elide;
-                }
-
-                if root.usage-has-limit: Rectangle {
-                    height: 4px;
-                    border-radius: 2px;
-                    background: root.fg.with-alpha(0.15);
-
-                    Rectangle {
-                        x: 0;
-                        width: parent.width * clamp(root.usage-ratio, 0, 1);
-                        border-radius: 2px;
-                        background: root.usage-ratio > 0.85 ? #FF453A : root.accent;
-                    }
-                }
-
-                for item in root.recent-rows: Rectangle {
-                    height: 20px;
-                    border-radius: 6px;
-                    background: recent-ta.has-hover ? root.fg.with-alpha(0.12) : transparent;
-
-                    recent-ta := TouchArea {
-                        clicked => { root.recent-open(item.id); }
-                    }
-
-                    HorizontalLayout {
-                        padding-left: 8px;
-                        padding-right: 8px;
-                        spacing: 10px;
-
-                        Text {
-                            text: item.title;
-                            color: root.fg;
-                            font-size: 12px;
-                            vertical-alignment: center;
-                            overflow: elide;
-                            horizontal-stretch: 1;
-                        }
-
-                        Text {
-                            text: item.meta;
-                            color: root.fg.with-alpha(0.5);
-                            font-size: 11px;
-                            vertical-alignment: center;
-                            horizontal-alignment: right;
-                        }
-                    }
-                }
-
-                if root.recent-rows.length == 0: Text {
-                    text: @tr("No conversation found");
-                    color: root.fg.with-alpha(0.5);
-                    font-size: 12px;
-                }
-            }
-
-            // Contenu ouvert.
-            if !root.custom-view: VerticalLayout {
-                padding: 16px;
-                padding-top: 10px + root.top-offset / 2;
-                spacing: 8px;
-                opacity: root.expanded ? 1 : 0;
-                visible: self.opacity > 0 && root.tab == 0;
-                animate opacity { duration: root.anim; }
-
-                HorizontalLayout {
-                    spacing: 12px;
+                    height: 24px;
 
                     Text {
                         text: root.time-text;
@@ -422,22 +562,11 @@ export component Island inherits Window {
                         font-size: 12px;
                         vertical-alignment: center;
                         horizontal-stretch: 1;
-                    }
-
-                    // Onglet Claude (consommation, conversations récentes).
-                    if root.has-claude-tab: Text {
-                        text: "Claude  ›";
-                        color: claude-tab-ta.has-hover ? root.accent : root.fg.with-alpha(0.55);
-                        font-size: 12px;
-                        vertical-alignment: center;
-
-                        claude-tab-ta := TouchArea {
-                            clicked => { root.tab = 1; }
-                        }
+                        overflow: elide;
                     }
 
                     // Visualiseur audio (désactivé par défaut) : barres d'équaliseur.
-                    if root.viz-bars.length > 0 && root.has-media: HorizontalLayout {
+                    if root.tab == 0 && root.viz-bars.length > 0 && root.has-media: HorizontalLayout {
                         spacing: 2px;
                         alignment: end;
                         height: 14px;
@@ -453,7 +582,7 @@ export component Island inherits Window {
                     }
 
                     // Source de la musique ; cliquable s'il y en a plusieurs.
-                    if root.has-media: Text {
+                    if root.tab == 0 && root.has-media: Text {
                         text: root.media.multi-source ? root.media.source + "  ⇄" : root.media.source;
                         color: source-ta.has-hover && root.media.multi-source ? root.fg : root.fg.with-alpha(0.55);
                         font-size: 12px;
@@ -464,471 +593,673 @@ export component Island inherits Window {
                             clicked => { root.media-action("source"); }
                         }
                     }
-                }
 
-                // Lecteur (masqué pendant une demande de permission, prioritaire).
-                if root.has-media && !root.has-prompt: HorizontalLayout {
-                    height: 56px;
-                    spacing: 12px;
+                    if root.tab == 2 && root.notif-rows.length > 0: Text {
+                        text: @tr("Clear all");
+                        color: clear-ta.has-hover ? root.accent : root.fg.with-alpha(0.55);
+                        font-size: 12px;
+                        vertical-alignment: center;
 
-                    Rectangle {
-                        width: 56px;
-                        height: 56px;
-                        border-radius: 8px;
-                        clip: true;
-                        background: root.fg.with-alpha(0.08);
-
-                        if root.media.has-art: Image {
-                            width: parent.width;
-                            height: parent.height;
-                            source: root.media.art;
-                            image-fit: cover;
+                        clear-ta := TouchArea {
+                            clicked => { root.notif-action("clear"); }
                         }
                     }
 
-                    VerticalLayout {
+                    if root.has-notif-tab || root.has-claude-tab: HorizontalLayout {
                         spacing: 2px;
-                        alignment: center;
-                        horizontal-stretch: 1;
+
+                        TabChip {
+                            y: (parent.height - self.height) / 2;
+                            text: @tr("Home");
+                            active: root.tab == 0;
+                            ink: root.fg;
+                            accent: root.accent;
+                            clicked => { root.tab = 0; }
+                        }
+
+                        if root.has-notif-tab: TabChip {
+                            y: (parent.height - self.height) / 2;
+                            text: @tr("Notifs");
+                            active: root.tab == 2;
+                            badge: root.notif-unread;
+                            ink: root.fg;
+                            accent: root.accent;
+                            clicked => { root.tab = 2; }
+                        }
+
+                        if root.has-claude-tab: TabChip {
+                            y: (parent.height - self.height) / 2;
+                            text: "Claude";
+                            active: root.tab == 1;
+                            ink: root.fg;
+                            accent: root.accent;
+                            clicked => { root.tab = 1; }
+                        }
+                    }
+                }
+
+                // Accueil : musique, Claude, minuteur, étagère, agenda…
+                if root.tab == 0: VerticalLayout {
+                    spacing: 8px;
+                    alignment: start;
+                    vertical-stretch: 1;
+
+                    // Lecteur (masqué pendant une demande de permission, prioritaire).
+                    if root.has-media && !root.has-prompt: HorizontalLayout {
+                        height: 56px;
+                        spacing: 12px;
+
+                        Rectangle {
+                            width: 56px;
+                            height: 56px;
+                            border-radius: 8px;
+                            clip: true;
+                            // Halo de la couleur de la pochette.
+                            drop-shadow-blur: 14px;
+                            drop-shadow-color: root.media.has-art ? root.accent.with-alpha(0.45) : transparent;
+                            background: root.fg.with-alpha(0.08);
+
+                            if root.media.has-art: Image {
+                                width: parent.width;
+                                height: parent.height;
+                                source: root.media.art;
+                                image-fit: cover;
+                            }
+                        }
+
+                        VerticalLayout {
+                            spacing: 2px;
+                            alignment: center;
+                            horizontal-stretch: 1;
+
+                            Text {
+                                text: root.media.title;
+                                color: root.fg;
+                                font-size: 14px;
+                                font-weight: 600;
+                                overflow: elide;
+                            }
+
+                            Text {
+                                text: root.media.artist;
+                                color: root.fg.with-alpha(0.6);
+                                font-size: 12px;
+                                overflow: elide;
+                            }
+
+                            if root.media.has-timeline: HorizontalLayout {
+                                spacing: 6px;
+                                padding-top: 4px;
+
+                                Text {
+                                    text: root.media.position;
+                                    color: root.fg.with-alpha(0.5);
+                                    font-size: 10px;
+                                    vertical-alignment: center;
+                                }
+
+                                bar := Rectangle {
+                                    height: 12px;
+                                    horizontal-stretch: 1;
+
+                                    Rectangle {
+                                        y: (parent.height - self.height) / 2;
+                                        height: bar-ta.has-hover && root.media.can-seek ? 5px : 3px;
+                                        border-radius: self.height / 2;
+                                        background: root.fg.with-alpha(0.15);
+                                    }
+
+                                    Rectangle {
+                                        x: 0;
+                                        y: (parent.height - self.height) / 2;
+                                        width: parent.width * clamp(root.media.progress, 0, 1);
+                                        height: bar-ta.has-hover && root.media.can-seek ? 5px : 3px;
+                                        border-radius: self.height / 2;
+                                        background: root.accent;
+                                    }
+
+                                    bar-ta := TouchArea {
+                                        enabled: root.media.can-seek;
+                                        clicked => { root.media-seek(self.mouse-x / self.width); }
+                                    }
+                                }
+
+                                Text {
+                                    text: root.media.duration;
+                                    color: root.fg.with-alpha(0.5);
+                                    font-size: 10px;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+
+                        HorizontalLayout {
+                            spacing: 2px;
+                            alignment: center;
+                            horizontal-stretch: 0;
+
+                            IconButton {
+                                y: (parent.height - self.height) / 2;
+                                icon: "previous";
+                                ink: root.fg;
+                                enabled: root.media.can-previous;
+                                clicked => { root.media-action("prev"); }
+                            }
+
+                            IconButton {
+                                y: (parent.height - self.height) / 2;
+                                size: 36px;
+                                icon: root.media.playing ? "pause" : "play";
+                                ink: root.fg;
+                                enabled: root.media.can-toggle;
+                                clicked => { root.media-action("toggle"); }
+                            }
+
+                            IconButton {
+                                y: (parent.height - self.height) / 2;
+                                icon: "next";
+                                ink: root.fg;
+                                enabled: root.media.can-next;
+                                clicked => { root.media-action("next"); }
+                            }
+                        }
+                    }
+
+                    // Demande de permission de Claude Code.
+                    if root.has-prompt: VerticalLayout {
+                        spacing: 6px;
 
                         Text {
-                            text: root.media.title;
-                            color: root.fg;
+                            text: @tr("{} wants to use {}", root.prompt.project, root.prompt.tool);
+                            color: root.accent;
                             font-size: 14px;
                             font-weight: 600;
                             overflow: elide;
                         }
 
                         Text {
-                            text: root.media.artist;
-                            color: root.fg.with-alpha(0.6);
+                            text: root.prompt.detail;
+                            color: root.fg.with-alpha(0.75);
                             font-size: 12px;
+                            font-family: "Consolas";
                             overflow: elide;
                         }
 
-                        if root.media.has-timeline: HorizontalLayout {
-                            spacing: 6px;
-                            padding-top: 4px;
-
-                            Text {
-                                text: root.media.position;
-                                color: root.fg.with-alpha(0.5);
-                                font-size: 10px;
-                                vertical-alignment: center;
-                            }
-
-                            bar := Rectangle {
-                                height: 12px;
-                                horizontal-stretch: 1;
-
-                                Rectangle {
-                                    y: (parent.height - self.height) / 2;
-                                    height: bar-ta.has-hover && root.media.can-seek ? 5px : 3px;
-                                    border-radius: self.height / 2;
-                                    background: root.fg.with-alpha(0.15);
-                                }
-
-                                Rectangle {
-                                    x: 0;
-                                    y: (parent.height - self.height) / 2;
-                                    width: parent.width * clamp(root.media.progress, 0, 1);
-                                    height: bar-ta.has-hover && root.media.can-seek ? 5px : 3px;
-                                    border-radius: self.height / 2;
-                                    background: root.accent;
-                                }
-
-                                bar-ta := TouchArea {
-                                    enabled: root.media.can-seek;
-                                    clicked => { root.media-seek(self.mouse-x / self.width); }
-                                }
-                            }
-
-                            Text {
-                                text: root.media.duration;
-                                color: root.fg.with-alpha(0.5);
-                                font-size: 10px;
-                                vertical-alignment: center;
-                            }
-                        }
-                    }
-
-                    HorizontalLayout {
-                        spacing: 2px;
-                        alignment: center;
-                        horizontal-stretch: 0;
-
-                        IconButton {
-                            y: (parent.height - self.height) / 2;
-                            icon: "previous";
-                            ink: root.fg;
-                            enabled: root.media.can-previous;
-                            clicked => { root.media-action("prev"); }
-                        }
-
-                        IconButton {
-                            y: (parent.height - self.height) / 2;
-                            size: 36px;
-                            icon: root.media.playing ? "pause" : "play";
-                            ink: root.fg;
-                            enabled: root.media.can-toggle;
-                            clicked => { root.media-action("toggle"); }
-                        }
-
-                        IconButton {
-                            y: (parent.height - self.height) / 2;
-                            icon: "next";
-                            ink: root.fg;
-                            enabled: root.media.can-next;
-                            clicked => { root.media-action("next"); }
-                        }
-                    }
-                }
-
-                // Demande de permission de Claude Code.
-                if root.has-prompt: VerticalLayout {
-                    spacing: 6px;
-
-                    Text {
-                        text: @tr("{} wants to use {}", root.prompt.project, root.prompt.tool);
-                        color: root.accent;
-                        font-size: 14px;
-                        font-weight: 600;
-                        overflow: elide;
-                    }
-
-                    Text {
-                        text: root.prompt.detail;
-                        color: root.fg.with-alpha(0.75);
-                        font-size: 12px;
-                        font-family: "Consolas";
-                        overflow: elide;
-                    }
-
-                    HorizontalLayout {
-                        spacing: 8px;
-
-                        PillButton {
-                            text: @tr("Allow");
-                            fill: root.accent;
-                            ink: root.bg;
-                            clicked => { root.claude-decide(root.prompt.id, "allow"); }
-                        }
-
-                        PillButton {
-                            text: @tr("Deny");
-                            fill: root.fg.with-alpha(0.12);
-                            ink: root.fg;
-                            clicked => { root.claude-decide(root.prompt.id, "deny"); }
-                        }
-
-                        PillButton {
-                            text: @tr("Terminal");
-                            fill: transparent;
-                            ink: root.fg.with-alpha(0.8);
-                            line: root.fg.with-alpha(0.25);
-                            clicked => { root.claude-decide(root.prompt.id, "ask"); }
-                        }
-                    }
-                }
-
-                // Minuteur : durées prédéfinies, compte à rebours, pause.
-                if !root.has-prompt && root.has-timer: HorizontalLayout {
-                    height: 30px;
-                    spacing: 6px;
-                    padding-left: 6px;
-
-                    Text {
-                        text: root.timer.phase == 0 ? @tr("Timer")
-                            : root.timer.phase == 3 ? @tr("Time's up!") : root.timer.time;
-                        color: root.timer.phase == 0 ? root.fg.with-alpha(0.7) : root.accent;
-                        font-size: root.timer.phase == 0 ? 12px : 16px;
-                        font-weight: 600;
-                        vertical-alignment: center;
-                        min-width: 64px;
-                    }
-
-                    if root.timer.phase == 0: HorizontalLayout {
-                        spacing: 6px;
-
-                        for minutes in root.timer.presets: PillButton {
-                            text: @tr("{} min", minutes);
-                            fill: root.fg.with-alpha(0.12);
-                            ink: root.fg;
-                            clicked => { root.timer-action("start:" + minutes); }
-                        }
-                    }
-
-                    if root.timer.phase == 1 || root.timer.phase == 2: Rectangle {
-                        horizontal-stretch: 1;
-                        height: 12px;
-
-                        Rectangle {
-                            y: (parent.height - self.height) / 2;
-                            height: 3px;
-                            border-radius: 1.5px;
-                            background: root.fg.with-alpha(0.15);
-                        }
-
-                        Rectangle {
-                            y: (parent.height - self.height) / 2;
-                            width: parent.width * clamp(root.timer.progress, 0, 1);
-                            height: 3px;
-                            border-radius: 1.5px;
-                            background: root.accent;
-                        }
-                    }
-
-                    if root.timer.phase == 1: PillButton {
-                        text: @tr("Pause");
-                        fill: root.fg.with-alpha(0.12);
-                        ink: root.fg;
-                        clicked => { root.timer-action("pause"); }
-                    }
-
-                    if root.timer.phase == 2: PillButton {
-                        text: @tr("Resume");
-                        fill: root.accent;
-                        ink: root.bg;
-                        clicked => { root.timer-action("resume"); }
-                    }
-
-                    if root.timer.phase == 1 || root.timer.phase == 2: PillButton {
-                        text: @tr("Reset");
-                        fill: transparent;
-                        ink: root.fg.with-alpha(0.8);
-                        line: root.fg.with-alpha(0.25);
-                        clicked => { root.timer-action("reset"); }
-                    }
-
-                    if root.timer.phase == 3: PillButton {
-                        text: @tr("OK");
-                        fill: root.accent;
-                        ink: root.bg;
-                        clicked => { root.timer-action("reset"); }
-                    }
-                }
-
-                // Plugins WASM : une ligne de texte par plugin.
-                if !root.has-prompt && root.plugin-rows.length > 0: VerticalLayout {
-                    spacing: 2px;
-
-                    for plugin in root.plugin-rows: Rectangle {
-                        height: 22px;
-
                         HorizontalLayout {
-                            padding-left: 6px;
                             spacing: 8px;
 
-                            Text {
-                                text: plugin.name;
-                                color: root.fg.with-alpha(0.55);
-                                font-size: 12px;
-                                font-weight: 600;
-                                vertical-alignment: center;
-                                min-width: 64px;
+                            PillButton {
+                                text: @tr("Allow");
+                                fill: root.accent;
+                                ink: root.bg;
+                                clicked => { root.claude-decide(root.prompt.id, "allow"); }
                             }
 
-                            Text {
-                                text: plugin.text;
-                                color: plugin.attention > 0 ? root.accent : root.fg;
-                                font-size: 12px;
-                                vertical-alignment: center;
-                                overflow: elide;
-                                horizontal-stretch: 1;
+                            PillButton {
+                                text: @tr("Deny");
+                                fill: root.fg.with-alpha(0.12);
+                                ink: root.fg;
+                                clicked => { root.claude-decide(root.prompt.id, "deny"); }
+                            }
+
+                            PillButton {
+                                text: @tr("Terminal");
+                                fill: transparent;
+                                ink: root.fg.with-alpha(0.8);
+                                line: root.fg.with-alpha(0.25);
+                                clicked => { root.claude-decide(root.prompt.id, "ask"); }
                             }
                         }
                     }
-                }
 
-                // Étagère : fichiers déposés sur l'île, un clic les ouvre.
-                if !root.has-prompt && root.shelf-rows.length > 0: HorizontalLayout {
-                    height: 28px;
-                    spacing: 6px;
-                    padding-left: 6px;
+                    // Minuteur : durées prédéfinies, compte à rebours, pause.
+                    if !root.has-prompt && root.has-timer: HorizontalLayout {
+                        height: 30px;
+                        spacing: 6px;
+                        padding-left: 6px;
 
-                    Text {
-                        text: @tr("Shelf");
-                        color: root.fg.with-alpha(0.7);
-                        font-size: 12px;
-                        font-weight: 600;
-                        vertical-alignment: center;
-                        min-width: 64px;
-                    }
-
-                    for item[i] in root.shelf-rows: Rectangle {
-                        horizontal-stretch: 1;
-                        height: 24px;
-                        border-radius: 12px;
-                        background: chip-ta.has-hover ? root.fg.with-alpha(0.2) : root.fg.with-alpha(0.12);
-
-                        chip-ta := TouchArea {
-                            clicked => { root.shelf-open(i); }
+                        Text {
+                            text: root.timer.phase == 0 ? @tr("Timer")
+                                : root.timer.phase == 3 ? @tr("Time's up!") : root.timer.time;
+                            color: root.timer.phase == 0 ? root.fg.with-alpha(0.7) : root.accent;
+                            font-size: root.timer.phase == 0 ? 12px : 16px;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                            min-width: 64px;
                         }
 
-                        HorizontalLayout {
-                            padding-left: 10px;
-                            padding-right: 2px;
-                            spacing: 2px;
+                        if root.timer.phase == 0: HorizontalLayout {
+                            spacing: 6px;
 
-                            Text {
-                                text: item.name;
-                                color: root.fg;
-                                font-size: 12px;
-                                vertical-alignment: center;
-                                overflow: elide;
-                                horizontal-stretch: 1;
+                            for minutes in root.timer.presets: PillButton {
+                                text: @tr("{} min", minutes);
+                                fill: root.fg.with-alpha(0.12);
+                                ink: root.fg;
+                                clicked => { root.timer-action("start:" + minutes); }
+                            }
+                        }
+
+                        if root.timer.phase == 1 || root.timer.phase == 2: Rectangle {
+                            horizontal-stretch: 1;
+                            height: 12px;
+
+                            Rectangle {
+                                y: (parent.height - self.height) / 2;
+                                height: 3px;
+                                border-radius: 1.5px;
+                                background: root.fg.with-alpha(0.15);
                             }
 
                             Rectangle {
-                                width: 20px;
+                                y: (parent.height - self.height) / 2;
+                                width: parent.width * clamp(root.timer.progress, 0, 1);
+                                height: 3px;
+                                border-radius: 1.5px;
+                                background: root.accent;
+                            }
+                        }
+
+                        if root.timer.phase == 1: PillButton {
+                            text: @tr("Pause");
+                            fill: root.fg.with-alpha(0.12);
+                            ink: root.fg;
+                            clicked => { root.timer-action("pause"); }
+                        }
+
+                        if root.timer.phase == 2: PillButton {
+                            text: @tr("Resume");
+                            fill: root.accent;
+                            ink: root.bg;
+                            clicked => { root.timer-action("resume"); }
+                        }
+
+                        if root.timer.phase == 1 || root.timer.phase == 2: PillButton {
+                            text: @tr("Reset");
+                            fill: transparent;
+                            ink: root.fg.with-alpha(0.8);
+                            line: root.fg.with-alpha(0.25);
+                            clicked => { root.timer-action("reset"); }
+                        }
+
+                        if root.timer.phase == 3: PillButton {
+                            text: @tr("OK");
+                            fill: root.accent;
+                            ink: root.bg;
+                            clicked => { root.timer-action("reset"); }
+                        }
+                    }
+
+                    // Plugins WASM : une ligne de texte par plugin.
+                    if !root.has-prompt && root.plugin-rows.length > 0: VerticalLayout {
+                        spacing: 2px;
+
+                        for plugin in root.plugin-rows: Rectangle {
+                            height: 22px;
+
+                            HorizontalLayout {
+                                padding-left: 6px;
+                                spacing: 8px;
+
                                 Text {
-                                    text: "×";
-                                    color: root.fg.with-alpha(0.7);
-                                    font-size: 14px;
-                                    horizontal-alignment: center;
+                                    text: plugin.name;
+                                    color: root.fg.with-alpha(0.55);
+                                    font-size: 12px;
+                                    font-weight: 600;
                                     vertical-alignment: center;
+                                    min-width: 64px;
                                 }
-                                TouchArea {
-                                    clicked => { root.shelf-remove(i); }
+
+                                Text {
+                                    text: plugin.text;
+                                    color: plugin.attention > 0 ? root.accent : root.fg;
+                                    font-size: 12px;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                    horizontal-stretch: 1;
                                 }
                             }
                         }
                     }
 
-                    if root.shelf-more != "": Text {
-                        text: root.shelf-more;
-                        color: root.fg.with-alpha(0.6);
-                        font-size: 12px;
-                        vertical-alignment: center;
+                    // Étagère : fichiers déposés sur l'île, un clic les ouvre.
+                    if !root.has-prompt && root.shelf-rows.length > 0: HorizontalLayout {
+                        height: 28px;
+                        spacing: 6px;
+                        padding-left: 6px;
+
+                        Text {
+                            text: @tr("Shelf");
+                            color: root.fg.with-alpha(0.7);
+                            font-size: 12px;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                            min-width: 64px;
+                        }
+
+                        for item[i] in root.shelf-rows: Rectangle {
+                            horizontal-stretch: 1;
+                            height: 24px;
+                            border-radius: 12px;
+                            background: chip-ta.has-hover ? root.fg.with-alpha(0.2) : root.fg.with-alpha(0.12);
+
+                            chip-ta := TouchArea {
+                                clicked => { root.shelf-open(i); }
+                            }
+
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 2px;
+                                spacing: 2px;
+
+                                Text {
+                                    text: item.name;
+                                    color: root.fg;
+                                    font-size: 12px;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                    horizontal-stretch: 1;
+                                }
+
+                                Rectangle {
+                                    width: 20px;
+                                    Text {
+                                        text: "×";
+                                        color: root.fg.with-alpha(0.7);
+                                        font-size: 14px;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                    TouchArea {
+                                        clicked => { root.shelf-remove(i); }
+                                    }
+                                }
+                            }
+                        }
+
+                        if root.shelf-more != "": Text {
+                            text: root.shelf-more;
+                            color: root.fg.with-alpha(0.6);
+                            font-size: 12px;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    // Agenda : prochaines réunions, bouton « Rejoindre ».
+                    if !root.has-prompt && root.agenda-rows.length > 0: VerticalLayout {
+                        spacing: 2px;
+
+                        for item in root.agenda-rows: Rectangle {
+                            height: 24px;
+
+                            HorizontalLayout {
+                                padding-left: 6px;
+                                padding-right: 2px;
+                                spacing: 8px;
+
+                                Dot {
+                                    y: (parent.height - self.height) / 2;
+                                    background: item.soon ? root.accent : root.fg.with-alpha(0.35);
+                                }
+
+                                Text {
+                                    text: item.time;
+                                    color: item.soon ? root.accent : root.fg.with-alpha(0.7);
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    vertical-alignment: center;
+                                }
+
+                                if item.location != "": Text {
+                                    text: item.location;
+                                    color: root.fg.with-alpha(0.55);
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    vertical-alignment: center;
+                                }
+
+                                Text {
+                                    text: item.title;
+                                    color: root.fg;
+                                    font-size: 13px;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                    horizontal-stretch: 1;
+                                }
+
+                                if item.relative != "": Text {
+                                    text: item.relative;
+                                    color: item.soon ? root.accent : root.fg.with-alpha(0.55);
+                                    font-size: 12px;
+                                    vertical-alignment: center;
+                                }
+
+                                if item.has-join: Rectangle {
+                                    width: join-label.preferred-width + 16px;
+                                    height: 20px;
+                                    y: (parent.height - self.height) / 2;
+                                    border-radius: 10px;
+                                    background: join-ta.has-hover ? root.accent.brighter(0.15) : root.accent;
+
+                                    join-label := Text {
+                                        text: @tr("Join");
+                                        color: root.bg;
+                                        font-size: 11px;
+                                        font-weight: 700;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+
+                                    join-ta := TouchArea {
+                                        clicked => { root.open-url(item.join-url); }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Sessions Claude Code en cours (clic : ramène le terminal).
+                    if !root.has-prompt && root.claude-rows.length > 0: VerticalLayout {
+                        spacing: 2px;
+
+                        for row in root.claude-rows: Rectangle {
+                            height: 24px;
+                            border-radius: 6px;
+                            background: row-ta.has-hover ? root.fg.with-alpha(0.08) : transparent;
+
+                            HorizontalLayout {
+                                padding-left: 6px;
+                                padding-right: 6px;
+                                spacing: 8px;
+
+                                Dot {
+                                    y: (parent.height - self.height) / 2;
+                                    background: row.urgent ? root.accent
+                                        : row.active ? root.fg.with-alpha(0.7) : root.fg.with-alpha(0.25);
+                                }
+
+                                Text {
+                                    text: row.project;
+                                    color: root.fg;
+                                    font-size: 13px;
+                                    font-weight: 600;
+                                    vertical-alignment: center;
+                                }
+
+                                Text {
+                                    text: row.status;
+                                    color: row.urgent ? root.accent : root.fg.with-alpha(0.6);
+                                    font-size: 13px;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                    horizontal-stretch: 1;
+                                }
+                            }
+
+                            row-ta := TouchArea {
+                                clicked => { root.claude-focus(row.id); }
+                            }
+                        }
+                    }
+
+                    if !root.has-prompt && !root.has-media && root.claude-rows.length == 0 && root.agenda-rows.length == 0: Text {
+                        text: root.has-attention ? root.attention-label : @tr("All quiet");
+                        color: root.has-attention && root.urgent ? root.accent : root.fg.with-alpha(0.75);
+                        font-size: 14px;
+                        overflow: elide;
                     }
                 }
 
-                // Agenda : prochaines réunions, bouton « Rejoindre ».
-                if !root.has-prompt && root.agenda-rows.length > 0: VerticalLayout {
-                    spacing: 2px;
+                // Onglet Claude : consommation estimée et conversations récentes.
+                if root.tab == 1: VerticalLayout {
+                    spacing: 3px;
+                    alignment: start;
+                    vertical-stretch: 1;
 
-                    for item in root.agenda-rows: Rectangle {
-                        height: 24px;
+                    Text {
+                        text: root.usage-text;
+                        color: root.fg.with-alpha(0.8);
+                        font-size: 12px;
+                        overflow: elide;
+                    }
+
+                    if root.usage-has-limit: Rectangle {
+                        height: 4px;
+                        border-radius: 2px;
+                        background: root.fg.with-alpha(0.15);
+
+                        Rectangle {
+                            x: 0;
+                            width: parent.width * clamp(root.usage-ratio, 0, 1);
+                            border-radius: 2px;
+                            background: root.usage-ratio > 0.85 ? #FF453A : root.accent;
+                        }
+                    }
+
+                    for item in root.recent-rows: Rectangle {
+                        height: 20px;
+                        border-radius: 6px;
+                        background: recent-ta.has-hover ? root.fg.with-alpha(0.12) : transparent;
+
+                        recent-ta := TouchArea {
+                            clicked => { root.recent-open(item.id); }
+                        }
 
                         HorizontalLayout {
-                            padding-left: 6px;
-                            padding-right: 2px;
-                            spacing: 8px;
-
-                            Dot {
-                                y: (parent.height - self.height) / 2;
-                                background: item.soon ? root.accent : root.fg.with-alpha(0.35);
-                            }
-
-                            Text {
-                                text: item.time;
-                                color: item.soon ? root.accent : root.fg.with-alpha(0.7);
-                                font-size: 12px;
-                                font-weight: 600;
-                                vertical-alignment: center;
-                            }
-
-                            if item.location != "": Text {
-                                text: item.location;
-                                color: root.fg.with-alpha(0.55);
-                                font-size: 12px;
-                                font-weight: 600;
-                                vertical-alignment: center;
-                            }
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 10px;
 
                             Text {
                                 text: item.title;
                                 color: root.fg;
-                                font-size: 13px;
+                                font-size: 12px;
                                 vertical-alignment: center;
                                 overflow: elide;
                                 horizontal-stretch: 1;
                             }
 
-                            if item.relative != "": Text {
-                                text: item.relative;
-                                color: item.soon ? root.accent : root.fg.with-alpha(0.55);
+                            Text {
+                                text: item.meta;
+                                color: root.fg.with-alpha(0.5);
+                                font-size: 11px;
+                                vertical-alignment: center;
+                                horizontal-alignment: right;
+                            }
+                        }
+                    }
+
+                    if root.recent-rows.length == 0: Text {
+                        text: @tr("No conversation found");
+                        color: root.fg.with-alpha(0.5);
+                        font-size: 12px;
+                    }
+                }
+
+                // Onglet des notifications : les dernières, un clic ouvre l'application.
+                if root.tab == 2: VerticalLayout {
+                    spacing: 2px;
+                    alignment: start;
+                    vertical-stretch: 1;
+
+                    for item in root.notif-rows: Rectangle {
+                        height: 26px;
+                        border-radius: 8px;
+                        background: notif-ta.has-hover || close-ta.has-hover ? root.fg.with-alpha(0.08) : transparent;
+
+                        notif-ta := TouchArea {
+                            clicked => { root.notif-action("open:" + item.id); }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 6px;
+                            padding-right: 4px;
+                            spacing: 8px;
+
+                            Avatar {
+                                size: 18px;
+                                y: (parent.height - self.height) / 2;
+                                initial: item.initial;
+                                tint: item.tint;
+                            }
+
+                            Text {
+                                text: item.app;
+                                color: item.tint;
                                 font-size: 12px;
+                                font-weight: 700;
                                 vertical-alignment: center;
                             }
 
-                            if item.has-join: Rectangle {
-                                width: join-label.preferred-width + 16px;
-                                height: 20px;
-                                y: (parent.height - self.height) / 2;
-                                border-radius: 10px;
-                                background: join-ta.has-hover ? root.accent.brighter(0.15) : root.accent;
+                            if item.title != "": Text {
+                                text: item.title;
+                                color: root.fg;
+                                font-size: 12px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                max-width: 140px;
+                            }
 
-                                join-label := Text {
-                                    text: @tr("Join");
-                                    color: root.bg;
-                                    font-size: 11px;
-                                    font-weight: 700;
+                            Text {
+                                text: item.body;
+                                color: root.fg.with-alpha(0.6);
+                                font-size: 12px;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+
+                            Text {
+                                text: item.ago;
+                                color: root.fg.with-alpha(0.45);
+                                font-size: 11px;
+                                vertical-alignment: center;
+                            }
+
+                            Rectangle {
+                                width: 18px;
+                                opacity: notif-ta.has-hover || close-ta.has-hover ? 1 : 0;
+
+                                Text {
+                                    text: "×";
+                                    color: close-ta.has-hover ? root.accent : root.fg.with-alpha(0.7);
+                                    font-size: 14px;
                                     horizontal-alignment: center;
                                     vertical-alignment: center;
                                 }
 
-                                join-ta := TouchArea {
-                                    clicked => { root.open-url(item.join-url); }
+                                close-ta := TouchArea {
+                                    clicked => { root.notif-action("remove:" + item.id); }
                                 }
                             }
                         }
                     }
-                }
 
-                // Sessions Claude Code en cours (clic : ramène le terminal).
-                if !root.has-prompt && root.claude-rows.length > 0: VerticalLayout {
-                    spacing: 2px;
-
-                    for row in root.claude-rows: Rectangle {
-                        height: 24px;
-                        border-radius: 6px;
-                        background: row-ta.has-hover ? root.fg.with-alpha(0.08) : transparent;
-
-                        HorizontalLayout {
-                            padding-left: 6px;
-                            padding-right: 6px;
-                            spacing: 8px;
-
-                            Dot {
-                                y: (parent.height - self.height) / 2;
-                                background: row.urgent ? root.accent
-                                    : row.active ? root.fg.with-alpha(0.7) : root.fg.with-alpha(0.25);
-                            }
-
-                            Text {
-                                text: row.project;
-                                color: root.fg;
-                                font-size: 13px;
-                                font-weight: 600;
-                                vertical-alignment: center;
-                            }
-
-                            Text {
-                                text: row.status;
-                                color: row.urgent ? root.accent : root.fg.with-alpha(0.6);
-                                font-size: 13px;
-                                vertical-alignment: center;
-                                overflow: elide;
-                                horizontal-stretch: 1;
-                            }
-                        }
-
-                        row-ta := TouchArea {
-                            clicked => { root.claude-focus(row.id); }
-                        }
+                    if root.notif-rows.length == 0: Text {
+                        text: @tr("No notifications");
+                        color: root.fg.with-alpha(0.5);
+                        font-size: 12px;
                     }
-                }
-
-                if !root.has-prompt && !root.has-media && root.claude-rows.length == 0 && root.agenda-rows.length == 0: Text {
-                    text: root.has-attention ? root.attention-label : @tr("All quiet");
-                    color: root.has-attention && root.urgent ? root.accent : root.fg.with-alpha(0.75);
-                    font-size: 14px;
-                    overflow: elide;
-                }
-
-                Rectangle {
-                    vertical-stretch: 1;
                 }
             }
         }

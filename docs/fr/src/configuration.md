@@ -131,6 +131,15 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 | `enabled` | `true` | | garder les fichiers déposés sur l'[étagère](etagere.md) |
 | `max` | `8` | 1 à 30 | nombre de fichiers gardés |
 
+## `[modules.notifications]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `true` | | annoncer les [notifications](notifications.md) des applications dans l'île (Windows) |
+| `show_secs` | `5` | 1 à 30 | durée d'affichage d'une nouvelle notification (s) |
+| `show_content` | `true` | | montrer l'expéditeur et le message ; sinon, seulement le nom de l'application |
+| `ignore` | `[]` | | applications à ignorer (morceau de nom, sans tenir compte de la casse) |
+
 ## `[modules.volume]`
 
 | Option | Défaut | Plage | Rôle |

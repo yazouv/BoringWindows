@@ -18,6 +18,7 @@ use bw_config::{Config, ConfigError, ConfigWatcher, OpenOn};
 use bw_core::{Action, Arbiter, Attention, Module, ModuleEvent, ModuleEventKind, ModuleHost};
 use bw_i18n::tr;
 use bw_media::{MediaConfig, MediaModule, MediaSnapshot};
+use bw_notify::{NotifyConfig, NotifyModule, NotifySnapshot};
 use bw_timer::{Phase as TimerPhase, TimerConfig, TimerModule, TimerSnapshot};
 use slint::winit_030::WinitWindowAccessor;
 use slint::{
@@ -28,8 +29,8 @@ use crate::geometry::{self, Shape};
 use crate::platform::{self, Platform, PlatformEvent, Tray, TrayCommand};
 use crate::shelf::{Shelf, ShelfConfig};
 use crate::{
-    AgendaRow, ClaudePrompt, ClaudeRow, Island, MediaInfo, PluginRow, RecentRow, ShelfRow,
-    TimerInfo, clock, demo,
+    AgendaRow, ClaudePrompt, ClaudeRow, Island, MediaInfo, NotifInfo, PluginRow, RecentRow,
+    ShelfRow, TimerInfo, clock, demo,
 };
 
 /// Pseudo-module utilisé pour signaler une config invalide dans l'île.
@@ -40,6 +41,10 @@ const FLASH: &str = "app";
 /// sans la carte du lecteur.
 const MAX_ROWS: usize = 4;
 const MAX_ROWS_WITH_MEDIA: usize = 2;
+/// Notifications qui tiennent dans leur onglet.
+const NOTIF_ROWS: usize = 4;
+/// Onglets de l'île ouverte (propriété `tab` de `island.slint`).
+const TAB_NOTIFICATIONS: i32 = 2;
 
 thread_local! {
     static CONTROLLER: OnceCell<Rc<Controller>> = const { OnceCell::new() };
@@ -105,6 +110,8 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         activity: RefCell::new(None),
         timer_tick: Timer::default(),
         media_seen: RefCell::new(BTreeSet::new()),
+        notify: RefCell::new(None),
+        notif_seq: Cell::new(0),
     });
     CONTROLLER.with(|c| {
         let _ = c.set(controller.clone());
@@ -154,6 +161,10 @@ pub struct Controller {
     /// Lecteurs vus depuis le lancement (jetons `ignore`), pour les réglages.
     media_seen: RefCell<BTreeSet<String>>,
     calendar: RefCell<Option<Arc<CalendarSnapshot>>>,
+    /// Dernier état des notifications (absent si le module est désactivé).
+    notify: RefCell<Option<Arc<NotifySnapshot>>>,
+    /// Compteur passé à l'UI pour rejouer l'animation d'arrivée.
+    notif_seq: Cell<i32>,
     settings: RefCell<Option<settings::SettingsState>>,
     open_settings_at_start: Cell<bool>,
     update_state: Cell<update::UpdateState>,
@@ -216,6 +227,10 @@ impl Controller {
             .on_media_seek(with(&weak, |c, fraction: f32| c.media_seek(fraction)));
         self.ui
             .on_recent_open(with(&weak, |c, id: slint::SharedString| c.open_recent(&id)));
+        self.ui
+            .on_notif_action(with(&weak, |c, action: slint::SharedString| {
+                c.notif_action(&action);
+            }));
         self.ui
             .on_shelf_open(with(&weak, |c, i: i32| c.shelf_open(i as usize)));
         self.ui
@@ -340,6 +355,10 @@ impl Controller {
     fn set_expanded(&self, expanded: bool) {
         self.collapse_timer.stop();
         if self.expanded.replace(expanded) != expanded {
+            if expanded && self.announcing().is_some() {
+                self.ui.set_tab(TAB_NOTIFICATIONS);
+                self.send_notify("hide");
+            }
             self.refresh_shape();
             if expanded {
                 self.refresh_activity();
@@ -375,8 +394,14 @@ impl Controller {
     /// Recalcule l'état affiché après un changement (ouverture, attention…).
     fn refresh_shape(&self) {
         let winner = self.arbiter.borrow().winner();
+        // Une notification ne dure que quelques secondes : elle passe devant
+        // tout, sauf une action requise (permission de Claude…).
+        let notif_wins = self.announcing().is_some()
+            && winner.as_ref().is_some_and(|w| w.level < Attention::Urgent);
         let new = if self.expanded.get() {
             Shape::Expanded
+        } else if notif_wins {
+            Shape::Notification
         } else if winner.is_some() {
             Shape::Attention
         } else {
@@ -385,6 +410,7 @@ impl Controller {
 
         self.ui.set_expanded(self.expanded.get());
         self.ui.set_has_attention(winner.is_some());
+        self.ui.set_has_notif(notif_wins);
         self.ui.set_urgent(
             winner
                 .as_ref()
@@ -483,6 +509,9 @@ impl Controller {
         ui.set_attention_height(t.attention.height);
         ui.set_expanded_width(t.expanded.width);
         ui.set_expanded_height(t.expanded.height);
+        let notif = geometry::notification_size(t);
+        ui.set_notif_width(notif.width);
+        ui.set_notif_height(notif.height);
         ui.set_corner_radius(t.corner_radius);
         ui.set_top_offset(t.top_offset);
         ui.set_anim(t.animation_ms.into());
@@ -578,6 +607,11 @@ impl Controller {
 
         *self.calendar.borrow_mut() = None;
         *self.timer.borrow_mut() = None;
+        *self.notify.borrow_mut() = None;
+        self.ui.set_has_notif_tab(false);
+        self.ui.set_notif_rows(ModelRc::default());
+        self.ui.set_unread_colors(ModelRc::default());
+        self.ui.set_notif_unread(0);
         self.viz_active.set(false);
         *self.activity.borrow_mut() = None;
         self.ui.set_has_claude_tab(false);
@@ -633,6 +667,8 @@ impl Controller {
                     self.apply_plugins(snapshot);
                 } else if let Some(snapshot) = state.downcast_ref::<bw_viz::VizSnapshot>() {
                     self.apply_viz(snapshot);
+                } else if let Ok(snapshot) = state.clone().downcast::<NotifySnapshot>() {
+                    self.apply_notify(snapshot);
                 } else if let Some(snapshot) = state.downcast_ref::<TimerSnapshot>() {
                     self.apply_timer(snapshot.clone());
                 } else if let Ok(snapshot) = state.clone().downcast::<CalendarSnapshot>() {
@@ -731,6 +767,79 @@ impl Controller {
             host.send_action(Action {
                 module: bw_claude::ACTIVITY_ID.into(),
                 name: "refresh".into(),
+            });
+        }
+    }
+
+    // --- Notifications des applications --------------------------------------
+
+    fn apply_notify(&self, snapshot: Arc<NotifySnapshot>) {
+        let previous = self.announcing().map(|n| n.id);
+        if let Some(n) = snapshot.announcing.as_ref()
+            && previous != Some(n.id)
+        {
+            self.ui.set_notif(notif_info(n, ""));
+            self.notif_seq.set(self.notif_seq.get().wrapping_add(1));
+            self.ui.set_notif_seq(self.notif_seq.get());
+        }
+
+        let now = chrono::Utc::now();
+        let rows: Vec<NotifInfo> = snapshot
+            .recent
+            .iter()
+            .take(NOTIF_ROWS)
+            .map(|n| notif_info(n, &ago(n.at.into(), now)))
+            .collect();
+        self.ui.set_notif_rows(ModelRc::new(VecModel::from(rows)));
+
+        // Un point par application, dans l'ordre d'arrivée des non lues.
+        let mut colors: Vec<slint::Color> = Vec::new();
+        for n in snapshot.recent.iter().take(snapshot.unread) {
+            let c = rgb(n.color());
+            if !colors.contains(&c) && colors.len() < 3 {
+                colors.push(c);
+            }
+        }
+        self.ui
+            .set_unread_colors(ModelRc::new(VecModel::from(colors)));
+        self.ui.set_notif_unread(snapshot.unread as i32);
+        self.ui.set_has_notif_tab(true);
+        // Arrivée pendant que l'onglet est sous les yeux : déjà lue.
+        if snapshot.unread > 0 && self.expanded.get() && self.ui.get_tab() == TAB_NOTIFICATIONS {
+            self.send_notify("seen");
+        }
+
+        *self.notify.borrow_mut() = Some(snapshot);
+        self.refresh_shape();
+    }
+
+    /// Notification annoncée dans la pilule en ce moment.
+    fn announcing(&self) -> Option<bw_notify::Notification> {
+        self.notify.borrow().as_ref()?.announcing.clone()
+    }
+
+    fn notif_action(&self, action: &str) {
+        let Some(id) = action.strip_prefix("open:") else {
+            return self.send_notify(action);
+        };
+        let app_id = self.notify.borrow().as_ref().and_then(|s| {
+            s.recent
+                .iter()
+                .find(|n| (n.id as i32).to_string() == id)
+                .map(|n| n.app_id.clone())
+        });
+        if let Some(app_id) = app_id
+            && !platform::open_app(&app_id)
+        {
+            log::info!("application {app_id} introuvable");
+        }
+    }
+
+    fn send_notify(&self, action: &str) {
+        if let Some(host) = self.host.borrow().as_ref() {
+            host.send_action(Action {
+                module: bw_notify::MODULE_ID.into(),
+                name: action.into(),
             });
         }
     }
@@ -1381,6 +1490,12 @@ fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
             Err(e) => errors.push(format!("modules.media : {e:#}")),
         }
     }
+    if NotifyModule::is_supported() && config.module_enabled(bw_notify::MODULE_ID, true) {
+        match NotifyConfig::from_table(config.modules.get(bw_notify::MODULE_ID)) {
+            Ok(c) => modules.push(Box::new(NotifyModule::new(c))),
+            Err(e) => errors.push(format!("modules.notifications : {e:#}")),
+        }
+    }
     if config.module_enabled(bw_calendar::MODULE_ID, true) {
         match CalendarConfig::from_table(config.modules.get(bw_calendar::MODULE_ID)) {
             Ok(c) => modules.push(Box::new(CalendarModule::new(c))),
@@ -1497,6 +1612,22 @@ fn format_time(d: Duration) -> String {
 
 fn color(c: bw_config::Color) -> slint::Color {
     slint::Color::from_argb_u8(c.a, c.r, c.g, c.b)
+}
+
+fn rgb([r, g, b]: [u8; 3]) -> slint::Color {
+    slint::Color::from_rgb_u8(r, g, b)
+}
+
+fn notif_info(n: &bw_notify::Notification, ago: &str) -> NotifInfo {
+    NotifInfo {
+        id: n.id as i32,
+        app: n.app.as_str().into(),
+        title: n.title.as_str().into(),
+        body: n.body.as_str().into(),
+        tint: rgb(n.color()),
+        initial: n.initial().into(),
+        ago: ago.into(),
+    }
 }
 
 /// Adapte une méthode du contrôleur en callback Slint sans cycle de références.

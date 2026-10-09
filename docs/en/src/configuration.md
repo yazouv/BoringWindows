@@ -130,6 +130,15 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 | `enabled` | `true` | | keep files dropped on the [shelf](etagere.md) |
 | `max` | `8` | 1 to 30 | number of files kept |
 
+## `[modules.notifications]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `true` | | announce app [notifications](notifications.md) in the island (Windows) |
+| `show_secs` | `5` | 1 to 30 | how long a new notification shows (s) |
+| `show_content` | `true` | | show the sender and the message; otherwise, only the app name |
+| `ignore` | `[]` | | apps to ignore (part of a name, case-insensitive) |
+
 ## `[modules.volume]`
 
 | Option | Default | Range | Purpose |

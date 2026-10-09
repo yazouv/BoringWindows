@@ -519,6 +519,30 @@ pub fn open_path(path: &Path) {
     }
 }
 
+/// Ouvre (ou ramène) l'application d'identifiant `app_id` (AppUserModelID,
+/// lu dans une notification) via le dossier virtuel des applications.
+pub fn open_app(app_id: &str) -> bool {
+    // L'identifiant vient du système, mais on refuse tout ce qui pourrait
+    // sortir du chemin `shell:AppsFolder\…`.
+    if app_id.is_empty() || app_id.len() > 512 || app_id.chars().any(|c| c.is_control() || c == '"')
+    {
+        return false;
+    }
+    let target = HSTRING::from(format!("shell:AppsFolder\\{app_id}"));
+    // SAFETY: chaînes valides pour la durée de l'appel.
+    let result = unsafe {
+        ShellExecuteW(
+            None,
+            w!("open"),
+            &target,
+            PCWSTR::null(),
+            PCWSTR::null(),
+            SW_SHOWNORMAL,
+        )
+    };
+    result.0 as isize > 32
+}
+
 // ---------------------------------------------------------------------------
 // Boîte de confirmation et terminal des sessions Claude
 
