@@ -9,9 +9,10 @@ use slint::BackendSelector;
 use slint::winit_030::winit::window::Window;
 
 use super::PlatformEvent;
+use super::SystemLook;
 #[cfg(not(target_os = "macos"))]
 use super::TrayCommand;
-use crate::geometry::PhysRect;
+use crate::geometry::{PhysRect, RoundRect};
 
 pub struct SingleInstance;
 
@@ -53,6 +54,10 @@ impl Platform {
     pub fn place(&self, _window: &slint::Window, _choice: MonitorChoice, _size: (f32, f32)) {}
 
     pub fn set_hit_region(&self, _rect: PhysRect) {}
+
+    pub fn set_round_region(&self, _shape: RoundRect) {}
+
+    pub fn set_blur(&self, _on: bool) {}
 
     pub fn set_visible(&self, _visible: bool) {}
 
@@ -158,4 +163,15 @@ pub fn open_path(path: &Path) {
 pub fn resume_claude_session(_cwd: &Path, _session_id: &str) -> bool {
     log::warn!("rouvrir une conversation n'est géré que sous Windows");
     false
+}
+
+/// Hors Windows : thème sombre, accent du thème.
+pub fn system_look() -> SystemLook {
+    SystemLook::default()
+}
+
+pub struct LookWatcher;
+
+pub fn watch_system_look(_on_change: impl Fn() + Send + 'static) -> Option<LookWatcher> {
+    None
 }

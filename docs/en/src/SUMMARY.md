@@ -15,6 +15,8 @@
 - [Timer](minuteur.md)
 - [Shelf](etagere.md)
 - [Volume and brightness](volume.md)
+- [Battery and Bluetooth](energie.md)
+- [Weather](meteo.md)
 - [Plugins (WASM)](plugins.md)
 - [Calendar](agenda/index.md)
   - [Google Calendar](agenda/google.md)

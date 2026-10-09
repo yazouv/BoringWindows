@@ -15,6 +15,13 @@ pub use tray::Tray;
 #[cfg(windows)]
 pub use win32::*;
 
+/// Apparence de Windows (mode des applications, couleur d'accent).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SystemLook {
+    pub light: bool,
+    pub accent: Option<[u8; 3]>,
+}
+
 /// Événements système remontés à l'application (sur le thread UI).
 // Construits uniquement par l'implémentation Win32.
 #[cfg_attr(not(windows), allow(dead_code))]

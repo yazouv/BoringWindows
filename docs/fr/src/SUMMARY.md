@@ -15,6 +15,8 @@
 - [Minuteur](minuteur.md)
 - [Étagère](etagere.md)
 - [Volume et luminosité](volume.md)
+- [Batterie et Bluetooth](energie.md)
+- [Météo](meteo.md)
 - [Plugins (WASM)](plugins.md)
 - [Agenda](agenda/index.md)
   - [Google Agenda](agenda/google.md)

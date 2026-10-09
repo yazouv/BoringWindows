@@ -16,8 +16,9 @@ collapse_delay_ms = 350
 auto_update = true
 
 [theme]
-# Theme: "default" (black), "light", "midnight" (midnight blue), "glass"
-# (smoked glass), or the name of a themes/<name>.toml file next to this file.
+# Theme: "auto" (follows the light or dark mode of Windows), "default" (black),
+# "light", "midnight" (midnight blue), "glass" (smoked glass, blurred), or the name
+# of a themes/<name>.toml file next to this file.
 name = "default"
 # The following keys override the theme's: uncomment to customize.
 # Colors as "#RRGGBB" or "#RRGGBBAA".
@@ -27,10 +28,13 @@ name = "default"
 # border = "#00000000"        # island border (transparent: none)
 # font = "Segoe UI"           # font (default: the system font)
 # corner_radius = 22.0        # corners of the open island (the pill stays round)
+# blur = false               # blur behind the island (Windows; translucent background)
 # Animation duration (ms). 0 = no animation.
 animation_ms = 240
 # Offset from the top of the screen (px).
 top_offset = 0.0
+# Accent color of Windows instead of the theme's.
+system_accent = false
 
 [theme.compact]
 width = 190.0
@@ -101,6 +105,33 @@ ignore = []
 # Clicking a notification in the island replays the real one (right Discord
 # channel, right tab…); false: it only opens the app.
 open_original = true
+
+[modules.battery]
+# PC battery: charger plugged in or out, fully charged, low battery.
+enabled = true
+# How long it stays (s).
+show_secs = 4
+# Low battery threshold (%), reminded again at half the threshold.
+low_percent = 20
+
+[modules.bluetooth]
+# Bluetooth devices: connection with their battery level (headphones,
+# earbuds, mouse…), disconnection, low battery.
+enabled = true
+show_secs = 4
+low_percent = 20
+
+[modules.weather]
+# Current weather next to the date (open-meteo.com, no account).
+enabled = false
+# City (e.g. "Lyon" or "Lyon, France"), or latitude/longitude instead.
+city = ""
+# latitude = 45.76
+# longitude = 4.84
+# Unit: "celsius" or "fahrenheit".
+units = "celsius"
+# Refresh interval (minutes).
+refresh_minutes = 30
 
 [modules.demo]
 # Demo module: changes attention every few seconds to try out the

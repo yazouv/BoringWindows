@@ -16,6 +16,9 @@ Ce qu'elle affiche :
 - 📅 **[Agenda](agenda/index.md)** : tes prochains cours ou réunions (Google,
   Outlook, iCloud, emplois du temps…), un rappel avant le début et un bouton
   **Rejoindre** pour Teams, Meet ou Zoom.
+- 🔋 **[Batterie et Bluetooth](energie.md)** : chargeur branché, batterie
+  faible, casque connecté avec son niveau de batterie.
+- 🌤️ **[Météo](meteo.md)** : le temps qu'il fait, à côté de la date.
 
 Elle est légère (écrite en Rust, aucun navigateur embarqué), ne vole jamais le
 focus et se cache toute seule quand tu passes une vidéo ou un jeu en plein

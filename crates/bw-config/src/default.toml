@@ -16,8 +16,9 @@ collapse_delay_ms = 350
 auto_update = true
 
 [theme]
-# Thème : "default" (noir), "light" (clair), "midnight" (bleu nuit), "glass"
-# (verre fumé), ou le nom d'un fichier themes/<nom>.toml placé à côté de ce fichier.
+# Thème : "auto" (suit le mode clair ou sombre de Windows), "default" (noir),
+# "light" (clair), "midnight" (bleu nuit), "glass" (verre fumé, flouté), ou le nom
+# d'un fichier themes/<nom>.toml placé à côté de ce fichier.
 name = "default"
 # Les clés suivantes remplacent celles du thème : décommente pour personnaliser.
 # Couleurs au format "#RRGGBB" ou "#RRGGBBAA".
@@ -27,10 +28,13 @@ name = "default"
 # border = "#00000000"        # contour de l'île (transparent : aucun)
 # font = "Segoe UI"           # police (par défaut : celle du système)
 # corner_radius = 22.0        # coins de l'île ouverte (la pilule reste ronde)
+# blur = false               # flou derrière l'île (Windows ; fond translucide)
 # Durée des animations (ms). 0 = pas d'animation.
 animation_ms = 240
 # Décalage depuis le haut de l'écran (px).
 top_offset = 0.0
+# Couleur d'accent de Windows à la place de celle du thème.
+system_accent = false
 
 [theme.compact]
 width = 190.0
@@ -101,6 +105,33 @@ ignore = []
 # Un clic sur une notification de l'île rejoue la vraie notification (bon salon
 # Discord, bon onglet…) ; false : il ouvre seulement l'application.
 open_original = true
+
+[modules.battery]
+# Batterie du PC : branchement du chargeur, charge terminée, batterie faible.
+enabled = true
+# Durée d'affichage (s).
+show_secs = 4
+# Seuil de batterie faible (%), rappelé à la moitié du seuil.
+low_percent = 20
+
+[modules.bluetooth]
+# Appareils Bluetooth : connexion avec leur niveau de batterie (casque,
+# écouteurs, souris…), déconnexion, batterie faible.
+enabled = true
+show_secs = 4
+low_percent = 20
+
+[modules.weather]
+# Météo du moment à côté de la date (open-meteo.com, sans compte).
+enabled = false
+# Ville (ex. "Lyon" ou "Lyon, France"), ou latitude/longitude à la place.
+city = ""
+# latitude = 45.76
+# longitude = 4.84
+# Unité : "celsius" ou "fahrenheit".
+units = "celsius"
+# Rafraîchissement (minutes).
+refresh_minutes = 30
 
 [modules.demo]
 # Module de démonstration : fait varier l'attention toutes les quelques secondes

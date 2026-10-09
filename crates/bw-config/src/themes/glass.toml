@@ -4,3 +4,4 @@ foreground = "#FFFFFF"
 accent = "#64D2FF"
 border = "#FFFFFF2E"
 corner_radius = 26.0
+blur = true

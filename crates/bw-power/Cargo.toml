@@ -1,0 +1,30 @@
+[package]
+name = "bw-power"
+description = "Batterie (branchement, charge, niveau faible) et appareils Bluetooth dans l'île de BoringWindows"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+bw-i18n.workspace = true
+anyhow.workspace = true
+bw-core.workspace = true
+log.workspace = true
+serde.workspace = true
+tokio.workspace = true
+toml.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-core = "0.62"
+windows-collections = "0.3"
+windows = { version = "0.62", features = [
+    "Devices_Bluetooth",
+    "Devices_Enumeration",
+    "Foundation",
+    "Foundation_Collections",
+    "System_Power",
+] }
+
+[lints]
+workspace = true

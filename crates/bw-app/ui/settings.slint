@@ -66,6 +66,8 @@ export component SettingsWindow inherits Window {
     in-out property <bool> autostart;
     in-out property <bool> volume-enabled;
     in-out property <bool> brightness-enabled;
+    in-out property <bool> battery-enabled;
+    in-out property <bool> bluetooth-enabled;
     in-out property <bool> notifications-enabled;
     in-out property <bool> notifications-content;
     in-out property <bool> notifications-original;
@@ -78,6 +80,12 @@ export component SettingsWindow inherits Window {
     // --- Apparence ---
     in property <[string]> themes;
     in-out property <int> theme-index;
+    in-out property <bool> blur;
+    in-out property <bool> system-accent;
+    // --- Météo ---
+    in-out property <bool> weather-enabled;
+    in-out property <string> weather-city;
+    in-out property <int> weather-units-index;
     in-out property <string> accent;
     in property <color> accent-preview;
     in-out property <string> background-color;
@@ -209,6 +217,18 @@ export component SettingsWindow inherits Window {
                     }
 
                     CheckBox {
+                        text: @tr("Show the charger and battery level in the island (laptops)");
+                        checked <=> root.battery-enabled;
+                        toggled => { root.changed("modules.battery.enabled"); }
+                    }
+
+                    CheckBox {
+                        text: @tr("Show Bluetooth devices connecting, with their battery level");
+                        checked <=> root.bluetooth-enabled;
+                        toggled => { root.changed("modules.bluetooth.enabled"); }
+                    }
+
+                    CheckBox {
                         text: @tr("Show app notifications in the island (Discord, Slack, Teams…)");
                         checked <=> root.notifications-enabled;
                         toggled => { root.changed("modules.notifications.enabled"); }
@@ -276,6 +296,18 @@ export component SettingsWindow inherits Window {
                             text: @tr("Themes folder");
                             clicked => { root.open-themes-folder(); }
                         }
+                    }
+
+                    CheckBox {
+                        text: @tr("Blur what is behind the island (Windows 11, translucent themes)");
+                        checked <=> root.blur;
+                        toggled => { root.changed("theme.blur"); }
+                    }
+
+                    CheckBox {
+                        text: @tr("Use the Windows accent color");
+                        checked <=> root.system-accent;
+                        toggled => { root.changed("theme.system_accent"); }
                     }
 
                     Row {
@@ -778,6 +810,41 @@ export component SettingsWindow inherits Window {
 
                     Hint {
                         text: @tr("Up to 5 durations, separated by commas (1 to 600). Open the island and pick one to start; 25 is the classic Pomodoro.");
+                    }
+                }
+            }
+
+            Tab {
+                title: @tr("Weather");
+                VerticalBox {
+                    alignment: start;
+
+                    CheckBox {
+                        text: @tr("Show the weather next to the date in the open island");
+                        checked <=> root.weather-enabled;
+                        toggled => { root.changed("modules.weather.enabled"); }
+                    }
+
+                    Row {
+                        label: @tr("City");
+                        LineEdit {
+                            text <=> root.weather-city;
+                            placeholder-text: "Lyon";
+                            edited => { root.changed("modules.weather.city"); }
+                        }
+                    }
+
+                    Row {
+                        label: @tr("Unit");
+                        ComboBox {
+                            model: ["°C", "°F"];
+                            current-index <=> root.weather-units-index;
+                            selected => { root.changed("modules.weather.units"); }
+                        }
+                    }
+
+                    Hint {
+                        text: @tr("Data from open-meteo.com, free and without an account; only the city name and its coordinates are sent. Hover the temperature to see the forecast of the day.");
                     }
                 }
             }

@@ -340,6 +340,7 @@ de texte aux écrans de l'assistant), puis la fenêtre de réglages.
 - [x] Thèmes : `theme.name`, 4 fournis (default, light, midnight, glass), thèmes perso
       `themes/<nom>.toml` rechargés à chaud, clés de `[theme]` prioritaires, contour et police,
       choix dans Réglages › Apparence, page de doc FR + EN
+- [x] Thème `auto` (suit le mode clair/sombre de Windows, à chaud), `system_accent` (accent de Windows), `blur` (flou à la forme de la pilule, Windows 11 ; activé dans `glass`)
 - [x] Layouts `.slint` au runtime (`layout.view`, slint-interpreter + ComponentContainer, rechargement à chaud) + doc de l'API de données, FR + EN
 
 ### Phase 5 — Extensions
@@ -356,6 +357,10 @@ de texte aux écrans de l'assistant), puis la fenêtre de réglages.
 - [x] Clic → bon endroit : la notification est rejouée depuis le centre de notifications (Win+N + UI Automation), sinon l'application s'ouvre
 - [x] Barre des tâches en haut et réduite : pilules ramenées à sa hauteur
 - [x] Plugins WASM (`bw-plugins`, wasmi : bac à sable, budget de calcul, mémoire plafonnée ; texte + attention ; doc FR + EN)
+- [x] Design modernisé de l'île : onglets segmentés à indicateur glissant, halo de la pochette, bouton lecture plein, barre de progression avec curseur
+- [x] Batterie du PC (`bw-power`, module `battery` : branchement, charge terminée, batterie faible ; événements `PowerManager`, doc FR + EN ; à valider sur un portable)
+- [x] Appareils Bluetooth (module `bluetooth` : connexion avec niveau de batterie, déconnexion, batterie faible ; `DeviceWatcher`, doc FR + EN ; à valider avec un casque)
+- [x] Météo (`bw-weather`, open-meteo sans clé, à côté de la date, détail au survol, onglet de réglages, doc FR + EN)
 
 ### Port macOS (en parallèle, sans bloquer Windows)
 
