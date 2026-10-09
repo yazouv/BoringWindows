@@ -35,12 +35,13 @@ use windows::Win32::UI::Shell::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, EVENT_SYSTEM_FOREGROUND, GWL_EXSTYLE,
-    GetCursorPos, GetForegroundWindow, GetWindowLongPtrW, GetWindowRect, GetWindowThreadProcessId,
-    HWND_TOPMOST, IsWindowVisible, RegisterClassW, RegisterWindowMessageW, SW_HIDE,
-    SW_SHOWNOACTIVATE, SW_SHOWNORMAL, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-    SWP_NOZORDER, SetWindowLongPtrW, SetWindowPos, ShowWindow, WINEVENT_OUTOFCONTEXT,
-    WINEVENT_SKIPOWNPROCESS, WM_APP, WM_DISPLAYCHANGE, WNDCLASSW, WS_EX_NOACTIVATE,
-    WS_EX_TOOLWINDOW, WS_POPUP,
+    GWL_STYLE, GetCursorPos, GetForegroundWindow, GetWindowLongPtrW, GetWindowRect,
+    GetWindowThreadProcessId, HWND_TOPMOST, IsWindowVisible, RegisterClassW,
+    RegisterWindowMessageW, SW_HIDE, SW_SHOWNOACTIVATE, SW_SHOWNORMAL, SWP_FRAMECHANGED,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowLongPtrW, SetWindowPos,
+    ShowWindow, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_APP, WM_DISPLAYCHANGE,
+    WNDCLASSW, WS_CAPTION, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_MAXIMIZEBOX, WS_MINIMIZEBOX,
+    WS_POPUP, WS_SYSMENU,
 };
 use windows::core::{BOOL, HSTRING, PCWSTR, w};
 use windows_numerics::Vector2;
@@ -217,6 +218,8 @@ impl Platform {
             // « Toujours au premier plan » vient de `always-on-top` côté Slint.
             let wanted = (WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE).0 as isize;
             SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex | wanted);
+            strip_caption(hwnd);
+            subclass_island(hwnd);
             SetWindowPos(
                 hwnd,
                 None,
@@ -259,6 +262,9 @@ impl Platform {
         if let Some(pos) = initial_position(choice, size) {
             window.set_position(pos);
         }
+        // winit peut remettre ses styles en redimensionnant la fenêtre.
+        // SAFETY: fenêtre vivante de l'île, sur son thread.
+        unsafe { strip_caption(self.hwnd) };
     }
 
     pub fn set_hit_region(&self, r: PhysRect) {
@@ -487,6 +493,79 @@ fn create_helper_window() -> anyhow::Result<HWND> {
             log::warn!("enregistrement appbar refusé : pas de détection du plein écran");
         }
         Ok(hwnd)
+    }
+}
+
+/// Procédure de fenêtre d'origine de l'île (celle de winit).
+static ISLAND_PROC: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
+
+/// Au premier clic, Windows envoie WM_NCACTIVATE et la procédure par défaut
+/// peint une barre de titre « classique » par-dessus l'île, visible jusqu'à
+/// la prochaine image de Slint (une fraction de seconde). L'île n'a pas de
+/// cadre : ces messages sont traités sans rien dessiner.
+///
+/// # Safety
+/// `hwnd` doit être la fenêtre vivante de l'île, sur ce thread, sous-classée
+/// une seule fois.
+unsafe fn subclass_island(hwnd: HWND) {
+    use windows::Win32::UI::WindowsAndMessaging::GWLP_WNDPROC;
+    // SAFETY: garanti par l'appelant ; `island_proc` est une procédure valide.
+    unsafe {
+        let old = SetWindowLongPtrW(hwnd, GWLP_WNDPROC, island_proc as *const () as isize);
+        ISLAND_PROC.store(old, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+unsafe extern "system" fn island_proc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        CallWindowProcW, WM_NCACTIVATE, WM_NCPAINT, WNDPROC,
+    };
+    match msg {
+        // lParam = -1 : l'activation est notée sans repeindre le cadre.
+        WM_NCACTIVATE => {
+            // SAFETY: procédure par défaut, arguments de Windows.
+            return unsafe { DefWindowProcW(hwnd, msg, wparam, LPARAM(-1)) };
+        }
+        WM_NCPAINT => return LRESULT(0),
+        _ => {}
+    }
+    let old = ISLAND_PROC.load(std::sync::atomic::Ordering::Relaxed);
+    // SAFETY: `old` est la procédure d'origine (winit), relevée au sous-classement.
+    unsafe {
+        let old: WNDPROC = std::mem::transmute(old);
+        CallWindowProcW(old, hwnd, msg, wparam, lparam)
+    }
+}
+
+/// winit garde une barre de titre aux fenêtres sans cadre et la masque lui-même ;
+/// Windows la repeint pourtant au premier clic (petite barre « BoringWindows × »).
+/// L'île n'en a pas besoin : style « popup » seul.
+///
+/// # Safety
+/// `hwnd` doit être une fenêtre vivante du thread appelant.
+unsafe fn strip_caption(hwnd: HWND) {
+    let caption = (WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX).0 as isize;
+    // SAFETY: garanti par l'appelant.
+    unsafe {
+        let style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+        let wanted = (style & !caption) | WS_POPUP.0 as isize;
+        if wanted != style {
+            SetWindowLongPtrW(hwnd, GWL_STYLE, wanted);
+            let _ = SetWindowPos(
+                hwnd,
+                None,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+            );
+        }
     }
 }
 
