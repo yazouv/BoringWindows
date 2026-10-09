@@ -1311,13 +1311,25 @@ impl Controller {
     fn on_platform_event(&self, event: PlatformEvent) {
         match event {
             PlatformEvent::Fullscreen(entering) => {
-                let relevant = self
-                    .platform
-                    .borrow()
-                    .as_ref()
-                    .is_some_and(Platform::foreground_on_our_monitor);
+                let relevant = self.platform.borrow().as_ref().is_some_and(|p| {
+                    p.foreground_on_our_monitor() && !p.foreground_is_capture_tool()
+                });
                 self.fullscreen.set(entering && relevant);
                 self.update_visibility();
+            }
+            // Le calque de capture peut prendre le premier plan après
+            // l'annonce du plein écran : l'île réapparaît alors.
+            PlatformEvent::Foreground => {
+                if self.fullscreen.get()
+                    && self
+                        .platform
+                        .borrow()
+                        .as_ref()
+                        .is_some_and(Platform::foreground_is_capture_tool)
+                {
+                    self.fullscreen.set(false);
+                    self.update_visibility();
+                }
             }
             PlatformEvent::DisplayChanged => {
                 self.place();

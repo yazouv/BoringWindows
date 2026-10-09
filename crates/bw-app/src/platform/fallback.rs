@@ -63,6 +63,10 @@ impl Platform {
     pub fn foreground_on_our_monitor(&self) -> bool {
         true
     }
+
+    pub fn foreground_is_capture_tool(&self) -> bool {
+        false
+    }
 }
 
 /// Linux : pas d'icône de notification (elle exigerait GTK).

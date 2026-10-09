@@ -24,6 +24,8 @@ pub enum PlatformEvent {
     Fullscreen(bool),
     /// Écrans branchés/débranchés ou résolution modifiée.
     DisplayChanged,
+    /// Une autre fenêtre passe au premier plan.
+    Foreground,
 }
 
 /// Commandes du menu de la zone de notification.

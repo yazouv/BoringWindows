@@ -21,17 +21,23 @@ use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Registry::{
     HKEY_CURRENT_USER, REG_SZ, RRF_RT_REG_SZ, RegDeleteKeyValueW, RegGetValueW, RegSetKeyValueW,
 };
-use windows::Win32::System::Threading::CreateMutexW;
+use windows::Win32::System::Threading::{
+    CreateMutexW, OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
+    QueryFullProcessImageNameW,
+};
+use windows::Win32::UI::Accessibility::{HWINEVENTHOOK, SetWinEventHook, UnhookWinEvent};
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::Shell::{
     ABM_NEW, ABM_REMOVE, ABN_FULLSCREENAPP, APPBARDATA, QUNS_BUSY, QUNS_PRESENTATION_MODE,
     QUNS_RUNNING_D3D_FULL_SCREEN, SHAppBarMessage, SHQueryUserNotificationState, ShellExecuteW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, GWL_EXSTYLE, GetCursorPos, GetForegroundWindow,
-    GetWindowLongPtrW, RegisterClassW, SW_HIDE, SW_SHOWNOACTIVATE, SW_SHOWNORMAL, SWP_FRAMECHANGED,
-    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowLongPtrW, SetWindowPos,
-    ShowWindow, WM_APP, WM_DISPLAYCHANGE, WNDCLASSW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, EVENT_SYSTEM_FOREGROUND, GWL_EXSTYLE,
+    GetCursorPos, GetForegroundWindow, GetWindowLongPtrW, GetWindowThreadProcessId, HWND_TOPMOST,
+    RegisterClassW, SW_HIDE, SW_SHOWNOACTIVATE, SW_SHOWNORMAL, SWP_FRAMECHANGED, SWP_NOACTIVATE,
+    SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowLongPtrW, SetWindowPos, ShowWindow,
+    WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_APP, WM_DISPLAYCHANGE, WNDCLASSW,
+    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP,
 };
 use windows::core::{HSTRING, PCWSTR, w};
 
@@ -164,12 +170,28 @@ type EventCallback = Box<dyn Fn(PlatformEvent)>;
 
 thread_local! {
     static ON_EVENT: RefCell<Option<EventCallback>> = const { RefCell::new(None) };
+    /// Fenêtre de l'île, pour la remettre au premier plan depuis le hook.
+    static ISLAND: std::cell::Cell<Option<HWND>> = const { std::cell::Cell::new(None) };
 }
+
+/// Outils de capture d'écran : leur calque couvre tout l'écran et le shell
+/// le signale comme une application plein écran. L'île reste affichée.
+const CAPTURE_TOOLS: &[&str] = &[
+    "screenclippinghost.exe",
+    "snippingtool.exe",
+    "screensketch.exe",
+    "sharex.exe",
+    "greenshot.exe",
+    "lightshot.exe",
+    "flameshot.exe",
+];
 
 pub struct Platform {
     hwnd: HWND,
     /// Fenêtre cachée qui reçoit les notifications du shell (appbar).
     helper: HWND,
+    /// Hook des changements de fenêtre au premier plan.
+    foreground_hook: HWINEVENTHOOK,
 }
 
 impl Platform {
@@ -201,8 +223,29 @@ impl Platform {
         }
 
         ON_EVENT.with(|cb| *cb.borrow_mut() = Some(Box::new(on_event)));
+        ISLAND.set(Some(hwnd));
         let helper = create_helper_window()?;
-        Ok(Self { hwnd, helper })
+        // SAFETY: `foreground_proc` est une fonction `extern "system"` valide ;
+        // hors contexte, elle est appelée sur ce thread via sa boucle de messages.
+        let foreground_hook = unsafe {
+            SetWinEventHook(
+                EVENT_SYSTEM_FOREGROUND,
+                EVENT_SYSTEM_FOREGROUND,
+                None,
+                Some(foreground_proc),
+                0,
+                0,
+                WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
+            )
+        };
+        if foreground_hook.is_invalid() {
+            log::warn!("hook du premier plan refusé : l'île peut passer sous la barre des tâches");
+        }
+        Ok(Self {
+            hwnd,
+            helper,
+            foreground_hook,
+        })
     }
 
     pub fn place(&self, window: &slint::Window, choice: MonitorChoice, size: (f32, f32)) {
@@ -234,6 +277,14 @@ impl Platform {
             state,
             Ok(QUNS_BUSY | QUNS_RUNNING_D3D_FULL_SCREEN | QUNS_PRESENTATION_MODE)
         ) && self.foreground_on_our_monitor()
+            && !self.foreground_is_capture_tool()
+    }
+
+    /// La fenêtre au premier plan est-elle un outil de capture d'écran ?
+    pub fn foreground_is_capture_tool(&self) -> bool {
+        // SAFETY: fonction sans effet de bord.
+        let fg = unsafe { GetForegroundWindow() };
+        process_name(fg).is_some_and(|name| CAPTURE_TOOLS.contains(&name.as_str()))
     }
 
     /// La fenêtre au premier plan est-elle sur le même écran que l'île ?
@@ -251,13 +302,79 @@ impl Platform {
 impl Drop for Platform {
     fn drop(&mut self) {
         ON_EVENT.with(|cb| cb.borrow_mut().take());
+        ISLAND.set(None);
         let mut data = appbar_data(self.helper);
-        // SAFETY: désenregistre l'appbar créée dans `create_helper_window`.
+        // SAFETY: désenregistre l'appbar créée dans `create_helper_window` et
+        // le hook posé dans `attach`.
         unsafe {
+            if !self.foreground_hook.is_invalid() {
+                let _ = UnhookWinEvent(self.foreground_hook);
+            }
             SHAppBarMessage(ABM_REMOVE, &mut data);
             let _ = DestroyWindow(self.helper);
         }
     }
+}
+
+/// Nom de l'exécutable (en minuscules) qui possède `hwnd`.
+fn process_name(hwnd: HWND) -> Option<String> {
+    if hwnd.is_invalid() {
+        return None;
+    }
+    let mut pid = 0;
+    // SAFETY: `pid` est une sortie locale ; le handle du processus est fermé
+    // après lecture, et le tampon vit pendant l'appel.
+    unsafe {
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+        let mut buffer = [0u16; 1024];
+        let mut len = buffer.len() as u32;
+        let result = QueryFullProcessImageNameW(
+            process,
+            PROCESS_NAME_WIN32,
+            windows::core::PWSTR(buffer.as_mut_ptr()),
+            &mut len,
+        );
+        let _ = CloseHandle(process);
+        result.ok()?;
+        let path = String::from_utf16_lossy(&buffer[..len as usize]);
+        let name = path.rsplit('\\').next()?;
+        Some(name.to_ascii_lowercase())
+    }
+}
+
+/// Changement de fenêtre au premier plan. La barre des tâches, une fois
+/// activée, repasse au-dessus des autres fenêtres « topmost » : on remet
+/// l'île au sommet de cette pile.
+unsafe extern "system" fn foreground_proc(
+    _hook: HWINEVENTHOOK,
+    _event: u32,
+    _hwnd: HWND,
+    _id_object: i32,
+    _id_child: i32,
+    _thread: u32,
+    _time: u32,
+) {
+    if let Some(island) = ISLAND.get() {
+        // SAFETY: fenêtre vivante tant que `ISLAND` est renseigné ; sans
+        // SWP_SHOWWINDOW, une île masquée le reste.
+        unsafe {
+            let _ = SetWindowPos(
+                island,
+                Some(HWND_TOPMOST),
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+            );
+        }
+    }
+    ON_EVENT.with(|cb| {
+        if let Some(cb) = cb.borrow().as_ref() {
+            cb(PlatformEvent::Foreground);
+        }
+    });
 }
 
 fn appbar_data(hwnd: HWND) -> APPBARDATA {
