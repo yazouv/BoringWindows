@@ -1,7 +1,7 @@
 //! Intégration Win32 : style de la fenêtre, zone cliquable, placement,
 //! détection du plein écran, démarrage automatique, instance unique.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::path::Path;
 
 use bw_config::MonitorChoice;
@@ -14,8 +14,9 @@ use windows::Win32::Foundation::{
     LRESULT, POINT, RECT, WPARAM,
 };
 use windows::Win32::Graphics::Gdi::{
-    CreateRectRgn, GetMonitorInfoW, HMONITOR, MONITOR_DEFAULTTONEAREST, MONITOR_DEFAULTTOPRIMARY,
-    MONITORINFO, MonitorFromPoint, MonitorFromRect, MonitorFromWindow, SetWindowRgn,
+    CombineRgn, CreateRectRgn, CreateRoundRectRgn, DeleteObject, GetMonitorInfoW, HMONITOR,
+    MONITOR_DEFAULTTONEAREST, MONITOR_DEFAULTTOPRIMARY, MONITORINFO, MonitorFromPoint,
+    MonitorFromRect, MonitorFromWindow, RGN_OR, SetWindowRgn,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Registry::{
@@ -34,16 +35,18 @@ use windows::Win32::UI::Shell::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, EVENT_SYSTEM_FOREGROUND, GWL_EXSTYLE,
-    GetCursorPos, GetForegroundWindow, GetWindowLongPtrW, GetWindowThreadProcessId, HWND_TOPMOST,
-    RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_SHOWNOACTIVATE, SW_SHOWNORMAL,
-    SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowLongPtrW,
-    SetWindowPos, ShowWindow, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_APP,
-    WM_DISPLAYCHANGE, WNDCLASSW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP,
+    GetCursorPos, GetForegroundWindow, GetWindowLongPtrW, GetWindowRect, GetWindowThreadProcessId,
+    HWND_TOPMOST, IsWindowVisible, RegisterClassW, RegisterWindowMessageW, SW_HIDE,
+    SW_SHOWNOACTIVATE, SW_SHOWNORMAL, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+    SWP_NOZORDER, SetWindowLongPtrW, SetWindowPos, ShowWindow, WINEVENT_OUTOFCONTEXT,
+    WINEVENT_SKIPOWNPROCESS, WM_APP, WM_DISPLAYCHANGE, WNDCLASSW, WS_EX_NOACTIVATE,
+    WS_EX_TOOLWINDOW, WS_POPUP,
 };
-use windows::core::{HSTRING, PCWSTR, w};
+use windows::core::{BOOL, HSTRING, PCWSTR, w};
+use windows_numerics::Vector2;
 
-use super::PlatformEvent;
-use crate::geometry::PhysRect;
+use super::{PlatformEvent, SystemLook};
+use crate::geometry::{PhysRect, RoundRect};
 
 const RUN_KEY: PCWSTR = w!("Software\\Microsoft\\Windows\\CurrentVersion\\Run");
 const RUN_VALUE: PCWSTR = w!("BoringWindows");
@@ -193,6 +196,8 @@ pub struct Platform {
     helper: HWND,
     /// Hook des changements de fenêtre au premier plan.
     foreground_hook: HWINEVENTHOOK,
+    /// Flou (créé à la première activation).
+    backdrop: RefCell<Option<Backdrop>>,
 }
 
 impl Platform {
@@ -246,6 +251,7 @@ impl Platform {
             hwnd,
             helper,
             foreground_hook,
+            backdrop: RefCell::new(None),
         })
     }
 
@@ -263,10 +269,43 @@ impl Platform {
         }
     }
 
+    /// Région à la forme exacte de la pilule (zone cliquable), et forme du
+    /// flou s'il est actif.
+    pub fn set_round_region(&self, shape: RoundRect) {
+        // SAFETY: la région appartient au système après SetWindowRgn.
+        unsafe {
+            SetWindowRgn(self.hwnd, Some(round_region(shape)), true);
+        }
+        if let Some(backdrop) = self.backdrop.borrow().as_ref()
+            && let Err(e) = backdrop.shape(shape)
+        {
+            log::debug!("flou : forme refusée : {e}");
+        }
+    }
+
+    /// Flou de ce qui est derrière l'île (voir `Backdrop`).
+    pub fn set_blur(&self, on: bool) {
+        let mut backdrop = self.backdrop.borrow_mut();
+        if on && backdrop.is_none() {
+            match Backdrop::new(self.hwnd) {
+                Ok(b) => *backdrop = Some(b),
+                Err(e) => log::warn!("flou indisponible : {e}"),
+            }
+        }
+        if let Some(b) = backdrop.as_ref() {
+            b.on.set(on);
+            // SAFETY: fenêtre vivante, appel sur son thread.
+            b.show(unsafe { IsWindowVisible(self.hwnd) }.as_bool());
+        }
+    }
+
     pub fn set_visible(&self, visible: bool) {
         // SAFETY: fenêtre vivante, appel sur son thread.
         unsafe {
             let _ = ShowWindow(self.hwnd, if visible { SW_SHOWNOACTIVATE } else { SW_HIDE });
+        }
+        if let Some(b) = self.backdrop.borrow().as_ref() {
+            b.show(visible);
         }
     }
 
@@ -651,7 +690,6 @@ fn is_main_window(hwnd: HWND) -> bool {
 fn main_window_of(pid: u32) -> Option<HWND> {
     use windows::Win32::Foundation::TRUE;
     use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, GetWindowThreadProcessId};
-    use windows::core::BOOL;
 
     struct Search {
         pid: u32,
@@ -771,4 +809,297 @@ pub fn resume_claude_session(cwd: &Path, session_id: &str) -> bool {
         .spawn()
         .map_err(|e| log::warn!("impossible de rouvrir la session : {e}"))
         .is_ok()
+}
+
+// ---------------------------------------------------------------------------
+// Flou : visuel de composition dans une fenêtre sous l'île
+
+/// Arrière-plan flouté (celui de l'acrylique de Windows), découpé à la forme
+/// de la pilule. Il vit dans sa propre fenêtre, sans contenu, juste sous
+/// l'île : un visuel de composition posé sur l'île elle-même masquerait son
+/// rendu OpenGL. L'île appartient à cette fenêtre, ce qui la garde au-dessus.
+struct Backdrop {
+    hwnd: HWND,
+    island: HWND,
+    /// Flou demandé ; la fenêtre ne se montre qu'avec l'île.
+    on: Cell<bool>,
+    /// File de messages exigée par le compositeur sur ce thread.
+    _queue: windows::System::DispatcherQueueController,
+    _target: windows::UI::Composition::Desktop::DesktopWindowTarget,
+    geometry: windows::UI::Composition::CompositionRoundedRectangleGeometry,
+}
+
+impl Backdrop {
+    fn new(island: HWND) -> windows::core::Result<Self> {
+        use windows::Win32::UI::WindowsAndMessaging::{
+            GWLP_HWNDPARENT, WS_EX_NOREDIRECTIONBITMAP, WS_EX_TOPMOST,
+        };
+
+        let class = w!("BoringWindows.Backdrop");
+        // SAFETY: appels sur le thread de l'île ; classe et fenêtre créées avec
+        // des chaînes statiques et la procédure par défaut.
+        let hwnd = unsafe {
+            let instance = GetModuleHandleW(None)?.into();
+            let wc = WNDCLASSW {
+                lpfnWndProc: Some(backdrop_proc),
+                hInstance: instance,
+                lpszClassName: class,
+                ..Default::default()
+            };
+            RegisterClassW(&wc);
+            CreateWindowExW(
+                WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TOPMOST | WS_EX_NOREDIRECTIONBITMAP,
+                class,
+                w!("BoringWindows"),
+                WS_POPUP,
+                0,
+                0,
+                0,
+                0,
+                None,
+                None,
+                Some(instance),
+                None,
+            )?
+        };
+        match Self::compose(hwnd) {
+            Ok((queue, target, geometry)) => {
+                // L'île appartient au fond : une fenêtre possédée reste
+                // toujours au-dessus de sa propriétaire.
+                // SAFETY: les deux fenêtres sont vivantes, sur ce thread.
+                unsafe { SetWindowLongPtrW(island, GWLP_HWNDPARENT, hwnd.0 as isize) };
+                Ok(Self {
+                    hwnd,
+                    island,
+                    on: Cell::new(false),
+                    _queue: queue,
+                    _target: target,
+                    geometry,
+                })
+            }
+            Err(e) => {
+                // SAFETY: fenêtre créée juste au-dessus.
+                unsafe {
+                    let _ = DestroyWindow(hwnd);
+                }
+                Err(e)
+            }
+        }
+    }
+
+    /// Visuel unique : le fond flouté de Windows, découpé par une géométrie.
+    fn compose(
+        hwnd: HWND,
+    ) -> windows::core::Result<(
+        windows::System::DispatcherQueueController,
+        windows::UI::Composition::Desktop::DesktopWindowTarget,
+        windows::UI::Composition::CompositionRoundedRectangleGeometry,
+    )> {
+        use windows::UI::Composition::Compositor;
+        use windows::Win32::Graphics::Dwm::{DWMWA_USE_HOSTBACKDROPBRUSH, DwmSetWindowAttribute};
+        use windows::Win32::System::WinRT::Composition::ICompositorDesktopInterop;
+        use windows::Win32::System::WinRT::{
+            CreateDispatcherQueueController, DQTAT_COM_NONE, DQTYPE_THREAD_CURRENT,
+            DispatcherQueueOptions,
+        };
+        use windows::core::Interface;
+
+        // SAFETY: structure locale, appel sur le thread de la fenêtre.
+        let queue = unsafe {
+            CreateDispatcherQueueController(DispatcherQueueOptions {
+                dwSize: size_of::<DispatcherQueueOptions>() as u32,
+                threadType: DQTYPE_THREAD_CURRENT,
+                apartmentType: DQTAT_COM_NONE,
+            })?
+        };
+        let enable = BOOL::from(true);
+        // SAFETY: attribut booléen documenté (Windows 11), taille exacte.
+        unsafe {
+            DwmSetWindowAttribute(
+                hwnd,
+                DWMWA_USE_HOSTBACKDROPBRUSH,
+                (&raw const enable).cast(),
+                size_of::<BOOL>() as u32,
+            )?;
+        }
+        let compositor = Compositor::new()?;
+        let interop: ICompositorDesktopInterop = compositor.cast()?;
+        // SAFETY: `hwnd` est la fenêtre du fond, vivante.
+        let target = unsafe { interop.CreateDesktopWindowTarget(hwnd, false)? };
+        let visual = compositor.CreateSpriteVisual()?;
+        visual.SetBrush(&compositor.CreateHostBackdropBrush()?)?;
+        // Assez grand pour toute fenêtre : seul le découpage compte.
+        visual.SetSize(Vector2 {
+            X: 8192.0,
+            Y: 8192.0,
+        })?;
+        let geometry = compositor.CreateRoundedRectangleGeometry()?;
+        visual.SetClip(&compositor.CreateGeometricClipWithGeometry(&geometry)?)?;
+        target.SetRoot(&visual)?;
+        Ok((queue, target, geometry))
+    }
+
+    /// Montre le fond si le flou est demandé et l'île visible.
+    fn show(&self, island_visible: bool) {
+        let visible = self.on.get() && island_visible;
+        // SAFETY: fenêtre vivante, appel sur son thread.
+        unsafe {
+            let _ = ShowWindow(self.hwnd, if visible { SW_SHOWNOACTIVATE } else { SW_HIDE });
+            if visible {
+                let _ = SetWindowPos(
+                    self.hwnd,
+                    Some(self.island),
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE,
+                );
+            }
+        }
+    }
+
+    /// Suit la fenêtre de l'île et prend la forme de la pilule.
+    fn shape(&self, shape: RoundRect) -> windows::core::Result<()> {
+        let mut rect = RECT::default();
+        // SAFETY: fenêtres vivantes ; la région appartient ensuite au système.
+        unsafe {
+            GetWindowRect(self.island, &mut rect)?;
+            // Juste sous l'île (les deux sont « toujours au premier plan »).
+            SetWindowPos(
+                self.hwnd,
+                Some(self.island),
+                rect.left,
+                rect.top,
+                rect.right - rect.left,
+                rect.bottom - rect.top,
+                SWP_NOACTIVATE,
+            )?;
+            // Les clics hors de la pilule traversent le fond.
+            SetWindowRgn(self.hwnd, Some(round_region(shape)), true);
+        }
+        let r = shape.rect;
+        let radius = shape.radius as f32;
+        // Coins du haut carrés : le rectangle déborde au-dessus de la
+        // fenêtre, ses coins arrondis tombent hors de l'écran.
+        let lift = if shape.flat_top { radius } else { 0.0 };
+        self.geometry.SetOffset(Vector2 {
+            X: r.x as f32,
+            Y: r.y as f32 - lift,
+        })?;
+        self.geometry.SetSize(Vector2 {
+            X: r.width as f32,
+            Y: r.height as f32 + lift,
+        })?;
+        self.geometry.SetCornerRadius(Vector2 {
+            X: radius,
+            Y: radius,
+        })
+    }
+}
+
+impl Drop for Backdrop {
+    fn drop(&mut self) {
+        use windows::Win32::UI::WindowsAndMessaging::GWLP_HWNDPARENT;
+        // SAFETY: rend l'île indépendante avant de détruire sa propriétaire.
+        unsafe {
+            SetWindowLongPtrW(self.island, GWLP_HWNDPARENT, 0);
+            let _ = DestroyWindow(self.hwnd);
+        }
+    }
+}
+
+/// Procédure du fond : celle par défaut.
+unsafe extern "system" fn backdrop_proc(
+    hwnd: HWND,
+    msg: u32,
+    wparam: WPARAM,
+    lparam: LPARAM,
+) -> LRESULT {
+    // SAFETY: arguments transmis tels quels par Windows.
+    unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) }
+}
+
+/// Région GDI à la forme de la pilule ; à confier à SetWindowRgn (ou à
+/// libérer).
+fn round_region(shape: RoundRect) -> windows::Win32::Graphics::Gdi::HRGN {
+    let PhysRect {
+        x,
+        y,
+        width,
+        height,
+    } = shape.rect;
+    let d = (shape.radius * 2).min(width).min(height);
+    // SAFETY: régions GDI locales ; `top` est libérée ici.
+    unsafe {
+        // CreateRoundRectRgn exclut le bord droit et le bas : +1.
+        let rgn = CreateRoundRectRgn(x, y, x + width + 1, y + height + 1, d, d);
+        if shape.flat_top {
+            let top = CreateRectRgn(x, y, x + width, y + height / 2);
+            CombineRgn(Some(rgn), Some(rgn), Some(top), RGN_OR);
+            let _ = DeleteObject(top.into());
+        }
+        rgn
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Apparence de Windows : mode clair ou sombre des applications, couleur d'accent
+
+/// Mode et accent actuels ; à défaut (API absente), sombre sans accent.
+pub fn system_look() -> SystemLook {
+    use windows::UI::ViewManagement::{UIColorType, UISettings};
+
+    let read = || -> windows::core::Result<SystemLook> {
+        let settings = UISettings::new()?;
+        let bg = settings.GetColorValue(UIColorType::Background)?;
+        let light = u32::from(bg.R) + u32::from(bg.G) + u32::from(bg.B) > 3 * 128;
+        // Comme Windows : un accent plus clair sur fond sombre, plus foncé
+        // sur fond clair, pour rester lisible.
+        let shade = if light {
+            UIColorType::AccentDark1
+        } else {
+            UIColorType::AccentLight2
+        };
+        let accent = settings.GetColorValue(shade)?;
+        Ok(SystemLook {
+            light,
+            accent: Some([accent.R, accent.G, accent.B]),
+        })
+    };
+    read().unwrap_or_else(|e| {
+        log::debug!("apparence de Windows illisible : {e}");
+        SystemLook::default()
+    })
+}
+
+/// Abonnement aux changements d'apparence ; désabonné à la destruction.
+pub struct LookWatcher {
+    settings: windows::UI::ViewManagement::UISettings,
+    token: i64,
+}
+
+impl Drop for LookWatcher {
+    fn drop(&mut self) {
+        let _ = self.settings.RemoveColorValuesChanged(self.token);
+    }
+}
+
+/// `on_change` est appelé (sur un thread de Windows) à chaque changement de
+/// mode ou d'accent.
+pub fn watch_system_look(on_change: impl Fn() + Send + 'static) -> Option<LookWatcher> {
+    use windows::Foundation::TypedEventHandler;
+    use windows::UI::ViewManagement::UISettings;
+
+    let subscribe = || -> windows::core::Result<LookWatcher> {
+        let settings = UISettings::new()?;
+        let token = settings.ColorValuesChanged(&TypedEventHandler::new(move |_, _| {
+            on_change();
+            Ok(())
+        }))?;
+        Ok(LookWatcher { settings, token })
+    };
+    subscribe()
+        .inspect_err(|e| log::warn!("apparence de Windows non suivie : {e}"))
+        .ok()
 }

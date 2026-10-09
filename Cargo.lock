@@ -476,11 +476,13 @@ dependencies = [
  "bw-media",
  "bw-notify",
  "bw-plugins",
+ "bw-power",
  "bw-secrets",
  "bw-timer",
  "bw-update",
  "bw-viz",
  "bw-volume",
+ "bw-weather",
  "chrono",
  "env_logger",
  "log",
@@ -493,6 +495,7 @@ dependencies = [
  "toml",
  "tray-icon",
  "windows",
+ "windows-numerics",
 ]
 
 [[package]]
@@ -618,6 +621,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "bw-power"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "bw-core",
+ "bw-i18n",
+ "log",
+ "serde",
+ "tokio",
+ "toml",
+ "windows",
+ "windows-collections",
+ "windows-core",
+]
+
+[[package]]
 name = "bw-secrets"
 version = "0.3.0"
 dependencies = [
@@ -677,6 +696,21 @@ dependencies = [
  "toml",
  "windows",
  "windows-core",
+]
+
+[[package]]
+name = "bw-weather"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "bw-core",
+ "bw-i18n",
+ "bw-net",
+ "log",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml",
 ]
 
 [[package]]

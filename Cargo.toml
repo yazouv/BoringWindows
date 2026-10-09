@@ -24,6 +24,8 @@ bw-volume = { path = "crates/bw-volume" }
 bw-viz = { path = "crates/bw-viz" }
 bw-plugins = { path = "crates/bw-plugins" }
 bw-notify = { path = "crates/bw-notify" }
+bw-weather = { path = "crates/bw-weather" }
+bw-power = { path = "crates/bw-power" }
 anyhow = "1"
 log = "0.4"
 serde = { version = "1", features = ["derive"] }

@@ -177,6 +177,14 @@ impl Controller {
         ui.set_view_name(config.layout.view.as_str().into());
         ui.set_volume_enabled(config.module_enabled(bw_volume::MODULE_ID, false));
         ui.set_brightness_enabled(config.module_enabled(bw_volume::BRIGHTNESS_ID, false));
+        ui.set_battery_enabled(config.module_enabled(bw_power::BATTERY_ID, true));
+        ui.set_bluetooth_enabled(config.module_enabled(bw_power::BLUETOOTH_ID, true));
+        let weather =
+            bw_weather::WeatherConfig::from_table(config.modules.get(bw_weather::MODULE_ID))
+                .unwrap_or_default();
+        ui.set_weather_enabled(config.module_enabled(bw_weather::MODULE_ID, false));
+        ui.set_weather_city(weather.city.as_str().into());
+        ui.set_weather_units_index(i32::from(weather.units == bw_weather::Units::Fahrenheit));
         ui.set_notifications_enabled(config.module_enabled(bw_notify::MODULE_ID, true));
         let notify = bw_notify::NotifyConfig::from_table(config.modules.get(bw_notify::MODULE_ID))
             .unwrap_or_default();
@@ -758,6 +766,38 @@ impl Controller {
                 vec!["modules", "brightness", "enabled"],
                 Value::Bool(ui.get_brightness_enabled()),
             )),
+            "modules.battery.enabled" => Some((
+                vec!["modules", "battery", "enabled"],
+                Value::Bool(ui.get_battery_enabled()),
+            )),
+            "modules.bluetooth.enabled" => Some((
+                vec!["modules", "bluetooth", "enabled"],
+                Value::Bool(ui.get_bluetooth_enabled()),
+            )),
+            "theme.blur" => Some((vec!["theme", "blur"], Value::Bool(ui.get_blur()))),
+            "theme.system_accent" => Some((
+                vec!["theme", "system_accent"],
+                Value::Bool(ui.get_system_accent()),
+            )),
+            "modules.weather.enabled" => Some((
+                vec!["modules", "weather", "enabled"],
+                Value::Bool(ui.get_weather_enabled()),
+            )),
+            "modules.weather.city" => Some((
+                vec!["modules", "weather", "city"],
+                Value::Str(ui.get_weather_city().trim().to_owned()),
+            )),
+            "modules.weather.units" => Some((
+                vec!["modules", "weather", "units"],
+                Value::Str(
+                    if ui.get_weather_units_index() == 1 {
+                        "fahrenheit"
+                    } else {
+                        "celsius"
+                    }
+                    .into(),
+                ),
+            )),
             "modules.notifications.enabled" => Some((
                 vec!["modules", "notifications", "enabled"],
                 Value::Bool(ui.get_notifications_enabled()),
@@ -910,6 +950,10 @@ impl Controller {
 /// Nom affiché d'un thème : traduit pour ceux fournis, nom du fichier sinon.
 fn theme_label(id: &str) -> String {
     match id {
+        bw_config::AUTO_THEME => tr!(
+            "Automatic (follows Windows light/dark)",
+            "Automatique (suit le mode clair/sombre de Windows)"
+        ),
         "default" => tr!("Black (default)", "Noir (par défaut)"),
         "light" => tr!("Light", "Clair"),
         "midnight" => tr!("Midnight", "Minuit"),
@@ -919,6 +963,8 @@ fn theme_label(id: &str) -> String {
 }
 
 fn fill_appearance(ui: &SettingsWindow, t: &bw_config::Theme) {
+    ui.set_blur(t.blur);
+    ui.set_system_accent(t.system_accent);
     ui.set_accent(hex(t.accent).into());
     ui.set_accent_preview(super::color(t.accent));
     ui.set_background_color(hex(t.background).into());

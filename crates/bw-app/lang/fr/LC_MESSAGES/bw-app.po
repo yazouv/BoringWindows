@@ -347,3 +347,30 @@ msgstr "Ne pas déranger : les notifications arrivent ici sans s'annoncer"
 
 msgid "Clicking a notification opens the right place (Discord channel, tab…)"
 msgstr "Un clic sur une notification ouvre le bon endroit (salon Discord, onglet…)"
+
+msgid "Show the charger and battery level in the island (laptops)"
+msgstr "Afficher le chargeur et le niveau de batterie dans l'île (portables)"
+
+msgid "Show Bluetooth devices connecting, with their battery level"
+msgstr "Afficher la connexion des appareils Bluetooth, avec leur niveau de batterie"
+
+msgid "Blur what is behind the island (Windows 11, translucent themes)"
+msgstr "Flouter ce qui est derrière l'île (Windows 11, thèmes translucides)"
+
+msgid "Use the Windows accent color"
+msgstr "Utiliser la couleur d'accent de Windows"
+
+msgid "Weather"
+msgstr "Météo"
+
+msgid "Show the weather next to the date in the open island"
+msgstr "Afficher la météo à côté de la date dans l'île ouverte"
+
+msgid "City"
+msgstr "Ville"
+
+msgid "Unit"
+msgstr "Unité"
+
+msgid "Data from open-meteo.com, free and without an account; only the city name and its coordinates are sent. Hover the temperature to see the forecast of the day."
+msgstr "Données d'open-meteo.com, gratuit et sans compte ; seuls le nom de la ville et ses coordonnées sont envoyés. Survole la température pour voir les prévisions du jour."

@@ -44,13 +44,15 @@ name = "Pro"
 
 | Option | Défaut | Valeurs | Rôle |
 |---|---|---|---|
-| `name` | `"default"` | `"default"`, `"light"`, `"midnight"`, `"glass"` ou un thème perso | thème de base (voir [Thèmes](themes.md)) ; les clés ci-dessous passent devant |
+| `name` | `"default"` | `"auto"`, `"default"`, `"light"`, `"midnight"`, `"glass"` ou un thème perso | thème de base (voir [Thèmes](themes.md)) ; `"auto"` suit le mode clair ou sombre de Windows ; les clés ci-dessous passent devant |
 | `background` | selon le thème | `"#RRGGBB"` ou `"#RRGGBBAA"` | fond de l'île |
 | `foreground` | selon le thème | idem | texte |
 | `accent` | selon le thème | idem | couleur d'accent (urgent, boutons) ; remplacée par la couleur de la pochette quand la musique joue (voir `[modules.media]`) |
 | `border` | selon le thème | idem | contour de l'île (`"#00000000"` : aucun) |
 | `font` | `""` | nom d'une police installée | police de l'île (vide : celle du système) |
 | `corner_radius` | selon le thème | 0 à 500 | arrondi des coins de l'île ouverte |
+| `blur` | selon le thème (`true` dans `glass`) | `true` / `false` | flou de ce qui est derrière l'île (Windows 11), visible à travers un fond translucide |
+| `system_accent` | `false` | `true` / `false` | couleur d'accent de Windows à la place de `accent` |
 | `animation_ms` | `240` | 0 à 2000 | durée des animations, `0` pour aucune |
 | `top_offset` | `0.0` | 0 à 500 | décalage depuis le haut de l'écran ; au-delà de 0, les coins du haut s'arrondissent aussi |
 
@@ -154,6 +156,32 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 |---|---|---|---|
 | `enabled` | `false` | | afficher les changements de [luminosité](volume.md#luminosité) de l'écran intégré (Windows, portables) |
 | `show_secs` | `2` | 1 à 10 | durée d'affichage (s) |
+
+## `[modules.battery]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `true` | | afficher le chargeur et la [batterie](energie.md) du PC (Windows, portables) |
+| `show_secs` | `4` | 1 à 10 | durée d'affichage (s) |
+| `low_percent` | `20` | 5 à 50 | seuil de batterie faible (%), rappelé à la moitié du seuil |
+
+## `[modules.bluetooth]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `true` | | afficher la connexion des [appareils Bluetooth](energie.md#appareils-bluetooth) et leur batterie (Windows) |
+| `show_secs` | `4` | 1 à 10 | durée d'affichage (s) |
+| `low_percent` | `20` | 5 à 50 | seuil de batterie faible (%) |
+
+## `[modules.weather]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `false` | | afficher la [météo](meteo.md) à côté de la date |
+| `city` | `""` | | ville cherchée chez open-meteo |
+| `latitude`, `longitude` | aucune | -90 à 90, -180 à 180 | coordonnées exactes, à la place de `city` (les deux ensemble) |
+| `units` | `"celsius"` | `"celsius"`, `"fahrenheit"` | unité des températures |
+| `refresh_minutes` | `30` | 10 à 180 | rafraîchissement (min) |
 
 ## `[modules.visualizer]`
 

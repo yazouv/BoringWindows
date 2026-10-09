@@ -8,9 +8,10 @@ use std::time::{Duration, Instant};
 use bw_core::{Attention, Module, ModuleCtx};
 use bw_media::{Artwork, MediaSnapshot, NowPlaying};
 
-const STEPS: [(Attention, Option<&str>); 3] = [
+const STEPS: [(Attention, Option<&str>); 4] = [
     (Attention::High, Some("Réunion dans 5 min")),
     (Attention::Urgent, Some("Claude attend ta réponse")),
+    (Attention::High, Some("En charge · 54 %")),
     (Attention::None, None),
 ];
 
@@ -129,6 +130,15 @@ impl Module for Demo {
             for (level, summary) in STEPS.iter().cycle() {
                 tick.tick().await;
                 if *level != Attention::None {
+                    // Jauge de batterie pour l'étape « en charge », aucune sinon
+                    // (icône vide).
+                    let charging = summary.is_some_and(|s| s.starts_with("En charge"));
+                    task_ctx.set_state(bw_power::Gauge {
+                        icon: if charging { "bolt" } else { "" },
+                        level: Some(54),
+                        charging,
+                        low: false,
+                    });
                     task_ctx.set_attention(*level, summary.map(str::to_owned));
                 }
             }

@@ -29,8 +29,8 @@ use crate::geometry::{self, Shape};
 use crate::platform::{self, Platform, PlatformEvent, Tray, TrayCommand};
 use crate::shelf::{Shelf, ShelfConfig};
 use crate::{
-    AgendaRow, ClaudePrompt, ClaudeRow, Island, MediaInfo, NotifInfo, PluginRow, RecentRow,
-    ShelfRow, TimerInfo, clock, demo,
+    AgendaRow, ClaudePrompt, ClaudeRow, GaugeInfo, Island, MediaInfo, NotifInfo, PluginRow,
+    RecentRow, ShelfRow, TimerInfo, WeatherInfo, clock, demo,
 };
 
 /// Pseudo-module utilisé pour signaler une config invalide dans l'île.
@@ -45,6 +45,10 @@ const MAX_ROWS_WITH_MEDIA: usize = 2;
 const NOTIF_ROWS: usize = 4;
 /// Onglets de l'île ouverte (propriété `tab` de `island.slint`).
 const TAB_NOTIFICATIONS: i32 = 2;
+/// Avec le flou : cadence de suivi de la pilule pendant une animation, et
+/// marge après sa fin.
+const BLUR_FRAME: Duration = Duration::from_millis(16);
+const BLUR_TAIL: Duration = Duration::from_millis(80);
 
 thread_local! {
     static CONTROLLER: OnceCell<Rc<Controller>> = const { OnceCell::new() };
@@ -63,6 +67,14 @@ fn post(f: impl FnOnce(&Rc<Controller>) + Send + 'static) {
 
 /// `open_settings` : ouvrir la fenêtre de réglages dès le démarrage (`--settings`).
 pub fn run(open_settings: bool) -> anyhow::Result<()> {
+    // Avant de lire la config : le thème « auto » dépend du mode de Windows.
+    let look = platform::system_look();
+    log::info!(
+        "apparence de Windows : {} ; accent {:?}",
+        if look.light { "claire" } else { "sombre" },
+        look.accent
+    );
+    bw_config::set_system_light(look.light);
     let path = bw_config::config_path();
     let (config, config_error) = match Config::load_or_create(&path) {
         Ok(config) => (config, None),
@@ -118,6 +130,12 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         dnd: Cell::new(dnd_file.exists()),
         dnd_file,
         app_icons: RefCell::new(std::collections::HashMap::new()),
+        look: Cell::new(look),
+        look_watcher: RefCell::new(None),
+        blur: Cell::new(false),
+        blur_timer: Timer::default(),
+        blur_until: Cell::new(None),
+        gauges: RefCell::new(std::collections::HashMap::new()),
     });
     CONTROLLER.with(|c| {
         let _ = c.set(controller.clone());
@@ -183,6 +201,16 @@ pub struct Controller {
     open_settings_at_start: Cell<bool>,
     update_state: Cell<update::UpdateState>,
     update_timer: Timer,
+    /// Mode clair/sombre et accent de Windows, et leur abonnement.
+    look: Cell<platform::SystemLook>,
+    look_watcher: RefCell<Option<platform::LookWatcher>>,
+    /// Flou actif : la région de la fenêtre suit la pilule image par image
+    /// pendant les animations (`blur_timer`) jusqu'à `blur_until`.
+    blur: Cell<bool>,
+    blur_timer: Timer,
+    blur_until: Cell<Option<std::time::Instant>>,
+    /// Dernière jauge publiée par chaque module (batterie, Bluetooth).
+    gauges: RefCell<std::collections::HashMap<&'static str, bw_power::Gauge>>,
 }
 
 impl Controller {
@@ -297,6 +325,8 @@ impl Controller {
             Ok(w) => *self.watcher.borrow_mut() = Some(w),
             Err(e) => log::warn!("rechargement à chaud désactivé : {e}"),
         }
+        *self.look_watcher.borrow_mut() =
+            platform::watch_system_look(|| post(|c| c.on_system_look()));
 
         self.restart_modules();
         if let Some(e) = config_error {
@@ -314,7 +344,7 @@ impl Controller {
         *self.platform.borrow_mut() = Some(platform);
         self.update_taskbar();
         self.update_visibility();
-        self.sync_region();
+        self.apply_blur();
 
         // Créée boucle d'événements lancée : exigé par macOS.
         let hooks_installed = self.installer.is_installed();
@@ -448,9 +478,30 @@ impl Controller {
                 .as_ref()
                 .is_some_and(|(owner, _)| w.module == *owner)
         });
-        let art = self.artwork.borrow().as_ref().map(|(_, img)| img.clone());
-        self.ui.set_compact_art_visible(media_wins && art.is_some());
-        if let Some(art) = art.filter(|_| media_wins) {
+        // Batterie, appareil Bluetooth : icône et jauge à la place du point
+        // (une icône vide retire la jauge, pour le module demo).
+        let gauge = winner
+            .as_ref()
+            .and_then(|w| self.gauges.borrow().get(w.module.as_str()).cloned())
+            .filter(|g| !g.icon.is_empty());
+        self.ui.set_compact_gauge_visible(gauge.is_some());
+        if let Some(g) = &gauge {
+            self.ui.set_compact_gauge(GaugeInfo {
+                icon: g.icon.into(),
+                level: g.level.map_or(-1, i32::from),
+                charging: g.charging,
+                low: g.low,
+            });
+        }
+        // La jauge passe devant la pochette (module demo, qui fait les deux).
+        let art = self
+            .artwork
+            .borrow()
+            .as_ref()
+            .map(|(_, img)| img.clone())
+            .filter(|_| media_wins && gauge.is_none());
+        self.ui.set_compact_art_visible(art.is_some());
+        if let Some(art) = art {
             self.ui.set_compact_art(art);
         }
         self.ui
@@ -461,14 +512,25 @@ impl Controller {
             return;
         }
 
+        let theme = self.theme();
+        let animation = Duration::from_millis(theme.animation_ms.into());
+        if self.blur.get() {
+            // Le flou remplit toute la région : elle suit la pilule pendant
+            // l'animation, sinon il déborderait de la forme dessinée.
+            self.blur_until
+                .set(Some(std::time::Instant::now() + animation + BLUR_TAIL));
+            self.blur_timer
+                .start(TimerMode::Repeated, BLUR_FRAME, || post(|c| c.blur_frame()));
+            self.schedule_region_sync(animation + BLUR_TAIL);
+            return;
+        }
         // Pendant l'animation, la zone cliquable couvre l'ancienne et la
         // nouvelle forme ; elle est ajustée à la fin.
-        let theme = self.theme();
         let scale = self.ui.window().scale_factor();
         let during =
             geometry::pill_rect(&theme, old, scale).union(geometry::pill_rect(&theme, new, scale));
         self.with_platform(|p| p.set_hit_region(during));
-        self.schedule_region_sync(Duration::from_millis(theme.animation_ms.into()));
+        self.schedule_region_sync(animation);
     }
 
     fn schedule_region_sync(&self, delay: Duration) {
@@ -480,12 +542,74 @@ impl Controller {
     }
 
     fn sync_region(&self) {
+        if self.blur.get() {
+            return self.sync_round_region();
+        }
         let rect = geometry::pill_rect(
             &self.theme(),
             self.shape.get(),
             self.ui.window().scale_factor(),
         );
         self.with_platform(|p| p.set_hit_region(rect));
+    }
+
+    /// Région à la forme exacte de la pilule, telle qu'elle est dessinée.
+    fn sync_round_region(&self) {
+        let ui = &self.ui;
+        let shape = geometry::pill_round_rect(
+            (
+                ui.get_pill_x(),
+                ui.get_pill_y(),
+                ui.get_pill_width(),
+                ui.get_pill_height(),
+            ),
+            ui.get_pill_radius(),
+            ui.get_pill_flat_top(),
+            ui.window().scale_factor(),
+        );
+        self.with_platform(|p| p.set_round_region(shape));
+    }
+
+    fn blur_frame(&self) {
+        self.sync_round_region();
+        let done = self
+            .blur_until
+            .get()
+            .is_none_or(|until| std::time::Instant::now() >= until);
+        if done {
+            self.blur_timer.stop();
+            self.blur_until.set(None);
+        }
+    }
+
+    /// Flou du thème (`theme.blur`), appliqué à la fenêtre.
+    fn apply_blur(&self) {
+        let on = self.config.borrow().theme.blur;
+        if self.blur.replace(on) != on || on {
+            self.with_platform(|p| p.set_blur(on));
+        }
+        self.blur_timer.stop();
+        self.sync_region();
+    }
+
+    /// Windows a changé de mode (clair/sombre) ou de couleur d'accent.
+    fn on_system_look(self: &Rc<Self>) {
+        let look = platform::system_look();
+        if self.look.replace(look) == look {
+            return;
+        }
+        log::info!(
+            "apparence de Windows : {} ; accent {:?}",
+            if look.light { "claire" } else { "sombre" },
+            look.accent
+        );
+        let auto = self.config.borrow().theme.name == bw_config::AUTO_THEME;
+        if bw_config::set_system_light(look.light) && auto {
+            // Le thème « auto » se résout à la lecture de la config.
+            self.on_config(Config::load_or_create(&self.path));
+        } else {
+            self.apply_accent();
+        }
     }
 
     fn update_visibility(&self) {
@@ -584,6 +708,7 @@ impl Controller {
         drop(config);
 
         self.apply_theme();
+        self.apply_blur();
         let view_changed = {
             let config = self.config.borrow();
             old.layout.view != config.layout.view
@@ -660,6 +785,8 @@ impl Controller {
         self.ui.set_viz_bars(ModelRc::default());
         self.timer_tick.stop();
         self.ui.set_has_timer(false);
+        self.ui.set_has_weather(false);
+        self.gauges.borrow_mut().clear();
         self.apply_claude(None);
         *self.media.borrow_mut() = None;
         *self.artwork.borrow_mut() = None;
@@ -714,6 +841,16 @@ impl Controller {
                     self.apply_notify(snapshot);
                 } else if let Some(snapshot) = state.downcast_ref::<TimerSnapshot>() {
                     self.apply_timer(snapshot.clone());
+                } else if let Some(gauge) = state.downcast_ref::<bw_power::Gauge>() {
+                    // Publiée juste avant l'attention qu'elle accompagne.
+                    self.gauges.borrow_mut().insert(event.module, gauge.clone());
+                } else if let Some(weather) = state.downcast_ref::<bw_weather::WeatherSnapshot>() {
+                    self.ui.set_has_weather(true);
+                    self.ui.set_weather(WeatherInfo {
+                        icon: weather.sky.icon(weather.day).into(),
+                        temperature: weather.temperature_text().into(),
+                        detail: weather.detail().into(),
+                    });
                 } else if let Ok(snapshot) = state.clone().downcast::<CalendarSnapshot>() {
                     *self.calendar.borrow_mut() = Some(snapshot);
                     self.layout_rows();
@@ -1302,7 +1439,12 @@ impl Controller {
             .as_ref()
             .filter(|_| self.media_config().accent_from_artwork)
             .and_then(|(_, s)| s.now_playing.as_ref()?.artwork.as_ref()?.accent);
-        let accent = from_artwork.map_or_else(
+        let system = self
+            .look
+            .get()
+            .accent
+            .filter(|_| self.config.borrow().theme.system_accent);
+        let accent = from_artwork.or(system).map_or_else(
             || color(self.config.borrow().theme.accent),
             |[r, g, b]| slint::Color::from_rgb_u8(r, g, b),
         );
@@ -1664,6 +1806,23 @@ fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
                 bw_plugins::plugins_dir(&bw_config::config_dir()),
             ))),
             Err(e) => errors.push(format!("modules.plugins : {e:#}")),
+        }
+    }
+    for id in [bw_power::BATTERY_ID, bw_power::BLUETOOTH_ID] {
+        if bw_power::PowerModule::is_supported() && config.module_enabled(id, true) {
+            match bw_power::PowerConfig::from_table(id, config.modules.get(id)) {
+                Ok(c) if id == bw_power::BATTERY_ID => {
+                    modules.push(Box::new(bw_power::PowerModule::battery(c)));
+                }
+                Ok(c) => modules.push(Box::new(bw_power::PowerModule::bluetooth(c))),
+                Err(e) => errors.push(format!("modules.{id} : {e:#}")),
+            }
+        }
+    }
+    if config.module_enabled(bw_weather::MODULE_ID, false) {
+        match bw_weather::WeatherConfig::from_table(config.modules.get(bw_weather::MODULE_ID)) {
+            Ok(c) => modules.push(Box::new(bw_weather::WeatherModule::new(c))),
+            Err(e) => errors.push(format!("modules.weather : {e:#}")),
         }
     }
     if config.module_enabled("demo", false) {

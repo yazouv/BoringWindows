@@ -43,13 +43,15 @@ name = "Work"
 
 | Option | Default | Values | Role |
 |---|---|---|---|
-| `name` | `"default"` | `"default"`, `"light"`, `"midnight"`, `"glass"` or a custom theme | base theme (see [Themes](themes.md)); the keys below take precedence |
+| `name` | `"default"` | `"auto"`, `"default"`, `"light"`, `"midnight"`, `"glass"` or a custom theme | base theme (see [Themes](themes.md)); `"auto"` follows the light or dark mode of Windows; the keys below take precedence |
 | `background` | from the theme | `"#RRGGBB"` or `"#RRGGBBAA"` | island background |
 | `foreground` | from the theme | same | text |
 | `accent` | from the theme | same | accent colour (urgent, buttons); replaced by the artwork colour while music plays (see `[modules.media]`) |
 | `border` | from the theme | same | island border (`"#00000000"`: none) |
 | `font` | `""` | name of an installed font | island font (empty: system font) |
 | `corner_radius` | from the theme | 0 to 500 | corner rounding of the open island |
+| `blur` | from the theme (`true` in `glass`) | `true` / `false` | blur what is behind the island (Windows 11), visible through a translucent background |
+| `system_accent` | `false` | `true` / `false` | Windows accent colour instead of `accent` |
 | `animation_ms` | `240` | 0 to 2000 | animation duration, `0` for none |
 | `top_offset` | `0.0` | 0 to 500 | offset from the top of the screen; above 0, the top corners are rounded too |
 
@@ -153,6 +155,32 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 |---|---|---|---|
 | `enabled` | `false` | | show [brightness](volume.md#brightness) changes of the built-in screen (Windows, laptops) |
 | `show_secs` | `2` | 1 to 10 | how long it shows (s) |
+
+## `[modules.battery]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `true` | | show the charger and PC [battery](energie.md) (Windows, laptops) |
+| `show_secs` | `4` | 1 to 10 | how long it shows (s) |
+| `low_percent` | `20` | 5 to 50 | low battery threshold (%), reminded again at half the threshold |
+
+## `[modules.bluetooth]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `true` | | show [Bluetooth devices](energie.md#bluetooth-devices) connecting and their battery (Windows) |
+| `show_secs` | `4` | 1 to 10 | how long it shows (s) |
+| `low_percent` | `20` | 5 to 50 | low battery threshold (%) |
+
+## `[modules.weather]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `false` | | show the [weather](meteo.md) next to the date |
+| `city` | `""` | | city looked up on open-meteo |
+| `latitude`, `longitude` | none | -90 to 90, -180 to 180 | exact coordinates, instead of `city` (both together) |
+| `units` | `"celsius"` | `"celsius"`, `"fahrenheit"` | temperature unit |
+| `refresh_minutes` | `30` | 10 to 180 | refresh interval (min) |
 
 ## `[modules.visualizer]`
 

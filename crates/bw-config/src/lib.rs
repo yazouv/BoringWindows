@@ -17,7 +17,9 @@ use bw_i18n::tr;
 
 pub use color::Color;
 pub use edit::{ConfigEditor, Value};
-pub use theme::{BUILTIN_THEMES, THEME_KEYS, available_themes, themes_dir};
+pub use theme::{
+    AUTO_THEME, BUILTIN_THEMES, THEME_KEYS, available_themes, set_system_light, themes_dir,
+};
 pub use watch::{ConfigWatcher, watch};
 
 /// Modèle du fichier créé au premier lancement, commenté en français. Il doit
@@ -118,6 +120,11 @@ pub struct Theme {
     /// Police ; vide : celle du système.
     pub font: String,
     pub corner_radius: f32,
+    /// Flou de ce qui est derrière l'île (Windows), visible à travers un fond
+    /// translucide.
+    pub blur: bool,
+    /// Couleur d'accent de Windows à la place de celle du thème.
+    pub system_accent: bool,
     pub animation_ms: u32,
     pub top_offset: f32,
     pub compact: Size,
@@ -140,6 +147,8 @@ impl Default for Theme {
             },
             font: String::new(),
             corner_radius: 22.0,
+            blur: false,
+            system_accent: false,
             animation_ms: 240,
             top_offset: 0.0,
             compact: Size::new(190.0, 32.0),

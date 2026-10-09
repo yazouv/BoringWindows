@@ -98,9 +98,62 @@ pub fn pill_rect(theme: &Theme, shape: Shape, scale: f32) -> PhysRect {
     }
 }
 
+/// Forme exacte de la pilule (coins arrondis) : sert de région à la fenêtre
+/// quand le flou est actif, puisque le flou de Windows remplit toute la région.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RoundRect {
+    pub rect: PhysRect,
+    /// Rayon des coins (pixels physiques).
+    pub radius: i32,
+    /// Coins du haut carrés : pilule collée en haut de l'écran.
+    pub flat_top: bool,
+}
+
+/// Pilule telle que l'île la dessine en ce moment (valeurs logiques, animées
+/// comprises), en pixels physiques.
+pub fn pill_round_rect(
+    (x, y, width, height): (f32, f32, f32, f32),
+    radius: f32,
+    flat_top: bool,
+    scale: f32,
+) -> RoundRect {
+    let left = (x * scale).round() as i32;
+    let top = (y * scale).round() as i32;
+    let right = ((x + width) * scale).round() as i32;
+    let bottom = ((y + height) * scale).round() as i32;
+    RoundRect {
+        rect: PhysRect {
+            x: left,
+            y: top,
+            width: (right - left).max(1),
+            height: (bottom - top).max(1),
+        },
+        radius: (radius * scale).round().max(0.0) as i32,
+        flat_top,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn round_rect_follows_the_drawn_pill() {
+        let r = pill_round_rect((165.0, 0.0, 190.0, 32.0), 16.0, true, 1.5);
+        assert_eq!(
+            r,
+            RoundRect {
+                rect: PhysRect {
+                    x: 248,
+                    y: 0,
+                    width: 285,
+                    height: 48
+                },
+                radius: 24,
+                flat_top: true
+            }
+        );
+    }
 
     #[test]
     fn pill_is_centered_and_clamped_to_window() {
