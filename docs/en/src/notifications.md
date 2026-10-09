@@ -19,6 +19,16 @@ while a notification is showing: it opens straight on that tab.
   notification center too. **Clear all** clears the ones in the list.
 - The tab's badge counts the notifications that arrived since your last visit.
 
+## Do not disturb
+
+Click the **moon** at the top right of the open island. Notifications keep
+arriving in the **Notifs** tab, but no longer pop up in the pill or leave dots:
+a small moon shows instead. Click the moon again to go back to normal; the dots
+for what you missed come back.
+
+The mode is kept across restarts (a `do-not-disturb` file next to
+`config.toml`). It doesn't follow Windows' own "Do not disturb".
+
 ## Settings
 
 On by default. Settings › **General** › "Show app notifications in the island",

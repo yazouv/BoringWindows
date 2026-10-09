@@ -22,6 +22,17 @@ onglet.
 - Le badge de l'onglet compte les notifications arrivées depuis ta dernière
   visite.
 
+## Ne pas déranger
+
+Clique sur la **lune** en haut à droite de l'île ouverte. Les notifications
+continuent d'arriver dans l'onglet **Notifs**, mais ne s'annoncent plus dans la
+pilule et ne laissent plus de points : une petite lune les remplace. Reclique
+sur la lune pour revenir à la normale ; les points de ce que tu as manqué
+réapparaissent.
+
+Le mode est gardé d'un lancement à l'autre (fichier `do-not-disturb` à côté de
+`config.toml`). Il ne suit pas le « Ne pas déranger » de Windows.
+
 ## Réglages
 
 Activé par défaut. Réglages › **Général** › « Afficher les notifications des

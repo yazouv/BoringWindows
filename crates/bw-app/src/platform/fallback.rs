@@ -67,6 +67,10 @@ impl Platform {
     pub fn foreground_is_capture_tool(&self) -> bool {
         false
     }
+
+    pub fn top_taskbar_height(&self) -> Option<f32> {
+        None
+    }
 }
 
 /// Linux : pas d'icône de notification (elle exigerait GTK).

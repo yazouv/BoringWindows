@@ -36,6 +36,22 @@ pub enum Shape {
     Expanded,
 }
 
+/// Hauteur minimale d'une pilule ramenée à la barre des tâches.
+const MIN_PILL_HEIGHT: f32 = 16.0;
+
+/// Barre des tâches en haut de l'écran de l'île, de hauteur `taskbar`
+/// (logique) : la pilule fermée et celle d'attention n'en dépassent pas.
+/// Une barre plus haute que les pilules (taille normale) ne change rien.
+pub fn fit_under_taskbar(theme: &Theme, taskbar: Option<f32>) -> Theme {
+    let mut fitted = theme.clone();
+    if let Some(bar) = taskbar {
+        let cap = (bar - theme.top_offset).max(MIN_PILL_HEIGHT);
+        fitted.compact.height = fitted.compact.height.min(cap);
+        fitted.attention.height = fitted.attention.height.min(cap);
+    }
+    fitted
+}
+
 /// Taille de la pilule qui annonce une notification : dérivée de l'attention,
 /// sans jamais dépasser l'île ouverte (la fenêtre).
 pub fn notification_size(theme: &Theme) -> Size {
@@ -148,6 +164,29 @@ mod tests {
             ..Theme::default()
         };
         assert_eq!(notification_size(&small), Size::new(320.0, 50.0));
+    }
+
+    #[test]
+    fn small_taskbar_caps_the_pills() {
+        let theme = Theme::default();
+        // Barre réduite (32 px) : l'attention (36) descend à 32.
+        let small = fit_under_taskbar(&theme, Some(32.0));
+        assert_eq!(small.compact.height, 32.0);
+        assert_eq!(small.attention.height, 32.0);
+        assert_eq!(small.expanded, theme.expanded);
+        // Barre normale (48 px) ou ailleurs qu'en haut : rien ne change.
+        assert_eq!(fit_under_taskbar(&theme, Some(48.0)), theme);
+        assert_eq!(fit_under_taskbar(&theme, None), theme);
+        // Décalage depuis le haut : la pilule finit au bord de la barre.
+        let offset = Theme {
+            top_offset: 4.0,
+            ..Theme::default()
+        };
+        assert_eq!(
+            fit_under_taskbar(&offset, Some(32.0)).attention.height,
+            28.0
+        );
+        assert_eq!(fit_under_taskbar(&theme, Some(4.0)).compact.height, 16.0);
     }
 
     #[test]

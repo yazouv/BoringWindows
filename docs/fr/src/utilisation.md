@@ -67,7 +67,9 @@ Greenshot…) couvrent aussi tout l'écran, mais l'île reste affichée pendant 
 capture.
 
 L'île reste au-dessus de la barre des tâches, même quand celle-ci est placée en
-haut de l'écran.
+haut de l'écran. Si cette barre est plus basse que la pilule (petites icônes),
+la pilule fermée et celle d'attention prennent sa hauteur pour ne pas dépasser ;
+avec une barre de taille normale, rien ne change.
 
 ## Modifier la configuration
 

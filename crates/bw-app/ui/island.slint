@@ -106,6 +106,7 @@ component IconButton inherits Rectangle {
         commands: root.icon == "play" ? "M 7 4 L 20 12 L 7 20 Z"
             : root.icon == "pause" ? "M 6 4 L 10 4 L 10 20 L 6 20 Z M 14 4 L 18 4 L 18 20 L 14 20 Z"
             : root.icon == "next" ? "M 4 5 L 14 12 L 4 19 Z M 15 5 L 18 5 L 18 19 L 15 19 Z"
+            : root.icon == "moon" ? "M 20.5 14.5 A 9 9 0 1 1 9.5 3.5 A 7 7 0 0 0 20.5 14.5 Z"
             : "M 20 5 L 10 12 L 20 19 Z M 6 5 L 9 5 L 9 19 L 6 19 Z";
     }
 
@@ -298,6 +299,9 @@ export component Island inherits Window {
     in property <int> notif-unread;
     in property <[color]> unread-colors;
     callback notif-action(string /* seen | clear | open:<id> | remove:<id> */);
+    // Ne pas déranger : plus d'annonces ni de points, une lune sur la pilule.
+    in property <bool> dnd;
+    callback dnd-toggle();
     // Onglets de l'île ouverte : 0 accueil, 1 Claude, 2 notifications.
     changed tab => {
         if self.tab == 2 {
@@ -481,11 +485,26 @@ export component Island inherits Window {
                 }
             }
 
+            // Ne pas déranger : une lune discrète à droite de la pilule fermée.
+            Path {
+                x: parent.width - self.width - 14px;
+                y: (parent.height - self.height) / 2;
+                width: 12px;
+                height: 12px;
+                viewbox-width: 24;
+                viewbox-height: 24;
+                fill: root.fg.with-alpha(0.55);
+                commands: "M 20.5 14.5 A 9 9 0 1 1 9.5 3.5 A 7 7 0 0 0 20.5 14.5 Z";
+                opacity: root.dnd && !root.expanded && !root.has-notif ? 1 : 0;
+                visible: self.opacity > 0;
+                animate opacity { duration: root.anim; }
+            }
+
             // Contenu compact : le module qui réclame l'attention.
             HorizontalLayout {
                 padding-left: 14px;
-                // Laisse la place aux points des notifications non lues.
-                padding-right: 14px + root.unread-colors.length * 10px;
+                // Laisse la place aux points des non lues et à la lune.
+                padding-right: 14px + root.unread-colors.length * 10px + (root.dnd ? 18px : 0px);
                 spacing: 8px;
                 opacity: root.has-attention && !root.has-notif && !root.expanded ? 1 : 0;
                 animate opacity { duration: root.anim / 2; }
@@ -635,6 +654,15 @@ export component Island inherits Window {
                             accent: root.accent;
                             clicked => { root.tab = 1; }
                         }
+                    }
+
+                    // Ne pas déranger (lune pleine et colorée quand il est actif).
+                    if root.has-notif-tab: IconButton {
+                        y: (parent.height - self.height) / 2;
+                        size: 24px;
+                        icon: "moon";
+                        ink: root.dnd ? root.accent : root.fg.with-alpha(0.55);
+                        clicked => { root.dnd-toggle(); }
                     }
                 }
 
@@ -1180,6 +1208,15 @@ export component Island inherits Window {
                     spacing: 2px;
                     alignment: start;
                     vertical-stretch: 1;
+
+                    if root.dnd: Text {
+                        height: 22px;
+                        text: @tr("Do not disturb: notifications arrive here without popping up");
+                        color: root.accent;
+                        font-size: 12px;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
 
                     for item in root.notif-rows: Rectangle {
                         height: 26px;

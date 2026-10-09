@@ -70,6 +70,8 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
     };
     bw_i18n::set(language(config.general.language));
     let shelf_file = path.with_file_name("shelf.txt");
+    // Présent : « ne pas déranger » activé (gardé d'un lancement à l'autre).
+    let dnd_file = path.with_file_name("do-not-disturb");
 
     let controller = Rc::new(Controller {
         // Seule l'île reçoit les attributs de fenêtre spéciaux (pas de focus,
@@ -112,6 +114,9 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         media_seen: RefCell::new(BTreeSet::new()),
         notify: RefCell::new(None),
         notif_seq: Cell::new(0),
+        taskbar: Cell::new(None),
+        dnd: Cell::new(dnd_file.exists()),
+        dnd_file,
     });
     CONTROLLER.with(|c| {
         let _ = c.set(controller.clone());
@@ -165,6 +170,12 @@ pub struct Controller {
     notify: RefCell<Option<Arc<NotifySnapshot>>>,
     /// Compteur passé à l'UI pour rejouer l'animation d'arrivée.
     notif_seq: Cell<i32>,
+    /// Hauteur (logique) de la barre des tâches quand elle est en haut de
+    /// l'écran de l'île.
+    taskbar: Cell<Option<f32>>,
+    /// Ne pas déranger : les notifications ne s'annoncent plus.
+    dnd: Cell<bool>,
+    dnd_file: PathBuf,
     settings: RefCell<Option<settings::SettingsState>>,
     open_settings_at_start: Cell<bool>,
     update_state: Cell<update::UpdateState>,
@@ -231,6 +242,15 @@ impl Controller {
             .on_notif_action(with(&weak, |c, action: slint::SharedString| {
                 c.notif_action(&action);
             }));
+        self.ui.on_dnd_toggle({
+            let weak = weak.clone();
+            move || {
+                if let Some(c) = weak.upgrade() {
+                    c.set_dnd(!c.dnd.get());
+                }
+            }
+        });
+        self.ui.set_dnd(self.dnd.get());
         self.ui
             .on_shelf_open(with(&weak, |c, i: i32| c.shelf_open(i as usize)));
         self.ui
@@ -289,6 +309,7 @@ impl Controller {
         }
         self.fullscreen.set(platform.fullscreen_now());
         *self.platform.borrow_mut() = Some(platform);
+        self.update_taskbar();
         self.update_visibility();
         self.sync_region();
 
@@ -397,6 +418,7 @@ impl Controller {
         // Une notification ne dure que quelques secondes : elle passe devant
         // tout, sauf une action requise (permission de Claude…).
         let notif_wins = self.announcing().is_some()
+            && !self.dnd.get()
             && winner.as_ref().is_some_and(|w| w.level < Attention::Urgent);
         let new = if self.expanded.get() {
             Shape::Expanded
@@ -438,15 +460,12 @@ impl Controller {
 
         // Pendant l'animation, la zone cliquable couvre l'ancienne et la
         // nouvelle forme ; elle est ajustée à la fin.
-        let config = self.config.borrow();
+        let theme = self.theme();
         let scale = self.ui.window().scale_factor();
-        let during = geometry::pill_rect(&config.theme, old, scale).union(geometry::pill_rect(
-            &config.theme,
-            new,
-            scale,
-        ));
+        let during =
+            geometry::pill_rect(&theme, old, scale).union(geometry::pill_rect(&theme, new, scale));
         self.with_platform(|p| p.set_hit_region(during));
-        self.schedule_region_sync(Duration::from_millis(config.theme.animation_ms.into()));
+        self.schedule_region_sync(Duration::from_millis(theme.animation_ms.into()));
     }
 
     fn schedule_region_sync(&self, delay: Duration) {
@@ -459,7 +478,7 @@ impl Controller {
 
     fn sync_region(&self) {
         let rect = geometry::pill_rect(
-            &self.config.borrow().theme,
+            &self.theme(),
             self.shape.get(),
             self.ui.window().scale_factor(),
         );
@@ -499,9 +518,28 @@ impl Controller {
 
     // --- Config ------------------------------------------------------------
 
+    /// Thème de la config, pilules ramenées à la barre des tâches si elle est
+    /// en haut et plus basse qu'elles.
+    fn theme(&self) -> bw_config::Theme {
+        geometry::fit_under_taskbar(&self.config.borrow().theme, self.taskbar.get())
+    }
+
+    /// Relit la barre des tâches (position, taille) et redessine si besoin.
+    fn update_taskbar(&self) {
+        let height = self
+            .platform
+            .borrow()
+            .as_ref()
+            .and_then(Platform::top_taskbar_height);
+        if self.taskbar.replace(height) != height {
+            log::info!("barre des tâches en haut : {height:?}");
+            self.apply_theme();
+            self.sync_region();
+        }
+    }
+
     fn apply_theme(&self) {
-        let config = self.config.borrow();
-        let t = &config.theme;
+        let t = &self.theme();
         let ui = &self.ui;
         ui.set_compact_width(t.compact.width);
         ui.set_compact_height(t.compact.height);
@@ -519,7 +557,6 @@ impl Controller {
         ui.set_fg(color(t.foreground));
         ui.set_border(color(t.border));
         ui.set_font(t.font.as_str().into());
-        drop(config);
         self.apply_accent();
     }
 
@@ -638,6 +675,9 @@ impl Controller {
         match ModuleHost::spawn(modules, |event| post(move |c| c.on_module_event(event))) {
             Ok(host) => *self.host.borrow_mut() = Some(host),
             Err(e) => log::error!("impossible de démarrer les modules : {e:#}"),
+        }
+        if self.dnd.get() {
+            self.send_notify("dnd:on");
         }
         self.refresh_shape();
     }
@@ -783,11 +823,31 @@ impl Controller {
             self.ui.set_notif_seq(self.notif_seq.get());
         }
 
+        self.ui.set_has_notif_tab(true);
+        // Arrivée pendant que l'onglet est sous les yeux : déjà lue.
+        if snapshot.unread > 0 && self.expanded.get() && self.ui.get_tab() == TAB_NOTIFICATIONS {
+            self.send_notify("seen");
+        }
+
+        *self.notify.borrow_mut() = Some(snapshot);
+        self.update_notif_ui();
+        self.refresh_shape();
+    }
+
+    /// Liste de l'onglet et points des non lues (masqués en « ne pas déranger »).
+    fn update_notif_ui(&self) {
+        let notify = self.notify.borrow();
+        let Some(snapshot) = notify.as_ref() else {
+            return;
+        };
+        let dnd = self.dnd.get();
+        // En « ne pas déranger », une ligne de l'onglet le rappelle.
+        let shown = NOTIF_ROWS - usize::from(dnd);
         let now = chrono::Utc::now();
         let rows: Vec<NotifInfo> = snapshot
             .recent
             .iter()
-            .take(NOTIF_ROWS)
+            .take(shown)
             .map(|n| notif_info(n, &ago(n.at.into(), now)))
             .collect();
         self.ui.set_notif_rows(ModelRc::new(VecModel::from(rows)));
@@ -796,20 +856,33 @@ impl Controller {
         let mut colors: Vec<slint::Color> = Vec::new();
         for n in snapshot.recent.iter().take(snapshot.unread) {
             let c = rgb(n.color());
-            if !colors.contains(&c) && colors.len() < 3 {
+            if !dnd && !colors.contains(&c) && colors.len() < 3 {
                 colors.push(c);
             }
         }
         self.ui
             .set_unread_colors(ModelRc::new(VecModel::from(colors)));
         self.ui.set_notif_unread(snapshot.unread as i32);
-        self.ui.set_has_notif_tab(true);
-        // Arrivée pendant que l'onglet est sous les yeux : déjà lue.
-        if snapshot.unread > 0 && self.expanded.get() && self.ui.get_tab() == TAB_NOTIFICATIONS {
-            self.send_notify("seen");
-        }
+    }
 
-        *self.notify.borrow_mut() = Some(snapshot);
+    /// Active ou coupe « ne pas déranger », et s'en souvient.
+    fn set_dnd(&self, on: bool) {
+        self.dnd.set(on);
+        let saved = if on {
+            std::fs::write(&self.dnd_file, "")
+        } else {
+            std::fs::remove_file(&self.dnd_file).or_else(|e| match e.kind() {
+                std::io::ErrorKind::NotFound => Ok(()),
+                _ => Err(e),
+            })
+        };
+        if let Err(e) = saved {
+            log::warn!("ne pas déranger : {} : {e}", self.dnd_file.display());
+        }
+        log::info!("ne pas déranger : {on}");
+        self.ui.set_dnd(on);
+        self.send_notify(if on { "dnd:on" } else { "dnd:off" });
+        self.update_notif_ui();
         self.refresh_shape();
     }
 
@@ -1440,8 +1513,10 @@ impl Controller {
                     self.update_visibility();
                 }
             }
+            PlatformEvent::TaskbarChanged => self.update_taskbar(),
             PlatformEvent::DisplayChanged => {
                 self.place();
+                self.update_taskbar();
                 // Laisse le temps au changement de DPI d'être appliqué.
                 self.schedule_region_sync(Duration::from_millis(250));
             }

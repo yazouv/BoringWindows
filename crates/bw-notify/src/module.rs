@@ -18,15 +18,19 @@ enum UiAction {
     Hide,
     Remove(u32),
     Clear,
+    /// Ne pas déranger : les notifications arrivent sans être annoncées.
+    DoNotDisturb(bool),
 }
 
 impl UiAction {
-    /// `seen`, `hide`, `remove:<id>`, `clear`.
+    /// `seen`, `hide`, `remove:<id>`, `clear`, `dnd:on`, `dnd:off`.
     fn parse(action: &str) -> Option<Self> {
         Some(match action {
             "seen" => Self::Seen,
             "hide" => Self::Hide,
             "clear" => Self::Clear,
+            "dnd:on" => Self::DoNotDisturb(true),
+            "dnd:off" => Self::DoNotDisturb(false),
             _ => Self::Remove(action.strip_prefix("remove:")?.parse().ok()?),
         })
     }
@@ -80,6 +84,7 @@ impl Module for NotifyModule {
             let mut inbox = Inbox::default();
             let mut announcing: Option<Notification> = None;
             let mut hide_at: Option<Instant> = None;
+            let mut quiet = false;
             loop {
                 let hide = async {
                     match hide_at {
@@ -91,7 +96,8 @@ impl Module for NotifyModule {
                     list = lists.recv() => {
                         let Some(list) = list else { break };
                         let list = list.into_iter().map(|n| redact(n, &config)).collect();
-                        if let Some(latest) = inbox.sync(list, &config).pop() {
+                        let latest = inbox.sync(list, &config).pop();
+                        if let Some(latest) = latest.filter(|_| !quiet) {
                             log::info!("notifications : nouvelle notification de {}", latest.app);
                             ctx.set_attention(Attention::High, Some(summary(&latest)));
                             announcing = Some(latest);
@@ -103,6 +109,12 @@ impl Module for NotifyModule {
                         match action {
                             UiAction::Seen => inbox.mark_seen(),
                             UiAction::Hide => hide_at = Some(Instant::now()),
+                            UiAction::DoNotDisturb(on) => {
+                                quiet = on;
+                                if on && announcing.is_some() {
+                                    hide_at = Some(Instant::now());
+                                }
+                            }
                             UiAction::Remove(id) => {
                                 inbox.remove(id);
                                 let _ = commands.send(Command::Remove(vec![id]));
@@ -172,6 +184,14 @@ mod tests {
         assert_eq!(UiAction::parse("seen"), Some(UiAction::Seen));
         assert_eq!(UiAction::parse("remove:42"), Some(UiAction::Remove(42)));
         assert_eq!(UiAction::parse("remove:x"), None);
+        assert_eq!(
+            UiAction::parse("dnd:on"),
+            Some(UiAction::DoNotDisturb(true))
+        );
+        assert_eq!(
+            UiAction::parse("dnd:off"),
+            Some(UiAction::DoNotDisturb(false))
+        );
         assert_eq!(UiAction::parse("boom"), None);
     }
 

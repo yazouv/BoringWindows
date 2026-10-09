@@ -66,7 +66,9 @@ Screenshot tools (Win+Shift+S, Snipping Tool, ShareX, Greenshot…) cover the
 whole screen too, but the island stays visible while you capture.
 
 The island stays above the taskbar, even when the taskbar sits at the top of
-the screen.
+the screen. If that taskbar is shorter than the pill (small icons), the closed
+and attention pills take its height so they don't stick out; with a
+normal-size taskbar, nothing changes.
 
 ## Changing the configuration
 

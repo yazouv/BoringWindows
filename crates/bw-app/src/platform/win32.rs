@@ -15,7 +15,7 @@ use windows::Win32::Foundation::{
 };
 use windows::Win32::Graphics::Gdi::{
     CreateRectRgn, GetMonitorInfoW, HMONITOR, MONITOR_DEFAULTTONEAREST, MONITOR_DEFAULTTOPRIMARY,
-    MONITORINFO, MonitorFromPoint, MonitorFromWindow, SetWindowRgn,
+    MONITORINFO, MonitorFromPoint, MonitorFromRect, MonitorFromWindow, SetWindowRgn,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Registry::{
@@ -28,16 +28,17 @@ use windows::Win32::System::Threading::{
 use windows::Win32::UI::Accessibility::{HWINEVENTHOOK, SetWinEventHook, UnhookWinEvent};
 use windows::Win32::UI::HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use windows::Win32::UI::Shell::{
-    ABM_NEW, ABM_REMOVE, ABN_FULLSCREENAPP, APPBARDATA, QUNS_BUSY, QUNS_PRESENTATION_MODE,
+    ABE_TOP, ABM_GETSTATE, ABM_GETTASKBARPOS, ABM_NEW, ABM_REMOVE, ABN_FULLSCREENAPP,
+    ABN_POSCHANGED, ABS_AUTOHIDE, APPBARDATA, QUNS_BUSY, QUNS_PRESENTATION_MODE,
     QUNS_RUNNING_D3D_FULL_SCREEN, SHAppBarMessage, SHQueryUserNotificationState, ShellExecuteW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, EVENT_SYSTEM_FOREGROUND, GWL_EXSTYLE,
     GetCursorPos, GetForegroundWindow, GetWindowLongPtrW, GetWindowThreadProcessId, HWND_TOPMOST,
-    RegisterClassW, SW_HIDE, SW_SHOWNOACTIVATE, SW_SHOWNORMAL, SWP_FRAMECHANGED, SWP_NOACTIVATE,
-    SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowLongPtrW, SetWindowPos, ShowWindow,
-    WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_APP, WM_DISPLAYCHANGE, WNDCLASSW,
-    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP,
+    RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_SHOWNOACTIVATE, SW_SHOWNORMAL,
+    SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowLongPtrW,
+    SetWindowPos, ShowWindow, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_APP,
+    WM_DISPLAYCHANGE, WNDCLASSW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_POPUP,
 };
 use windows::core::{HSTRING, PCWSTR, w};
 
@@ -280,6 +281,30 @@ impl Platform {
             && !self.foreground_is_capture_tool()
     }
 
+    /// Hauteur logique de la barre des tâches si elle est collée en haut de
+    /// l'écran de l'île et toujours visible (pas en masquage automatique).
+    pub fn top_taskbar_height(&self) -> Option<f32> {
+        let mut data = APPBARDATA {
+            cbSize: size_of::<APPBARDATA>() as u32,
+            ..Default::default()
+        };
+        // SAFETY: `data` est une structure locale valide pendant les appels.
+        unsafe {
+            if SHAppBarMessage(ABM_GETSTATE, &mut data) as u32 & ABS_AUTOHIDE != 0
+                || SHAppBarMessage(ABM_GETTASKBARPOS, &mut data) == 0
+                || data.uEdge != ABE_TOP
+            {
+                return None;
+            }
+            let ours = MonitorFromWindow(self.hwnd, MONITOR_DEFAULTTONEAREST);
+            if MonitorFromRect(&data.rc, MONITOR_DEFAULTTONEAREST) != ours {
+                return None;
+            }
+            let scale = monitor_info(ours).scale;
+            Some((data.rc.bottom - data.rc.top) as f32 / scale)
+        }
+    }
+
     /// La fenêtre au premier plan est-elle un outil de capture d'écran ?
     pub fn foreground_is_capture_tool(&self) -> bool {
         // SAFETY: fonction sans effet de bord.
@@ -426,6 +451,13 @@ fn create_helper_window() -> anyhow::Result<HWND> {
     }
 }
 
+/// Message diffusé quand l'Explorateur (re)crée la barre des tâches.
+fn taskbar_created() -> u32 {
+    static MESSAGE: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+    // SAFETY: chaîne statique.
+    *MESSAGE.get_or_init(|| unsafe { RegisterWindowMessageW(w!("TaskbarCreated")) })
+}
+
 unsafe extern "system" fn helper_proc(
     hwnd: HWND,
     msg: u32,
@@ -436,7 +468,15 @@ unsafe extern "system" fn helper_proc(
         APPBAR_CALLBACK if wparam.0 as u32 == ABN_FULLSCREENAPP => {
             Some(PlatformEvent::Fullscreen(lparam.0 != 0))
         }
+        APPBAR_CALLBACK if wparam.0 as u32 == ABN_POSCHANGED => Some(PlatformEvent::TaskbarChanged),
         WM_DISPLAYCHANGE => Some(PlatformEvent::DisplayChanged),
+        // Explorateur redémarré : l'appbar est à réenregistrer.
+        m if m != 0 && m == taskbar_created() => {
+            let mut data = appbar_data(hwnd);
+            // SAFETY: `hwnd` est notre fenêtre auxiliaire, vivante.
+            unsafe { SHAppBarMessage(ABM_NEW, &mut data) };
+            Some(PlatformEvent::TaskbarChanged)
+        }
         _ => None,
     };
     if let Some(event) = event {

@@ -341,3 +341,6 @@ msgstr "Afficher les notifications des applications dans l'île (Discord, Slack,
 
 msgid "Show the sender and the message of notifications"
 msgstr "Montrer l'expéditeur et le message des notifications"
+
+msgid "Do not disturb: notifications arrive here without popping up"
+msgstr "Ne pas déranger : les notifications arrivent ici sans s'annoncer"
