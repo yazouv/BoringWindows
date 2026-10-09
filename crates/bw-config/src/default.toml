@@ -98,6 +98,9 @@ show_secs = 5
 show_content = true
 # Applications à ignorer (morceau de nom, ex. ["docker", "intel"]).
 ignore = []
+# Un clic sur une notification de l'île rejoue la vraie notification (bon salon
+# Discord, bon onglet…) ; false : il ouvre seulement l'application.
+open_original = true
 
 [modules.demo]
 # Module de démonstration : fait varier l'attention toutes les quelques secondes

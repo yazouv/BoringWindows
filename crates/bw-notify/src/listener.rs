@@ -15,7 +15,7 @@ use windows::UI::Notifications::Management::{
 };
 use windows::UI::Notifications::{KnownNotificationBindings, NotificationKinds, UserNotification};
 
-use crate::inbox::Notification;
+use crate::inbox::{AppIcon, Notification};
 
 const POLL: Duration = Duration::from_secs(2);
 /// Unités WinRT : 100 ns.
@@ -45,6 +45,14 @@ where
 }
 
 fn run<F: Fn(Vec<Notification>)>(rx: &Receiver<Command>, out: F) -> windows::core::Result<()> {
+    // COM pour les icônes (le shell) ; WinRT s'en accommode.
+    // SAFETY: initialisation du thread courant, une seule fois.
+    unsafe {
+        let _ = windows::Win32::System::Com::CoInitializeEx(
+            None,
+            windows::Win32::System::Com::COINIT_MULTITHREADED,
+        );
+    }
     let listener = UserNotificationListener::Current()?;
     let mut access = listener.GetAccessStatus()?;
     if access == Access::Unspecified {
@@ -59,9 +67,11 @@ fn run<F: Fn(Vec<Notification>)>(rx: &Receiver<Command>, out: F) -> windows::cor
     log::info!("notifications : lecture du centre de notifications");
 
     let mut cache: HashMap<u32, Notification> = HashMap::new();
+    // Icônes par application : lues une fois.
+    let mut icons: HashMap<String, Option<AppIcon>> = HashMap::new();
     let mut last_ids: Option<Vec<u32>> = None;
     loop {
-        match read(&listener, &mut cache) {
+        match read(&listener, &mut cache, &mut icons) {
             Ok(list) => {
                 let mut ids: Vec<u32> = list.iter().map(|n| n.id).collect();
                 ids.sort_unstable();
@@ -89,6 +99,7 @@ fn run<F: Fn(Vec<Notification>)>(rx: &Receiver<Command>, out: F) -> windows::cor
 fn read(
     listener: &UserNotificationListener,
     cache: &mut HashMap<u32, Notification>,
+    icons: &mut HashMap<String, Option<AppIcon>>,
 ) -> windows::core::Result<Vec<Notification>> {
     let list = listener
         .GetNotificationsAsync(NotificationKinds::Toast)?
@@ -99,7 +110,13 @@ fn read(
         let notification = match cache.get(&id) {
             Some(known) => known.clone(),
             None => match details(&n, id) {
-                Ok(details) => details,
+                Ok(mut details) => {
+                    details.icon = icons
+                        .entry(details.app_id.clone())
+                        .or_insert_with(|| crate::icon::app_icon(&details.app_id))
+                        .clone();
+                    details
+                }
                 Err(e) => {
                     log::debug!("notifications : {id} illisible : {e}");
                     continue;
@@ -138,6 +155,8 @@ fn details(n: &UserNotification, id: u32) -> windows::core::Result<Notification>
             .get(1..)
             .map(|rest| rest.join(" · "))
             .unwrap_or_default(),
+        lines: texts,
+        icon: None,
         at: at.min(SystemTime::now()),
     })
 }

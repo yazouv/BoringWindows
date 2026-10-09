@@ -80,6 +80,8 @@ export struct NotifInfo {
     body: string,
     tint: color,
     initial: string,
+    has-icon: bool,
+    icon: image,
     ago: string,
 }
 
@@ -151,18 +153,31 @@ component PillButton inherits Rectangle {
     }
 }
 
-// Pastille ronde à l'initiale de l'application, à sa couleur.
+// Pastille ronde de l'application : son icône sur un fond de sa couleur, ou
+// à défaut son initiale.
 component Avatar inherits Rectangle {
     in property <string> initial;
     in property <color> tint;
+    in property <bool> has-icon;
+    in property <image> icon;
     in property <length> size: 36px;
 
     width: root.size;
     height: root.size;
     border-radius: root.size / 2;
-    background: @radial-gradient(circle, root.tint.brighter(0.35) 0%, root.tint 100%);
+    background: root.has-icon ? root.tint.with-alpha(0.22)
+        : @radial-gradient(circle, root.tint.brighter(0.35) 0%, root.tint 100%);
 
-    Text {
+    if root.has-icon: Image {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: root.size * 0.68;
+        height: root.size * 0.68;
+        source: root.icon;
+        image-fit: contain;
+    }
+
+    if !root.has-icon: Text {
         text: root.initial;
         color: white;
         font-size: root.size * 0.46;
@@ -422,6 +437,8 @@ export component Island inherits Window {
                         y: (parent.height - self.height) / 2;
                         initial: root.notif.initial;
                         tint: root.notif.tint;
+                        has-icon: root.notif.has-icon;
+                        icon: root.notif.icon;
                         animate size { duration: root.popped ? 550ms : 0ms; easing: ease-out-back; }
                     }
                 }
@@ -1237,6 +1254,8 @@ export component Island inherits Window {
                                 y: (parent.height - self.height) / 2;
                                 initial: item.initial;
                                 tint: item.tint;
+                                has-icon: item.has-icon;
+                                icon: item.icon;
                             }
 
                             Text {

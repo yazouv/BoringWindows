@@ -594,6 +594,7 @@ dependencies = [
  "anyhow",
  "bw-core",
  "bw-i18n",
+ "bw-media",
  "log",
  "serde",
  "tokio",

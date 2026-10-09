@@ -352,6 +352,8 @@ de texte aux écrans de l'assistant), puis la fenêtre de réglages.
 - [x] Notifications des applications (`bw-notify` : annonce animée dans la pilule, points non lus, onglet « Notifs », clic → ouvre l'application, doc FR + EN)
 - [x] Onglets de l'île ouverte (Accueil, Notifs, Claude)
 - [x] Ne pas déranger (lune dans l'île, gardé entre deux lancements)
+- [x] Icône des applications (`shell:AppsFolder`), couleur tirée de l'icône pour les applis inconnues
+- [x] Clic → bon endroit : la notification est rejouée depuis le centre de notifications (Win+N + UI Automation), sinon l'application s'ouvre
 - [x] Barre des tâches en haut et réduite : pilules ramenées à sa hauteur
 - [x] Plugins WASM (`bw-plugins`, wasmi : bac à sable, budget de calcul, mémoire plafonnée ; texte + attention ; doc FR + EN)
 

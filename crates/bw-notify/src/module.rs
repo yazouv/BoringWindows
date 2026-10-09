@@ -204,6 +204,8 @@ mod tests {
             app_id: String::new(),
             title: "Arkyan".into(),
             body: "salut".into(),
+            lines: vec!["Arkyan".into(), "salut".into()],
+            icon: None,
             at: std::time::SystemTime::UNIX_EPOCH,
         };
         let hidden = redact(

@@ -14,6 +14,10 @@ pub struct NotifyConfig {
     pub show_content: bool,
     /// Applications à ignorer (morceau du nom, sans tenir compte de la casse).
     pub ignore: Vec<String>,
+    /// Un clic rejoue la notification depuis le centre de notifications, pour
+    /// arriver au bon endroit (salon Discord, onglet…) ; sinon, il ouvre
+    /// seulement l'application.
+    pub open_original: bool,
 }
 
 impl Default for NotifyConfig {
@@ -23,6 +27,7 @@ impl Default for NotifyConfig {
             show_secs: 5,
             show_content: true,
             ignore: Vec::new(),
+            open_original: true,
         }
     }
 }
@@ -64,7 +69,7 @@ mod tests {
     #[test]
     fn defaults_and_validation() {
         let c = NotifyConfig::from_table(None).unwrap();
-        assert!(c.enabled && c.show_content);
+        assert!(c.enabled && c.show_content && c.open_original);
         assert_eq!(c.show_for(), Duration::from_secs(5));
         for bad in ["show_secs = 0", "show_secs = 31", "sound = true"] {
             let t: toml::Table = toml::from_str(bad).unwrap();

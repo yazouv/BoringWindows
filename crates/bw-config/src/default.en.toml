@@ -98,6 +98,9 @@ show_secs = 5
 show_content = true
 # Apps to ignore (part of a name, e.g. ["docker", "intel"]).
 ignore = []
+# Clicking a notification in the island replays the real one (right Discord
+# channel, right tab…); false: it only opens the app.
+open_original = true
 
 [modules.demo]
 # Demo module: changes attention every few seconds to try out the

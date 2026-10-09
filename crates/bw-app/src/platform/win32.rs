@@ -559,6 +559,12 @@ pub fn open_path(path: &Path) {
     }
 }
 
+/// Rejoue la notification aux textes `lines` depuis le centre de
+/// notifications (bon salon, bon onglet…). Bloquant : hors du thread UI.
+pub fn open_notification(lines: &[String]) -> bool {
+    bw_notify::open_from_center(lines)
+}
+
 /// Ouvre (ou ramène) l'application d'identifiant `app_id` (AppUserModelID,
 /// lu dans une notification) via le dossier virtuel des applications.
 pub fn open_app(app_id: &str) -> bool {

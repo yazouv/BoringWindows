@@ -4,6 +4,7 @@
 #![cfg_attr(not(windows), allow(dead_code))]
 
 use std::collections::BTreeSet;
+use std::sync::Arc;
 use std::time::SystemTime;
 
 use crate::config::NotifyConfig;
@@ -24,14 +25,31 @@ pub struct Notification {
     pub title: String,
     /// Le reste du message, sur une ligne.
     pub body: String,
+    /// Textes d'origine, gardés même quand l'affichage les masque : ils
+    /// servent à retrouver la notification dans le centre de notifications.
+    pub lines: Vec<String>,
+    /// Icône de l'application, si Windows en fournit une.
+    pub icon: Option<AppIcon>,
     pub at: SystemTime,
 }
 
+/// Icône d'application, RGBA non prémultiplié.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppIcon {
+    pub width: u32,
+    pub height: u32,
+    pub rgba: Arc<Vec<u8>>,
+    /// Couleur dominante de l'icône.
+    pub accent: Option<[u8; 3]>,
+}
+
 impl Notification {
-    /// Couleur de l'application : celle de la marque si on la connaît,
-    /// sinon une teinte stable tirée de son nom.
+    /// Couleur de l'application : celle de la marque si on la connaît, sinon
+    /// celle de son icône, sinon une teinte stable tirée de son nom.
     pub fn color(&self) -> [u8; 3] {
-        brand_color(&self.app)
+        known_brand(&self.app)
+            .or_else(|| self.icon.as_ref()?.accent)
+            .unwrap_or_else(|| brand_color(&self.app))
     }
 
     /// Lettre de l'avatar.
@@ -147,16 +165,50 @@ const BRANDS: &[(&str, [u8; 3])] = &[
     ("github", [0x8B, 0x94, 0x9E]),
 ];
 
-pub fn brand_color(app: &str) -> [u8; 3] {
+fn known_brand(app: &str) -> Option<[u8; 3]> {
     let lower = app.to_lowercase();
-    if let Some((_, c)) = BRANDS.iter().find(|(name, _)| lower.contains(name)) {
-        return *c;
+    BRANDS
+        .iter()
+        .find(|(name, _)| lower.contains(name))
+        .map(|(_, c)| *c)
+}
+
+pub fn brand_color(app: &str) -> [u8; 3] {
+    if let Some(c) = known_brand(app) {
+        return c;
     }
     // Teinte stable (FNV-1a), saturation et luminosité fixes.
-    let hash = lower.bytes().fold(0x811c_9dc5_u32, |h, b| {
+    let hash = app.to_lowercase().bytes().fold(0x811c_9dc5_u32, |h, b| {
         (h ^ u32::from(b)).wrapping_mul(0x0100_0193)
     });
     hsl(hash % 360, 0.62, 0.58)
+}
+
+/// Le texte d'un élément du centre de notifications (« Titre. Message. .
+/// Reçu à 18:21 ») est-il celui de la notification aux lignes `lines` ?
+pub fn matches_center_entry(entry: &str, lines: &[String]) -> bool {
+    let normalize = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
+    let expected = normalize(&lines.join(". "));
+    !expected.is_empty() && normalize(entry).starts_with(&expected)
+}
+
+/// Pixels BGRA prémultipliés (bitmap Windows) → RGBA ordinaire. Une image
+/// sans aucune transparence renseignée est considérée opaque.
+pub fn straight_rgba(bgra: &[u8]) -> Vec<u8> {
+    let pixels = bgra.as_chunks::<4>().0;
+    let opaque = pixels.iter().all(|px| px[3] == 0);
+    pixels
+        .iter()
+        .flat_map(|px| {
+            let a = if opaque { 255 } else { px[3] };
+            let un = |c: u8| match a {
+                0 => 0,
+                255 => c,
+                _ => ((u32::from(c) * 255 + u32::from(a) / 2) / u32::from(a)).min(255) as u8,
+            };
+            [un(px[2]), un(px[1]), un(px[0]), a]
+        })
+        .collect()
 }
 
 fn hsl(hue: u32, s: f32, l: f32) -> [u8; 3] {
@@ -186,6 +238,8 @@ mod tests {
             app_id: String::new(),
             title: format!("t{id}"),
             body: String::new(),
+            lines: vec![format!("t{id}")],
+            icon: None,
             at: SystemTime::UNIX_EPOCH,
         }
     }
@@ -250,6 +304,51 @@ mod tests {
         );
         assert_eq!(fresh.len(), 1);
         assert_eq!(inbox.snapshot(None).recent.len(), 1);
+    }
+
+    #[test]
+    fn icon_color_for_unknown_apps() {
+        let mut n = notif(1, "Inconnue");
+        n.icon = Some(AppIcon {
+            width: 1,
+            height: 1,
+            rgba: Arc::new(vec![1, 2, 3, 255]),
+            accent: Some([9, 8, 7]),
+        });
+        assert_eq!(n.color(), [9, 8, 7]);
+        // Une marque connue garde sa couleur.
+        n.app = "Discord".into();
+        assert_eq!(n.color(), [0x58, 0x65, 0xF2]);
+    }
+
+    #[test]
+    fn center_entries() {
+        let lines = vec!["Sonde UIA".to_owned(), "message de sonde 42".to_owned()];
+        assert!(matches_center_entry(
+            "Sonde UIA. message de sonde 42. . Reçu à 18:21",
+            &lines
+        ));
+        assert!(matches_center_entry(
+            "Sonde  UIA.\nmessage de sonde 42. . Reçu à 18:21",
+            &lines
+        ));
+        assert!(!matches_center_entry(
+            "Autre. message. . Reçu à 18:21",
+            &lines
+        ));
+        assert!(!matches_center_entry("n'importe quoi", &[]));
+    }
+
+    #[test]
+    fn pixels() {
+        // Bleu à moitié transparent, prémultiplié → bleu plein, alpha 128.
+        assert_eq!(straight_rgba(&[128, 0, 0, 128]), [0, 0, 255, 128]);
+        assert_eq!(
+            straight_rgba(&[0, 0, 0, 0, 10, 20, 30, 255]),
+            [0, 0, 0, 0, 30, 20, 10, 255]
+        );
+        // Sans alpha du tout : opaque.
+        assert_eq!(straight_rgba(&[10, 20, 30, 0]), [30, 20, 10, 255]);
     }
 
     #[test]

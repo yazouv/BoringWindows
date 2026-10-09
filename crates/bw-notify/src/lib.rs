@@ -6,12 +6,18 @@
 //! `UserNotificationListener` (autorisé par Paramètres › Confidentialité ›
 //! Notifications). Ailleurs, le module ne fait rien.
 
+#[cfg(windows)]
+mod activate;
 mod config;
+#[cfg(windows)]
+mod icon;
 mod inbox;
 #[cfg(windows)]
 mod listener;
 mod module;
 
+#[cfg(windows)]
+pub use activate::open_from_center;
 pub use config::NotifyConfig;
-pub use inbox::{Notification, NotifySnapshot, brand_color, summary};
+pub use inbox::{AppIcon, Notification, NotifySnapshot, brand_color, summary};
 pub use module::{MODULE_ID, NotifyModule};

@@ -138,6 +138,7 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 | `show_secs` | `5` | 1 to 30 | how long a new notification shows (s) |
 | `show_content` | `true` | | show the sender and the message; otherwise, only the app name |
 | `ignore` | `[]` | | apps to ignore (part of a name, case-insensitive) |
+| `open_original` | `true` | | a click replays the real notification ([right channel, right tab](notifications.md#the-click-that-lands-in-the-right-place)); `false`: only opens the app |
 
 ## `[modules.volume]`
 

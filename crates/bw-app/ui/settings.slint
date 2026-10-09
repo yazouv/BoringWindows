@@ -68,6 +68,7 @@ export component SettingsWindow inherits Window {
     in-out property <bool> brightness-enabled;
     in-out property <bool> notifications-enabled;
     in-out property <bool> notifications-content;
+    in-out property <bool> notifications-original;
     in-out property <bool> viz-enabled;
     in-out property <bool> activity-enabled;
     in-out property <int> activity-limit-millions;
@@ -218,6 +219,13 @@ export component SettingsWindow inherits Window {
                         enabled: root.notifications-enabled;
                         checked <=> root.notifications-content;
                         toggled => { root.changed("modules.notifications.show_content"); }
+                    }
+
+                    CheckBox {
+                        text: @tr("Clicking a notification opens the right place (Discord channel, tab…)");
+                        enabled: root.notifications-enabled;
+                        checked <=> root.notifications-original;
+                        toggled => { root.changed("modules.notifications.open_original"); }
                     }
 
                     Row {

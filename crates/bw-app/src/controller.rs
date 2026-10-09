@@ -117,6 +117,7 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         taskbar: Cell::new(None),
         dnd: Cell::new(dnd_file.exists()),
         dnd_file,
+        app_icons: RefCell::new(std::collections::HashMap::new()),
     });
     CONTROLLER.with(|c| {
         let _ = c.set(controller.clone());
@@ -176,6 +177,8 @@ pub struct Controller {
     /// Ne pas déranger : les notifications ne s'annoncent plus.
     dnd: Cell<bool>,
     dnd_file: PathBuf,
+    /// Icônes des applications converties pour Slint, par AppUserModelID.
+    app_icons: RefCell<std::collections::HashMap<String, Image>>,
     settings: RefCell<Option<settings::SettingsState>>,
     open_settings_at_start: Cell<bool>,
     update_state: Cell<update::UpdateState>,
@@ -818,7 +821,7 @@ impl Controller {
         if let Some(n) = snapshot.announcing.as_ref()
             && previous != Some(n.id)
         {
-            self.ui.set_notif(notif_info(n, ""));
+            self.ui.set_notif(self.notif_info(n, ""));
             self.notif_seq.set(self.notif_seq.get().wrapping_add(1));
             self.ui.set_notif_seq(self.notif_seq.get());
         }
@@ -848,7 +851,7 @@ impl Controller {
             .recent
             .iter()
             .take(shown)
-            .map(|n| notif_info(n, &ago(n.at.into(), now)))
+            .map(|n| self.notif_info(n, &ago(n.at.into(), now)))
             .collect();
         self.ui.set_notif_rows(ModelRc::new(VecModel::from(rows)));
 
@@ -895,16 +898,59 @@ impl Controller {
         let Some(id) = action.strip_prefix("open:") else {
             return self.send_notify(action);
         };
-        let app_id = self.notify.borrow().as_ref().and_then(|s| {
+        let Some(n) = self.notify.borrow().as_ref().and_then(|s| {
             s.recent
                 .iter()
                 .find(|n| (n.id as i32).to_string() == id)
-                .map(|n| n.app_id.clone())
+                .cloned()
+        }) else {
+            return;
+        };
+        let original =
+            NotifyConfig::from_table(self.config.borrow().modules.get(bw_notify::MODULE_ID))
+                .unwrap_or_default()
+                .open_original;
+        // Rejouer la notification bloque un instant (centre de notifications à
+        // ouvrir, puis à parcourir) : hors du thread UI.
+        let spawned = std::thread::Builder::new()
+            .name("bw-notify-open".into())
+            .spawn(move || {
+                if original && platform::open_notification(&n.lines) {
+                    return;
+                }
+                if !platform::open_app(&n.app_id) {
+                    log::info!("application {} introuvable", n.app_id);
+                }
+            });
+        if let Err(e) = spawned {
+            log::warn!("notifications : ouverture impossible : {e}");
+        }
+    }
+
+    fn notif_info(&self, n: &bw_notify::Notification, ago: &str) -> NotifInfo {
+        let icon = n.icon.as_ref().map(|icon| {
+            self.app_icons
+                .borrow_mut()
+                .entry(n.app_id.clone())
+                .or_insert_with(|| {
+                    Image::from_rgba8(SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
+                        &icon.rgba,
+                        icon.width,
+                        icon.height,
+                    ))
+                })
+                .clone()
         });
-        if let Some(app_id) = app_id
-            && !platform::open_app(&app_id)
-        {
-            log::info!("application {app_id} introuvable");
+        NotifInfo {
+            id: n.id as i32,
+            app: n.app.as_str().into(),
+            title: n.title.as_str().into(),
+            body: n.body.as_str().into(),
+            tint: rgb(n.color()),
+            initial: n.initial().into(),
+            has_icon: icon.is_some(),
+            icon: icon.unwrap_or_default(),
+            ago: ago.into(),
         }
     }
 
@@ -1691,18 +1737,6 @@ fn color(c: bw_config::Color) -> slint::Color {
 
 fn rgb([r, g, b]: [u8; 3]) -> slint::Color {
     slint::Color::from_rgb_u8(r, g, b)
-}
-
-fn notif_info(n: &bw_notify::Notification, ago: &str) -> NotifInfo {
-    NotifInfo {
-        id: n.id as i32,
-        app: n.app.as_str().into(),
-        title: n.title.as_str().into(),
-        body: n.body.as_str().into(),
-        tint: rgb(n.color()),
-        initial: n.initial().into(),
-        ago: ago.into(),
-    }
 }
 
 /// Adapte une méthode du contrôleur en callback Slint sans cycle de références.

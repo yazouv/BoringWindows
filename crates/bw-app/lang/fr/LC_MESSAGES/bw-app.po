@@ -344,3 +344,6 @@ msgstr "Montrer l'expéditeur et le message des notifications"
 
 msgid "Do not disturb: notifications arrive here without popping up"
 msgstr "Ne pas déranger : les notifications arrivent ici sans s'annoncer"
+
+msgid "Clicking a notification opens the right place (Discord channel, tab…)"
+msgstr "Un clic sur une notification ouvre le bon endroit (salon Discord, onglet…)"
