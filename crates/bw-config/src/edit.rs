@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use toml_edit::{Array, ArrayOfTables, DocumentMut, Item, Table, value};
 
-use crate::{Config, ConfigError, DEFAULT_TOML};
+use crate::{Config, ConfigError, default_toml};
 
 /// Une valeur à écrire.
 #[derive(Debug, Clone, PartialEq)]
@@ -28,7 +28,7 @@ impl ConfigEditor {
     pub fn open(path: &Path) -> Result<Self, ConfigError> {
         let text = match std::fs::read_to_string(path) {
             Ok(t) => t,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => DEFAULT_TOML.to_owned(),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => default_toml().to_owned(),
             Err(source) => {
                 return Err(ConfigError::Io {
                     path: path.to_owned(),
@@ -248,7 +248,7 @@ mod tests {
 
     #[test]
     fn keeps_comments_and_creates_sections() {
-        let mut e = editor(DEFAULT_TOML);
+        let mut e = editor(crate::DEFAULT_TOML);
         e.set(&["general", "open_on"], Value::Str("click".into()));
         e.set(&["theme", "accent"], Value::Str("#112233".into()));
         e.set(
@@ -273,7 +273,7 @@ mod tests {
 
     #[test]
     fn caldav_account_and_secrets() {
-        let mut e = editor(DEFAULT_TOML);
+        let mut e = editor(crate::DEFAULT_TOML);
         e.add_calendar_account(
             "iCloud",
             "https://caldav.icloud.com/",
@@ -298,7 +298,7 @@ mod tests {
 
     #[test]
     fn calendar_sources_round_trip() {
-        let mut e = editor(DEFAULT_TOML);
+        let mut e = editor(crate::DEFAULT_TOML);
         assert!(e.calendar_sources().is_empty());
         e.add_calendar_source("Pro", "https://a/b.ics");
         e.add_calendar_source("", "C:/x.ics");

@@ -33,7 +33,11 @@ On Linux, building needs `libfontconfig1-dev libxkbcommon-dev`.
 
 ## CI/CD and versioning
 
-- **`ci.yml`**: runs on PRs to `main` and on pushes to `main`. Only the run on `main` fills the cache that PRs reuse: a PR can only read caches from its own branch and from `main`. It runs parallel jobs, all on Linux runners: `fmt`, `check` (Linux clippy + tests) and `clippy` for the Windows and macOS targets (type-check only). It skips release-please PRs (`release-please--*` branches): they only touch the version, changelog and lockfile. Don't move checks to Windows or macOS runners: they are slower, and they burned the minutes quota while the repo was private.
+- **`ci.yml`**: runs on PRs to `main` and on pushes to `main`, as a single `check` job: fmt, clippy, tests.
+  - **Runner**: the user's `self-hosted` runner for pushes and same-repo PRs. Its build dir (`CARGO_TARGET_DIR`, next to the workspace) persists between runs.
+  - **PRs from forks** run on `ubuntu-latest`, with `rust-cache`. The repo is public: never route fork code to the self-hosted runner.
+  - **Steps depend on the OS**: on Linux, clippy also checks the Windows and macOS targets; on other OSes, only the host.
+  - It skips release-please PRs (`release-please--*` branches): they only touch the version, changelog and lockfile.
 - **`release.yml`**: release-please runs on every push to `main`. It keeps a "chore: release x.y.z" PR open. Merging that PR tags `vX.Y.Z`, builds the Windows, macOS and Linux binaries, and attaches them with `.sha256` files. The updater depends on the asset names in that workflow and in `bw_update::asset_name()`; keep them in sync. The `installer` job builds `installer/boringwindows.iss` (Inno Setup). The `winget` job updates the `Yazouv.BoringWindows` package; it is skipped when the `WINGET_TOKEN` secret is absent.
 - **Commit messages must follow Conventional Commits** (`feat:`, `fix:`, `docs:`, `chore:`…). release-please derives the version and changelog from them.
 - Never bump versions by hand. release-please owns `[workspace.package] version` in `Cargo.toml`, plus `version.txt`, `CHANGELOG.md` and the manifest.
@@ -66,7 +70,7 @@ The Cargo workspace (edition 2024) has one crate per concern. `bw-app` is the on
   - `DEFAULT_TOML` (`default.toml`) must stay equivalent to `Config::default()`, and a test enforces it.
   - `ConfigEditor` (toml_edit) writes changes while keeping comments, and validates before an atomic save.
   - `watch.rs` hot-reloads on changes to config.toml or theme files. It notifies only when the resulting config changes, because inotify also reports reads.
-- **More modules**: `bw-timer` (timer), `bw-volume` (system volume changes), `bw-viz` (audio visualizer via WASAPI loopback, active only while the island is open and music plays), `bw-plugins` (third-party WASM plugins on wasmi: only 4 host functions, no file or network access, fuel and memory caps — keep it that way).
+- **More modules**: `bw-timer` (timer), `bw-volume` (system volume changes, plus built-in screen brightness via WMI), `bw-viz` (audio visualizer via WASAPI loopback, active only while the island is open and music plays), `bw-plugins` (third-party WASM plugins on wasmi: only 4 host functions, no file or network access, fuel and memory caps — keep it that way).
 - **`bw-secrets`**: private ICS links and CalDAV passwords live in the OS credential manager. `config.toml` only holds `secret:<id>` references.
 - **`bw-i18n`**: the global language plus the `tr!("English", "Français", args…)` macro, used for every user-facing string on the Rust side. Logs and the hook journal stay in French.
 - **`bw-net`**: blocking HTTP requests. Windows uses the WinRT HttpClient, so system proxy and certificates apply. Elsewhere it shells out to `curl`, with the URL, headers and body passed **through stdin (`-K -`), never as arguments**, because other local accounts can read the command line. Redirects never resend `Authorization` to another host.

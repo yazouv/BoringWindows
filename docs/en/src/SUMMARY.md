@@ -13,7 +13,7 @@
 - [Music](musique.md)
 - [Timer](minuteur.md)
 - [Shelf](etagere.md)
-- [Volume](volume.md)
+- [Volume and brightness](volume.md)
 - [Plugins (WASM)](plugins.md)
 - [Calendar](agenda/index.md)
   - [Google Calendar](agenda/google.md)

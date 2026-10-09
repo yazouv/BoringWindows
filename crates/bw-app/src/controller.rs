@@ -1400,6 +1400,15 @@ fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
             Err(e) => errors.push(format!("modules.volume : {e:#}")),
         }
     }
+    if bw_volume::VolumeModule::is_supported()
+        && config.module_enabled(bw_volume::BRIGHTNESS_ID, false)
+    {
+        let table = config.modules.get(bw_volume::BRIGHTNESS_ID);
+        match bw_volume::VolumeConfig::from_module_table(bw_volume::BRIGHTNESS_ID, table) {
+            Ok(c) => modules.push(Box::new(bw_volume::VolumeModule::brightness(c))),
+            Err(e) => errors.push(format!("modules.brightness : {e:#}")),
+        }
+    }
     if bw_viz::VizModule::is_supported() && config.module_enabled(bw_viz::MODULE_ID, false) {
         match bw_viz::VizConfig::from_table(config.modules.get(bw_viz::MODULE_ID)) {
             Ok(c) => modules.push(Box::new(bw_viz::VizModule::new(c))),

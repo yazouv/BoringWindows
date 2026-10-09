@@ -1,14 +1,17 @@
-//! Volume du système : chaque changement (touches du clavier, mélangeur,
-//! application) s'affiche un instant dans la pilule. Événementiel : un
-//! callback de l'API audio de Windows, aucun polling.
+//! Volume du système et luminosité de l'écran intégré : chaque changement
+//! (touches du clavier, mélangeur, centre de notifications, application)
+//! s'affiche un instant dans la pilule. Le volume passe par un callback de
+//! l'API audio de Windows, la luminosité par un événement WMI.
 
 mod config;
 mod module;
 #[cfg(windows)]
 mod wasapi;
+#[cfg(windows)]
+mod wmi;
 
 pub use config::VolumeConfig;
-pub use module::{MODULE_ID, VolumeModule};
+pub use module::{BRIGHTNESS_ID, MODULE_ID, VolumeModule};
 
 /// Texte affiché : « Volume 45 % » ou « Muet ».
 pub fn label(level: f32, muted: bool) -> String {
@@ -23,6 +26,11 @@ pub fn label(level: f32, muted: bool) -> String {
     }
 }
 
+/// Texte affiché pour la luminosité : « Luminosité 70 % ».
+pub fn brightness_label(level: u8) -> String {
+    bw_i18n::tr!("Brightness {} %", "Luminosité {} %", level.min(100))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -34,5 +42,7 @@ mod tests {
         assert_eq!(label(0.5, true), "Muet");
         assert_eq!(label(0.0, false), "Muet");
         assert_eq!(label(1.7, false), "Volume 100 %");
+        assert_eq!(brightness_label(70), "Luminosité 70 %");
+        assert_eq!(brightness_label(255), "Luminosité 100 %");
     }
 }
