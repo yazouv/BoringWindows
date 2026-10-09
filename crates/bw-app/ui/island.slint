@@ -91,20 +91,26 @@ component IconButton inherits Rectangle {
     in property <color> ink;
     in property <bool> enabled: true;
     in property <length> size: 30px;
+    // Bouton plein (lecture/pause) : disque de la couleur de l'encre, icône
+    // de la couleur `hole`.
+    in property <bool> filled;
+    in property <color> hole: black;
     callback clicked;
 
     width: root.size;
     height: root.size;
     border-radius: root.size / 2;
-    background: ta.has-hover && root.enabled ? root.ink.with-alpha(0.12) : transparent;
+    background: root.filled ? (ta.pressed ? root.ink.darker(0.15) : root.ink)
+        : ta.has-hover && root.enabled ? root.ink.with-alpha(0.12) : transparent;
     opacity: root.enabled ? 1 : 0.3;
+    animate background { duration: 120ms; }
 
     Path {
-        width: root.size * 0.6;
-        height: root.size * 0.6;
+        width: root.size * (root.filled ? 0.46 : 0.6);
+        height: self.width;
         viewbox-width: 24;
         viewbox-height: 24;
-        fill: root.ink;
+        fill: root.filled ? root.hole : root.ink;
         commands: root.icon == "play" ? "M 7 4 L 20 12 L 7 20 Z"
             : root.icon == "pause" ? "M 6 4 L 10 4 L 10 20 L 6 20 Z M 14 4 L 18 4 L 18 20 L 14 20 Z"
             : root.icon == "next" ? "M 4 5 L 14 12 L 4 19 Z M 15 5 L 18 5 L 18 19 L 15 19 Z"
@@ -129,20 +135,23 @@ component PillButton inherits Rectangle {
     in property <color> fill;
     in property <color> ink;
     in property <color> line: transparent;
+    // Faux : le bouton garde sa taille au lieu de remplir la ligne.
+    in property <bool> grow: true;
     callback clicked;
 
     height: 28px;
     min-width: label.preferred-width + 24px;
-    horizontal-stretch: 1;
+    horizontal-stretch: root.grow ? 1 : 0;
     border-radius: 14px;
     border-width: 1px;
     border-color: root.line;
     background: ta.pressed ? root.fill.darker(0.2) : ta.has-hover ? root.fill.brighter(0.15) : root.fill;
+    animate background { duration: 120ms; }
 
     label := Text {
         text: root.text;
         color: root.ink;
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 600;
         horizontal-alignment: center;
         vertical-alignment: center;
@@ -195,24 +204,21 @@ component TabChip inherits Rectangle {
     in property <color> accent;
     callback clicked;
 
-    width: row.preferred-width;
+    // Largeur fixe : l'indicateur du contrôle segmenté glisse d'un cran à l'autre.
+    width: 62px;
     height: 22px;
-    border-radius: 11px;
-    background: root.active ? root.ink.with-alpha(0.16)
-        : ta.has-hover ? root.ink.with-alpha(0.08) : transparent;
-    animate background { duration: 150ms; }
 
     row := HorizontalLayout {
-        padding-left: 10px;
-        padding-right: 10px;
-        spacing: 5px;
+        alignment: center;
+        spacing: 4px;
 
         Text {
             text: root.text;
-            color: root.active ? root.ink : root.ink.with-alpha(0.6);
+            color: root.active ? root.ink : ta.has-hover ? root.ink.with-alpha(0.85) : root.ink.with-alpha(0.55);
             font-size: 12px;
-            font-weight: root.active ? 700 : 500;
+            font-weight: root.active ? 650 : 500;
             vertical-alignment: center;
+            animate color { duration: 150ms; }
         }
 
         if root.badge > 0: Rectangle {
@@ -367,8 +373,11 @@ export component Island inherits Window {
             : root.has-notif ? root.notif-height
             : root.has-attention ? root.attention-height : root.compact-height;
         background: root.bg;
-        border-width: root.border.alpha > 0 ? 1px : 0px;
-        border-color: root.border;
+        // Sans contour dans le thème, un liseré à peine visible détache l'île
+        // ouverte du fond.
+        border-width: root.border.alpha > 0 || root.expanded ? 1px : 0px;
+        border-color: root.border.alpha > 0 ? root.border : root.fg.with-alpha(root.expanded ? 0.09 : 0);
+        animate border-color { duration: root.anim; }
         clip: true;
         border-top-left-radius: self.top-radius;
         border-top-right-radius: self.top-radius;
@@ -385,6 +394,15 @@ export component Island inherits Window {
             }
             clicked => {
                 root.clicked();
+            }
+
+            // Île ouverte sur la musique : halo de la couleur de la pochette
+            // (l'accent la suit) qui part du coin de la pochette.
+            Rectangle {
+                opacity: root.expanded && !root.custom-view && root.tab == 0 && root.has-media && !root.has-prompt ? 1 : 0;
+                visible: self.opacity > 0;
+                animate opacity { duration: root.anim * 2; }
+                background: @linear-gradient(160deg, root.accent.with-alpha(0.34) 0%, root.accent.with-alpha(0.1) 45%, transparent 75%);
             }
 
             // Nouvelle notification : la couleur de l'application monte du bas.
@@ -529,13 +547,15 @@ export component Island inherits Window {
                 if !root.compact-art-visible: Dot {
                     y: (parent.height - self.height) / 2;
                     background: root.urgent ? root.accent : root.fg.with-alpha(0.6);
+                    drop-shadow-blur: root.urgent ? 8px : 0px;
+                    drop-shadow-color: root.accent.with-alpha(0.9);
                 }
 
                 if root.compact-art-visible: Rectangle {
                     width: 22px;
                     height: 22px;
                     y: (parent.height - self.height) / 2;
-                    border-radius: 5px;
+                    border-radius: 6px;
                     clip: true;
 
                     Image {
@@ -550,6 +570,7 @@ export component Island inherits Window {
                     text: root.attention-label;
                     color: root.fg;
                     font-size: 13px;
+                    font-weight: 500;
                     vertical-alignment: center;
                     overflow: elide;
                 }
@@ -587,14 +608,15 @@ export component Island inherits Window {
                     Text {
                         text: root.time-text;
                         color: root.fg;
-                        font-size: 15px;
+                        font-size: 17px;
                         font-weight: 700;
+                        letter-spacing: -0.3px;
                         vertical-alignment: center;
                     }
 
                     Text {
                         text: root.date-text;
-                        color: root.fg.with-alpha(0.55);
+                        color: root.fg.with-alpha(0.5);
                         font-size: 12px;
                         vertical-alignment: center;
                         horizontal-stretch: 1;
@@ -641,35 +663,55 @@ export component Island inherits Window {
                         }
                     }
 
-                    if root.has-notif-tab || root.has-claude-tab: HorizontalLayout {
-                        spacing: 2px;
+                    // Contrôle segmenté : un indicateur glisse sous l'onglet choisi.
+                    if root.has-notif-tab || root.has-claude-tab: Rectangle {
+                        property <int> slot: root.tab == 0 ? 0 : root.tab == 2 ? 1 : root.has-notif-tab ? 2 : 1;
+                        width: tabs.preferred-width;
+                        height: 24px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 12px;
+                        background: root.fg.with-alpha(0.07);
 
-                        TabChip {
-                            y: (parent.height - self.height) / 2;
-                            text: @tr("Home");
-                            active: root.tab == 0;
-                            ink: root.fg;
-                            accent: root.accent;
-                            clicked => { root.tab = 0; }
+                        Rectangle {
+                            x: 1px + parent.slot * 62px;
+                            y: 1px;
+                            width: 62px;
+                            height: 22px;
+                            border-radius: 11px;
+                            background: root.fg.with-alpha(0.16);
+                            animate x { duration: root.anim; easing: ease-out-quint; }
                         }
 
-                        if root.has-notif-tab: TabChip {
-                            y: (parent.height - self.height) / 2;
-                            text: @tr("Notifs");
-                            active: root.tab == 2;
-                            badge: root.notif-unread;
-                            ink: root.fg;
-                            accent: root.accent;
-                            clicked => { root.tab = 2; }
-                        }
+                        tabs := HorizontalLayout {
+                            padding: 1px;
 
-                        if root.has-claude-tab: TabChip {
-                            y: (parent.height - self.height) / 2;
-                            text: "Claude";
-                            active: root.tab == 1;
-                            ink: root.fg;
-                            accent: root.accent;
-                            clicked => { root.tab = 1; }
+                            TabChip {
+                                y: (parent.height - self.height) / 2;
+                                text: @tr("Home");
+                                active: root.tab == 0;
+                                ink: root.fg;
+                                accent: root.accent;
+                                clicked => { root.tab = 0; }
+                            }
+
+                            if root.has-notif-tab: TabChip {
+                                y: (parent.height - self.height) / 2;
+                                text: @tr("Notifs");
+                                active: root.tab == 2;
+                                badge: root.notif-unread;
+                                ink: root.fg;
+                                accent: root.accent;
+                                clicked => { root.tab = 2; }
+                            }
+
+                            if root.has-claude-tab: TabChip {
+                                y: (parent.height - self.height) / 2;
+                                text: "Claude";
+                                active: root.tab == 1;
+                                ink: root.fg;
+                                accent: root.accent;
+                                clicked => { root.tab = 1; }
+                            }
                         }
                     }
 
@@ -691,17 +733,17 @@ export component Island inherits Window {
 
                     // Lecteur (masqué pendant une demande de permission, prioritaire).
                     if root.has-media && !root.has-prompt: HorizontalLayout {
-                        height: 56px;
+                        height: 58px;
                         spacing: 12px;
 
                         Rectangle {
-                            width: 56px;
-                            height: 56px;
-                            border-radius: 8px;
+                            width: 58px;
+                            height: 58px;
+                            border-radius: 12px;
                             clip: true;
                             // Halo de la couleur de la pochette.
-                            drop-shadow-blur: 14px;
-                            drop-shadow-color: root.media.has-art ? root.accent.with-alpha(0.45) : transparent;
+                            drop-shadow-blur: 18px;
+                            drop-shadow-color: root.media.has-art ? root.accent.with-alpha(0.5) : transparent;
                             background: root.fg.with-alpha(0.08);
 
                             if root.media.has-art: Image {
@@ -720,14 +762,14 @@ export component Island inherits Window {
                             Text {
                                 text: root.media.title;
                                 color: root.fg;
-                                font-size: 14px;
-                                font-weight: 600;
+                                font-size: 15px;
+                                font-weight: 700;
                                 overflow: elide;
                             }
 
                             Text {
                                 text: root.media.artist;
-                                color: root.fg.with-alpha(0.6);
+                                color: root.fg.with-alpha(0.55);
                                 font-size: 12px;
                                 overflow: elide;
                             }
@@ -747,20 +789,37 @@ export component Island inherits Window {
                                     height: 12px;
                                     horizontal-stretch: 1;
 
+                                    property <bool> grab: bar-ta.has-hover && root.media.can-seek;
+
                                     Rectangle {
                                         y: (parent.height - self.height) / 2;
-                                        height: bar-ta.has-hover && root.media.can-seek ? 5px : 3px;
+                                        height: bar.grab ? 6px : 4px;
                                         border-radius: self.height / 2;
-                                        background: root.fg.with-alpha(0.15);
+                                        background: root.fg.with-alpha(0.14);
+                                        animate height { duration: 120ms; }
                                     }
 
                                     Rectangle {
                                         x: 0;
                                         y: (parent.height - self.height) / 2;
                                         width: parent.width * clamp(root.media.progress, 0, 1);
-                                        height: bar-ta.has-hover && root.media.can-seek ? 5px : 3px;
+                                        height: bar.grab ? 6px : 4px;
                                         border-radius: self.height / 2;
-                                        background: root.accent;
+                                        background: @linear-gradient(90deg, root.accent.with-alpha(0.7) 0%, root.accent 100%);
+                                        animate height { duration: 120ms; }
+                                    }
+
+                                    // Curseur au survol, là où la lecture en est.
+                                    Rectangle {
+                                        width: bar.grab ? 12px : 0px;
+                                        height: self.width;
+                                        x: parent.width * clamp(root.media.progress, 0, 1) - self.width / 2;
+                                        y: (parent.height - self.height) / 2;
+                                        border-radius: self.width / 2;
+                                        background: root.fg;
+                                        drop-shadow-blur: 4px;
+                                        drop-shadow-color: root.bg.with-alpha(0.5);
+                                        animate width { duration: 120ms; }
                                     }
 
                                     bar-ta := TouchArea {
@@ -793,7 +852,9 @@ export component Island inherits Window {
 
                             IconButton {
                                 y: (parent.height - self.height) / 2;
-                                size: 36px;
+                                size: 38px;
+                                filled: true;
+                                hole: root.bg.with-alpha(1);
                                 icon: root.media.playing ? "pause" : "play";
                                 ink: root.fg;
                                 enabled: root.media.can-toggle;
@@ -842,7 +903,7 @@ export component Island inherits Window {
 
                             PillButton {
                                 text: @tr("Deny");
-                                fill: root.fg.with-alpha(0.12);
+                                fill: root.fg.with-alpha(0.09);
                                 ink: root.fg;
                                 clicked => { root.claude-decide(root.prompt.id, "deny"); }
                             }
@@ -875,10 +936,14 @@ export component Island inherits Window {
 
                         if root.timer.phase == 0: HorizontalLayout {
                             spacing: 6px;
+                            alignment: start;
+                            horizontal-stretch: 1;
 
                             for minutes in root.timer.presets: PillButton {
+                                grow: false;
+                                min-width: 64px;
                                 text: @tr("{} min", minutes);
-                                fill: root.fg.with-alpha(0.12);
+                                fill: root.fg.with-alpha(0.09);
                                 ink: root.fg;
                                 clicked => { root.timer-action("start:" + minutes); }
                             }
@@ -906,7 +971,7 @@ export component Island inherits Window {
 
                         if root.timer.phase == 1: PillButton {
                             text: @tr("Pause");
-                            fill: root.fg.with-alpha(0.12);
+                            fill: root.fg.with-alpha(0.09);
                             ink: root.fg;
                             clicked => { root.timer-action("pause"); }
                         }
