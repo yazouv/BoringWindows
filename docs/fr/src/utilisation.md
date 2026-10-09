@@ -18,6 +18,20 @@ question de Claude passe avant une réunion qui commence, qui passe avant la
 musique. L'ordre à importance égale se règle avec
 [`layout.compact`](configuration.md#layout).
 
+## Les onglets
+
+L'île ouverte a des onglets, en haut à droite :
+
+- **Accueil** : la musique, l'agenda, les sessions Claude, le minuteur,
+  l'étagère ;
+- **Notifs** : les dernières [notifications](notifications.md) des
+  applications, avec un badge pour celles que tu n'as pas vues ;
+- **Claude** : la consommation et les
+  [conversations récentes](claude-code.md#conversations-récentes-et-consommation).
+
+Un onglet n'apparaît que si son module est actif. L'île revient sur l'accueil
+quand elle se referme.
+
 ## Ouvrir et fermer
 
 - **Survole** l'île pour l'ouvrir ; elle se referme quand la souris s'en va.
@@ -47,6 +61,15 @@ Clic droit sur l'icône BoringWindows dans la zone de notification :
 Quand une application passe en plein écran (jeu, vidéo F11, présentation) sur
 le même écran, l'île se cache, puis revient à la sortie du plein écran.
 Désactivable avec `hide_in_fullscreen = false`.
+
+Les outils de capture d'écran (Win+Maj+S, Outil Capture d'écran, ShareX,
+Greenshot…) couvrent aussi tout l'écran, mais l'île reste affichée pendant la
+capture.
+
+L'île reste au-dessus de la barre des tâches, même quand celle-ci est placée en
+haut de l'écran. Si cette barre est plus basse que la pilule (petites icônes),
+la pilule fermée et celle d'attention prennent sa hauteur pour ne pas dépasser ;
+avec une barre de taille normale, rien ne change.
 
 ## Modifier la configuration
 

@@ -294,6 +294,9 @@ msgstr "Glisse des fichiers sur l'île pour les garder sous la main ; un clic le
 msgid "Show volume changes in the island"
 msgstr "Afficher les changements de volume dans l'île"
 
+msgid "Show brightness changes in the island (laptops)"
+msgstr "Afficher les changements de luminosité dans l'île (portables)"
+
 msgid "Audio visualizer (uses some CPU while the island is open and music plays)"
 msgstr "Visualiseur audio (consomme un peu de CPU tant que l'île est ouverte et que la musique joue)"
 
@@ -302,9 +305,6 @@ msgstr "Lancer les plugins WASM (code tiers, dans un bac à sable)"
 
 msgid "Plugins folder"
 msgstr "Dossier des plugins"
-
-msgid "Back"
-msgstr "Retour"
 
 msgid "No conversation found"
 msgstr "Aucune conversation trouvée"
@@ -320,3 +320,30 @@ msgstr "Heure de reset de la fenêtre (facultatif)"
 
 msgid "Usage is an estimate from Claude Code only; your plan's window also counts claude.ai and the app. Type the reset time that /usage shows (HH:MM) to align the countdown."
 msgstr "La consommation est une estimation faite à partir de Claude Code seul ; la fenêtre de ton abonnement compte aussi claude.ai et l'application. Saisis l'heure de reset affichée par /usage (HH:MM) pour caler le compte à rebours."
+
+msgid "now"
+msgstr "à l'instant"
+
+msgid "Clear all"
+msgstr "Tout effacer"
+
+msgid "Home"
+msgstr "Accueil"
+
+msgid "Notifs"
+msgstr "Notifs"
+
+msgid "No notifications"
+msgstr "Aucune notification"
+
+msgid "Show app notifications in the island (Discord, Slack, Teams…)"
+msgstr "Afficher les notifications des applications dans l'île (Discord, Slack, Teams…)"
+
+msgid "Show the sender and the message of notifications"
+msgstr "Montrer l'expéditeur et le message des notifications"
+
+msgid "Do not disturb: notifications arrive here without popping up"
+msgstr "Ne pas déranger : les notifications arrivent ici sans s'annoncer"
+
+msgid "Clicking a notification opens the right place (Discord channel, tab…)"
+msgstr "Un clic sur une notification ouvre le bon endroit (salon Discord, onglet…)"

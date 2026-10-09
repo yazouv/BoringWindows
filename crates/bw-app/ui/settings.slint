@@ -65,6 +65,10 @@ export component SettingsWindow inherits Window {
     in-out property <bool> hide-fullscreen;
     in-out property <bool> autostart;
     in-out property <bool> volume-enabled;
+    in-out property <bool> brightness-enabled;
+    in-out property <bool> notifications-enabled;
+    in-out property <bool> notifications-content;
+    in-out property <bool> notifications-original;
     in-out property <bool> viz-enabled;
     in-out property <bool> activity-enabled;
     in-out property <int> activity-limit-millions;
@@ -196,6 +200,32 @@ export component SettingsWindow inherits Window {
                         text: @tr("Show volume changes in the island");
                         checked <=> root.volume-enabled;
                         toggled => { root.changed("modules.volume.enabled"); }
+                    }
+
+                    CheckBox {
+                        text: @tr("Show brightness changes in the island (laptops)");
+                        checked <=> root.brightness-enabled;
+                        toggled => { root.changed("modules.brightness.enabled"); }
+                    }
+
+                    CheckBox {
+                        text: @tr("Show app notifications in the island (Discord, Slack, Teams…)");
+                        checked <=> root.notifications-enabled;
+                        toggled => { root.changed("modules.notifications.enabled"); }
+                    }
+
+                    CheckBox {
+                        text: @tr("Show the sender and the message of notifications");
+                        enabled: root.notifications-enabled;
+                        checked <=> root.notifications-content;
+                        toggled => { root.changed("modules.notifications.show_content"); }
+                    }
+
+                    CheckBox {
+                        text: @tr("Clicking a notification opens the right place (Discord channel, tab…)");
+                        enabled: root.notifications-enabled;
+                        checked <=> root.notifications-original;
+                        toggled => { root.changed("modules.notifications.open_original"); }
                     }
 
                     Row {

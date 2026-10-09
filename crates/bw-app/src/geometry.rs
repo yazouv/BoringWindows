@@ -1,7 +1,7 @@
 //! Calcul de la forme de l'île en pixels physiques, partagé entre la zone
 //! cliquable Win32 et le placement de la fenêtre.
 
-use bw_config::Theme;
+use bw_config::{Size, Theme};
 
 /// Rectangle en pixels physiques, relatif au coin haut-gauche de la fenêtre.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -31,7 +31,34 @@ impl PhysRect {
 pub enum Shape {
     Compact,
     Attention,
+    /// Nouvelle notification : plus large et plus haute que l'attention.
+    Notification,
     Expanded,
+}
+
+/// Hauteur minimale d'une pilule ramenée à la barre des tâches.
+const MIN_PILL_HEIGHT: f32 = 16.0;
+
+/// Barre des tâches en haut de l'écran de l'île, de hauteur `taskbar`
+/// (logique) : la pilule fermée et celle d'attention n'en dépassent pas.
+/// Une barre plus haute que les pilules (taille normale) ne change rien.
+pub fn fit_under_taskbar(theme: &Theme, taskbar: Option<f32>) -> Theme {
+    let mut fitted = theme.clone();
+    if let Some(bar) = taskbar {
+        let cap = (bar - theme.top_offset).max(MIN_PILL_HEIGHT);
+        fitted.compact.height = fitted.compact.height.min(cap);
+        fitted.attention.height = fitted.attention.height.min(cap);
+    }
+    fitted
+}
+
+/// Taille de la pilule qui annonce une notification : dérivée de l'attention,
+/// sans jamais dépasser l'île ouverte (la fenêtre).
+pub fn notification_size(theme: &Theme) -> Size {
+    Size::new(
+        (theme.attention.width + 80.0).min(theme.expanded.width),
+        (theme.attention.height + 22.0).min(theme.expanded.height),
+    )
 }
 
 /// Marge autour de la pilule pour ne pas rogner l'anticrénelage des bords.
@@ -50,6 +77,7 @@ pub fn pill_rect(theme: &Theme, shape: Shape, scale: f32) -> PhysRect {
     let size = match shape {
         Shape::Compact => theme.compact,
         Shape::Attention => theme.attention,
+        Shape::Notification => notification_size(theme),
         Shape::Expanded => theme.expanded,
     };
     let (win_w, win_h) = window_size(theme);
@@ -125,6 +153,40 @@ mod tests {
         let r = pill_rect(&theme, Shape::Attention, 1.0);
         assert_eq!(r.y, 8);
         assert_eq!(r.height, 36 + 4);
+    }
+
+    #[test]
+    fn notification_fits_in_the_window() {
+        let theme = Theme::default();
+        assert_eq!(notification_size(&theme), Size::new(380.0, 58.0));
+        let small = Theme {
+            expanded: Size::new(320.0, 50.0),
+            ..Theme::default()
+        };
+        assert_eq!(notification_size(&small), Size::new(320.0, 50.0));
+    }
+
+    #[test]
+    fn small_taskbar_caps_the_pills() {
+        let theme = Theme::default();
+        // Barre réduite (32 px) : l'attention (36) descend à 32.
+        let small = fit_under_taskbar(&theme, Some(32.0));
+        assert_eq!(small.compact.height, 32.0);
+        assert_eq!(small.attention.height, 32.0);
+        assert_eq!(small.expanded, theme.expanded);
+        // Barre normale (48 px) ou ailleurs qu'en haut : rien ne change.
+        assert_eq!(fit_under_taskbar(&theme, Some(48.0)), theme);
+        assert_eq!(fit_under_taskbar(&theme, None), theme);
+        // Décalage depuis le haut : la pilule finit au bord de la barre.
+        let offset = Theme {
+            top_offset: 4.0,
+            ..Theme::default()
+        };
+        assert_eq!(
+            fit_under_taskbar(&offset, Some(32.0)).attention.height,
+            28.0
+        );
+        assert_eq!(fit_under_taskbar(&theme, Some(4.0)).compact.height, 16.0);
     }
 
     #[test]

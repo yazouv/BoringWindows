@@ -63,6 +63,14 @@ impl Platform {
     pub fn foreground_on_our_monitor(&self) -> bool {
         true
     }
+
+    pub fn foreground_is_capture_tool(&self) -> bool {
+        false
+    }
+
+    pub fn top_taskbar_height(&self) -> Option<f32> {
+        None
+    }
 }
 
 /// Linux : pas d'icône de notification (elle exigerait GTK).
@@ -108,6 +116,16 @@ pub fn confirm(title: &str, text: &str) -> bool {
 
 /// Ramener le terminal d'une session au premier plan : Windows uniquement.
 pub fn focus_terminal(_ancestors: &[u32], _console_window: Option<i64>) -> bool {
+    false
+}
+
+/// Rejouer une notification : Windows uniquement.
+pub fn open_notification(_lines: &[String]) -> bool {
+    false
+}
+
+/// Ouvrir l'application d'une notification : Windows uniquement.
+pub fn open_app(_app_id: &str) -> bool {
     false
 }
 

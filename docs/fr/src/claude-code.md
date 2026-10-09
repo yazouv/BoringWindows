@@ -93,7 +93,7 @@ rien faire : **Claude n'est jamais bloqué**.
 
 ## Conversations récentes et consommation
 
-Ouvre l'île et clique sur **Claude ›** (en haut à droite) : un onglet affiche
+Ouvre l'île et clique sur l'onglet **Claude** (en haut à droite) : il affiche
 
 - une **estimation de ta consommation** sur la fenêtre de 5 h en cours, avec le
   temps avant son renouvellement (et une jauge si tu fixes une limite) ;

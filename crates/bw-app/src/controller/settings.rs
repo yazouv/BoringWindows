@@ -176,6 +176,12 @@ impl Controller {
         fill_layout(ui, &config.layout.compact);
         ui.set_view_name(config.layout.view.as_str().into());
         ui.set_volume_enabled(config.module_enabled(bw_volume::MODULE_ID, false));
+        ui.set_brightness_enabled(config.module_enabled(bw_volume::BRIGHTNESS_ID, false));
+        ui.set_notifications_enabled(config.module_enabled(bw_notify::MODULE_ID, true));
+        let notify = bw_notify::NotifyConfig::from_table(config.modules.get(bw_notify::MODULE_ID))
+            .unwrap_or_default();
+        ui.set_notifications_content(notify.show_content);
+        ui.set_notifications_original(notify.open_original);
         ui.set_viz_enabled(config.module_enabled(bw_viz::MODULE_ID, false));
         ui.set_plugins_enabled(config.module_enabled(bw_plugins::MODULE_ID, false));
         let activity =
@@ -747,6 +753,22 @@ impl Controller {
             "modules.volume.enabled" => Some((
                 vec!["modules", "volume", "enabled"],
                 Value::Bool(ui.get_volume_enabled()),
+            )),
+            "modules.brightness.enabled" => Some((
+                vec!["modules", "brightness", "enabled"],
+                Value::Bool(ui.get_brightness_enabled()),
+            )),
+            "modules.notifications.enabled" => Some((
+                vec!["modules", "notifications", "enabled"],
+                Value::Bool(ui.get_notifications_enabled()),
+            )),
+            "modules.notifications.open_original" => Some((
+                vec!["modules", "notifications", "open_original"],
+                Value::Bool(ui.get_notifications_original()),
+            )),
+            "modules.notifications.show_content" => Some((
+                vec!["modules", "notifications", "show_content"],
+                Value::Bool(ui.get_notifications_content()),
             )),
             "modules.shelf.enabled" => Some((
                 vec!["modules", "shelf", "enabled"],

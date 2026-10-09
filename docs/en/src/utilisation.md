@@ -19,6 +19,19 @@ from Claude comes before a meeting that is starting, which comes before music.
 The order between items of equal importance is set with
 [`layout.compact`](configuration.md#layout).
 
+## Tabs
+
+The open island has tabs, top right:
+
+- **Home**: music, calendar, Claude sessions, timer, shelf;
+- **Notifs**: the latest app [notifications](notifications.md), with a badge
+  for the ones you haven't seen;
+- **Claude**: usage and
+  [recent conversations](claude-code.md#recent-conversations-and-usage).
+
+A tab only shows when its module is on. The island goes back to Home when it
+closes.
+
 ## Open and close
 
 - **Hover** the island to open it; it closes when the mouse leaves.
@@ -48,6 +61,14 @@ Right-click the BoringWindows icon in the notification area:
 When an application goes full screen (game, F11 video, presentation) on the
 same screen, the island hides, then comes back when full screen ends. Turn this
 off with `hide_in_fullscreen = false`.
+
+Screenshot tools (Win+Shift+S, Snipping Tool, ShareX, Greenshot…) cover the
+whole screen too, but the island stays visible while you capture.
+
+The island stays above the taskbar, even when the taskbar sits at the top of
+the screen. If that taskbar is shorter than the pill (small icons), the closed
+and attention pills take its height so they don't stick out; with a
+normal-size taskbar, nothing changes.
 
 ## Changing the configuration
 

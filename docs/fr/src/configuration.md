@@ -131,11 +131,28 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 | `enabled` | `true` | | garder les fichiers déposés sur l'[étagère](etagere.md) |
 | `max` | `8` | 1 à 30 | nombre de fichiers gardés |
 
+## `[modules.notifications]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `true` | | annoncer les [notifications](notifications.md) des applications dans l'île (Windows) |
+| `show_secs` | `5` | 1 à 30 | durée d'affichage d'une nouvelle notification (s) |
+| `show_content` | `true` | | montrer l'expéditeur et le message ; sinon, seulement le nom de l'application |
+| `ignore` | `[]` | | applications à ignorer (morceau de nom, sans tenir compte de la casse) |
+| `open_original` | `true` | | un clic rejoue la vraie notification ([bon salon, bon onglet](notifications.md#le-clic-qui-amène-au-bon-endroit)) ; `false` : ouvre seulement l'application |
+
 ## `[modules.volume]`
 
 | Option | Défaut | Plage | Rôle |
 |---|---|---|---|
 | `enabled` | `false` | | afficher les changements de [volume](volume.md) dans l'île (Windows) |
+| `show_secs` | `2` | 1 à 10 | durée d'affichage (s) |
+
+## `[modules.brightness]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `false` | | afficher les changements de [luminosité](volume.md#luminosité) de l'écran intégré (Windows, portables) |
 | `show_secs` | `2` | 1 à 10 | durée d'affichage (s) |
 
 ## `[modules.visualizer]`

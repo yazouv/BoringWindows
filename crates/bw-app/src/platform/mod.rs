@@ -24,6 +24,10 @@ pub enum PlatformEvent {
     Fullscreen(bool),
     /// Écrans branchés/débranchés ou résolution modifiée.
     DisplayChanged,
+    /// Une autre fenêtre passe au premier plan.
+    Foreground,
+    /// La barre des tâches a bougé, changé de taille, ou l'Explorateur a redémarré.
+    TaskbarChanged,
 }
 
 /// Commandes du menu de la zone de notification.

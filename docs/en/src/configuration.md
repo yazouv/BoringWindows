@@ -130,11 +130,28 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 | `enabled` | `true` | | keep files dropped on the [shelf](etagere.md) |
 | `max` | `8` | 1 to 30 | number of files kept |
 
+## `[modules.notifications]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `true` | | announce app [notifications](notifications.md) in the island (Windows) |
+| `show_secs` | `5` | 1 to 30 | how long a new notification shows (s) |
+| `show_content` | `true` | | show the sender and the message; otherwise, only the app name |
+| `ignore` | `[]` | | apps to ignore (part of a name, case-insensitive) |
+| `open_original` | `true` | | a click replays the real notification ([right channel, right tab](notifications.md#the-click-that-lands-in-the-right-place)); `false`: only opens the app |
+
 ## `[modules.volume]`
 
 | Option | Default | Range | Purpose |
 |---|---|---|---|
 | `enabled` | `false` | | show [volume](volume.md) changes in the island (Windows) |
+| `show_secs` | `2` | 1 to 10 | how long it shows (s) |
+
+## `[modules.brightness]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `false` | | show [brightness](volume.md#brightness) changes of the built-in screen (Windows, laptops) |
 | `show_secs` | `2` | 1 to 10 | how long it shows (s) |
 
 ## `[modules.visualizer]`

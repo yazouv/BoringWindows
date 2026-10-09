@@ -3,7 +3,7 @@ use std::time::Duration;
 use bw_i18n::tr;
 use serde::Deserialize;
 
-/// Section `[modules.volume]` de config.toml.
+/// Section `[modules.volume]` (ou `[modules.brightness]`) de config.toml.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct VolumeConfig {
@@ -24,6 +24,11 @@ impl Default for VolumeConfig {
 
 impl VolumeConfig {
     pub fn from_table(table: Option<&toml::Table>) -> anyhow::Result<Self> {
+        Self::from_module_table(crate::MODULE_ID, table)
+    }
+
+    /// Même section pour un autre module (`brightness`), messages compris.
+    pub fn from_module_table(id: &str, table: Option<&toml::Table>) -> anyhow::Result<Self> {
         let config: Self = match table {
             Some(t) => toml::Value::Table(t.clone()).try_into()?,
             None => Self::default(),
@@ -31,8 +36,9 @@ impl VolumeConfig {
         anyhow::ensure!(
             (1..=10).contains(&config.show_secs),
             tr!(
-                "modules.volume.show_secs must be between 1 and 10",
-                "modules.volume.show_secs doit être entre 1 et 10"
+                "modules.{}.show_secs must be between 1 and 10",
+                "modules.{}.show_secs doit être entre 1 et 10",
+                id
             )
         );
         Ok(config)

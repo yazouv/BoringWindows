@@ -155,7 +155,7 @@ Sécurité : tokens stockés dans le **Gestionnaire d'identifiants Windows** (cr
 | Batterie / charge | animation au branchement |
 | Minuteur / Pomodoro | simple et très demandé |
 | Presse-papiers | derniers éléments copiés |
-| Notifications Windows | `UserNotificationListener` exige une identité de package (MSIX) → à garder pour plus tard |
+| Notifications Windows | fait : `bw-notify`, lecture de `UserNotificationListener` (permise sans MSIX, mais l'événement ne l'est pas → relecture toutes les 2 s) |
 | Stats système | CPU/RAM/GPU, à la demande uniquement |
 
 ---
@@ -348,7 +348,13 @@ de texte aux écrans de l'assistant), puis la fenêtre de réglages.
 - [x] Minuteur (module `bw-timer`, durées prédéfinies, doc FR + EN)
 - [x] Étagère de fichiers (glisser-déposer sur l'île, `[modules.shelf]`, doc FR + EN)
 - [x] Volume (module `bw-volume`, callback WASAPI sans polling, doc FR + EN)
-- [ ] Luminosité (WMI, écrans intégrés seulement : non testable sur un PC fixe)
+- [x] Luminosité (`[modules.brightness]` dans `bw-volume`, événement WMI `WmiMonitorBrightnessEvent`, écrans intégrés seulement, doc FR + EN ; à valider sur un portable)
+- [x] Notifications des applications (`bw-notify` : annonce animée dans la pilule, points non lus, onglet « Notifs », clic → ouvre l'application, doc FR + EN)
+- [x] Onglets de l'île ouverte (Accueil, Notifs, Claude)
+- [x] Ne pas déranger (lune dans l'île, gardé entre deux lancements)
+- [x] Icône des applications (`shell:AppsFolder`), couleur tirée de l'icône pour les applis inconnues
+- [x] Clic → bon endroit : la notification est rejouée depuis le centre de notifications (Win+N + UI Automation), sinon l'application s'ouvre
+- [x] Barre des tâches en haut et réduite : pilules ramenées à sa hauteur
 - [x] Plugins WASM (`bw-plugins`, wasmi : bac à sable, budget de calcul, mémoire plafonnée ; texte + attention ; doc FR + EN)
 
 ### Port macOS (en parallèle, sans bloquer Windows)
@@ -375,7 +381,7 @@ Note : sur Mac, boring.notch existe déjà ; l'intérêt est surtout d'avoir la 
 - [ ] Signature de code (ex. SignPath, gratuit pour l'open source) pour éviter SmartScreen
 - [x] macOS : binaire Intel (`boringwindows-macos-x64.tar.gz`, compilé depuis le runner Apple Silicon), mise à jour automatique comprise
 - [ ] macOS : bundle `.app` signé + notarisé
-- [ ] (opt.) MSIX pour débloquer les API à identité de package (notifications)
+- [ ] (opt.) MSIX pour débloquer les API à identité de package (événement des notifications, sans relecture périodique)
 
 ---
 
