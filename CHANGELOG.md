@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.5.0](https://github.com/yazouv/BoringWindows/compare/v0.4.0...v0.5.0) (2026-10-10)
+
+
+### Nouveautés
+
+* animations façon Dynamic Island, halo de Claude et grande mascotte ([3b0d04e](https://github.com/yazouv/BoringWindows/commit/3b0d04eabeb526c647027a7aa25aee4a27318af2))
+* animations façon Dynamic Island, halo de Claude et grande mascotte ([557aeed](https://github.com/yazouv/BoringWindows/commit/557aeedb14d3eed677d69fe0687c0b3923fd8b2f))
+* notifications, conversations et sessions Claude en cartes ([4ca0959](https://github.com/yazouv/BoringWindows/commit/4ca0959c0ed6f306c16bb56897cbf3f50a11f40f))
+* port macOS, processeur et mémoire, raccourcis clavier ([00c39c7](https://github.com/yazouv/BoringWindows/commit/00c39c790a774e25eccb298b7a99f6641b58f0b5))
+* port macOS, processeur et mémoire, raccourcis clavier ([d079997](https://github.com/yazouv/BoringWindows/commit/d0799978b41ffc5f32f2da7783444b9cc738061b))
+* processeur et mémoire dans l'île, avec alertes de surcharge ([d079997](https://github.com/yazouv/BoringWindows/commit/d0799978b41ffc5f32f2da7783444b9cc738061b))
+* raccourcis clavier globaux configurables ([d079997](https://github.com/yazouv/BoringWindows/commit/d0799978b41ffc5f32f2da7783444b9cc738061b))
+* refonte de la fenêtre de réglages façon Windows 11 ([587144f](https://github.com/yazouv/BoringWindows/commit/587144f4836ea076144ba16908ba9b942b14e36d))
+
+
+### Corrections
+
+* le détail de la météo s'affiche de nouveau au survol ([d079997](https://github.com/yazouv/BoringWindows/commit/d0799978b41ffc5f32f2da7783444b9cc738061b))
+* surveillance de la config sous macOS (chemins résolus par FSEvents) ([d9d0b9f](https://github.com/yazouv/BoringWindows/commit/d9d0b9f672050f60e5a35cd6e53d13a0f0f19582))
+
 ## [0.4.0](https://github.com/yazouv/BoringWindows/compare/v0.3.0...v0.4.0) (2026-10-10)
 
 
