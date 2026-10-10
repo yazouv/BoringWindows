@@ -365,7 +365,9 @@ impl Controller {
         self.ui.on_open_url(|url| {
             // Uniquement des liens web : jamais de chemin ou de commande venus d'un ICS.
             if url.starts_with("https://") {
-                log::info!("ouverture : {url}");
+                // Le domaine seulement : un lien de réunion peut contenir son
+                // mot de passe (`pwd=` chez Zoom).
+                log::info!("ouverture d'un lien ({})", link_host(&url));
                 platform::open_path(std::path::Path::new(url.as_str()));
             }
         });
@@ -1802,7 +1804,7 @@ impl Controller {
         if let Some((ancestors, console)) = target
             && !platform::focus_terminal(&ancestors, console)
         {
-            log::info!("terminal de la session {session} introuvable");
+            log::info!("terminal de la session introuvable");
         }
     }
 
@@ -2392,6 +2394,14 @@ fn split_rows(agenda: usize, claude: usize, budget: usize) -> (usize, usize) {
 }
 
 /// « 3:07 », « 1:02:45 ».
+/// Domaine d'un lien `https://…`, pour le journal.
+fn link_host(url: &str) -> &str {
+    let rest = url.strip_prefix("https://").unwrap_or(url);
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    // Sans identifiants éventuels (`user:pass@hôte`).
+    authority.rsplit('@').next().unwrap_or_default()
+}
+
 /// « 950 », « 123k », « 1.2M » : lisible dans une ligne étroite.
 fn compact_tokens(n: u64) -> String {
     match n {
@@ -2481,7 +2491,24 @@ fn select_ui_language() {
 
 #[cfg(test)]
 mod tests {
-    use super::{ago, compact_tokens, duration_text, split_rows};
+    use super::{ago, compact_tokens, duration_text, link_host, split_rows};
+
+    #[test]
+    fn link_host_hides_the_rest_of_the_link() {
+        assert_eq!(
+            link_host("https://us02web.zoom.us/j/123?pwd=secret"),
+            "us02web.zoom.us"
+        );
+        assert_eq!(
+            link_host("https://meet.google.com/abc-defg-hij"),
+            "meet.google.com"
+        );
+        assert_eq!(link_host("https://user:pass@example.com#x"), "example.com");
+        assert_eq!(
+            link_host("https://teams.microsoft.com"),
+            "teams.microsoft.com"
+        );
+    }
 
     #[test]
     fn activity_formats() {

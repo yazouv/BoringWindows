@@ -105,12 +105,8 @@ async fn locate(place: &Place) -> anyhow::Result<Located> {
             let body = get(crate::geocoding_url(city, bw_i18n::lang())).await?;
             let found = crate::parse_geocoding(&body)?
                 .ok_or_else(|| anyhow::anyhow!("ville « {city} » introuvable"))?;
-            log::info!(
-                "météo : {city} → {} ({:.2}, {:.2})",
-                found.name,
-                found.latitude,
-                found.longitude
-            );
+            // Jamais les coordonnées : le journal finit parfois dans un rapport de bug.
+            log::info!("météo : ville trouvée ({})", found.name);
             Ok(found)
         }
     }
