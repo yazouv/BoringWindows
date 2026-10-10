@@ -25,6 +25,13 @@ pieds, une bouche selon son humeur, des notes de musique quand elle danse et
 des « z » qui s'envolent quand elle dort. Elle s'anime tant que l'île est
 ouverte.
 
+Et elle réagit à la souris :
+
+- elle **suit le curseur des yeux** ;
+- un **clic** dessus l'écrase comme de la gelée, et elle rit ;
+- une **caresse** (quelques allers-retours rapides de la souris sur elle) fait
+  s'envoler des cœurs.
+
 ## Saisons
 
 Elle se déguise, et l'île ouverte se décore :
@@ -45,6 +52,8 @@ always_animated = false   # toujours animée (respire, cligne des yeux)
 music = true              # danser sur la musique
 seasonal = true           # déguisements et décorations
 sleep_after_minutes = 10  # avant qu'elle s'endorme (1 à 240)
+accessory = "sprout"      # sprout, glasses, headphones, bow ou none
+color = ""                # couleur du corps ("#FFB3C7"), vide : celle du thème
 ```
 
 Par défaut, la mascotte ne bouge **que quand il se passe quelque chose**

@@ -372,6 +372,7 @@ de texte aux écrans de l'assistant), puis la fenêtre de réglages.
 - [x] Plus de barre de titre au premier clic sur l'île (sous-classement de la fenêtre)
 - [x] Processeur et mémoire (`bw-system` : à côté de l'heure, mesurés seulement île ouverte ; alertes facultatives qui nomment l'application en cause ; doc FR + EN)
 - [x] Animations façon Dynamic Island : ouverture en ressort (dépasse puis se pose), contenu qui arrive en cascade ; halo de Claude (irisé qui tourne au travail, orange qui pulse quand il attend, vague verte à la fin ; `theme.glow`) ; mascotte en grand et détaillée dans l'île ouverte ; île ouverte élargie à 580 px ; notifications et conversations récentes en cartes, jauge circulaire de consommation, pastilles d'état des sessions Claude
+- [x] Île vivante : onglets qui glissent (ressort), carrousel des pochettes au changement de morceau, mascotte qui suit le curseur des yeux / s'écrase au clic / fait des cœurs aux caresses, accessoire et couleur de la mascotte (`[modules.mascot]`), bulle détachée pour la deuxième activité (pont liquide)
 - [x] Raccourcis clavier globaux (`[hotkeys]` : ouvrir l'île, lecture/pause, morceaux, ne pas déranger ; `global-hotkey`, réglables dans Réglages › Système ; doc FR + EN)
 
 ### Port macOS (en parallèle, sans bloquer Windows)

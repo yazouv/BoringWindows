@@ -294,7 +294,10 @@ impl Platform {
 
     /// Pas de région arrondie ici : la zone cliquable reste le rectangle.
     pub fn set_round_region(&self, shape: RoundRect) {
-        self.set_hit_region(shape.rect);
+        self.set_hit_region(match shape.bubble {
+            Some(b) => shape.rect.union(b),
+            None => shape.rect,
+        });
     }
 
     /// Le flou de `theme.blur` n'existe que sous Windows.

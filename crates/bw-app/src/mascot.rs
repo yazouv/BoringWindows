@@ -21,7 +21,14 @@ pub struct MascotConfig {
     pub seasonal: bool,
     /// Minutes sans clavier ni souris avant qu'elle s'endorme.
     pub sleep_after_minutes: u32,
+    /// Accessoire de la grande mascotte (voir `ACCESSORIES`).
+    pub accessory: String,
+    /// Couleur du corps (« #RRGGBB ») ; vide : celle du texte du thème.
+    pub color: String,
 }
+
+/// Accessoires possibles, dans l'ordre de la liste des réglages.
+pub const ACCESSORIES: [&str; 5] = ["sprout", "glasses", "headphones", "bow", "none"];
 
 impl Default for MascotConfig {
     fn default() -> Self {
@@ -31,6 +38,8 @@ impl Default for MascotConfig {
             music: true,
             seasonal: true,
             sleep_after_minutes: 10,
+            accessory: "sprout".into(),
+            color: String::new(),
         }
     }
 }
@@ -48,7 +57,27 @@ impl MascotConfig {
                 "modules.mascot.sleep_after_minutes doit être entre 1 et 240"
             )
         );
+        anyhow::ensure!(
+            ACCESSORIES.contains(&config.accessory.as_str()),
+            tr!(
+                "modules.mascot.accessory must be one of: {}",
+                "modules.mascot.accessory doit valoir : {}",
+                ACCESSORIES.join(", ")
+            )
+        );
+        anyhow::ensure!(
+            config.color.is_empty() || config.color.parse::<bw_config::Color>().is_ok(),
+            tr!(
+                "modules.mascot.color must be a color like \"#FFB3C7\" (or empty)",
+                "modules.mascot.color doit être une couleur comme « #FFB3C7 » (ou vide)"
+            )
+        );
         Ok(config)
+    }
+
+    /// Couleur du corps choisie, s'il y en a une.
+    pub fn body_color(&self) -> Option<bw_config::Color> {
+        self.color.parse().ok()
     }
 }
 
@@ -208,7 +237,22 @@ mod tests {
     fn config_validation() {
         let c = MascotConfig::from_table(None).unwrap();
         assert!(c.enabled && !c.always_animated && c.music && c.seasonal);
-        for bad in ["sleep_after_minutes = 0", "danse = true"] {
+        assert_eq!(c.accessory, "sprout");
+        assert!(c.body_color().is_none());
+        let t: toml::Table = toml::from_str(
+            "accessory = \"glasses\"
+color = \"#FFB3C7\"",
+        )
+        .unwrap();
+        let c = MascotConfig::from_table(Some(&t)).unwrap();
+        assert_eq!(c.accessory, "glasses");
+        assert!(c.body_color().is_some());
+        for bad in [
+            "sleep_after_minutes = 0",
+            "danse = true",
+            "accessory = \"chapeau\"",
+            "color = \"rose\"",
+        ] {
             let t: toml::Table = toml::from_str(bad).unwrap();
             assert!(MascotConfig::from_table(Some(&t)).is_err(), "{bad}");
         }

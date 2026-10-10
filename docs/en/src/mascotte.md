@@ -23,6 +23,13 @@ waiting for you, typing while it works), feet, a mouth that follows its mood,
 music notes when it dances and "z"s floating up while it sleeps. It stays
 animated as long as the island is open.
 
+It also reacts to the mouse:
+
+- it **follows the cursor with its eyes**;
+- a **click** squishes it like jelly, and it giggles;
+- **petting** it (a few quick back-and-forth mouse moves over it) sends
+  hearts flying.
+
 ## Seasons
 
 It dresses up, and the open island gets decorated:
@@ -43,6 +50,8 @@ always_animated = false   # always animated (breathes, blinks)
 music = true              # dance to the music
 seasonal = true           # costumes and decorations
 sleep_after_minutes = 10  # before it falls asleep (1 to 240)
+accessory = "sprout"      # sprout, glasses, headphones, bow or none
+color = ""                # body color ("#FFB3C7"), empty: the theme's
 ```
 
 By default, the mascot **only moves when something happens** (Claude, music):
