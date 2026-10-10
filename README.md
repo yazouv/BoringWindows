@@ -6,6 +6,7 @@ Une « Dynamic Island » pour Windows, écrite en Rust : légère, discrète et 
 - 🎵 **Musique en cours** (Spotify, Apple Music, navigateur…) avec précédent / pause / suivant
 - 📅 **Calendrier** (ICS, Google, Outlook, CalDAV) avec rappel et bouton « Rejoindre »
 - 🔋 **Batterie et Bluetooth** (chargeur, batterie faible, casque connecté avec son niveau) et 🌤️ **météo**
+- 👻 Une **mascotte** qui réagit à Claude et danse sur la musique, des **gestes** (volume, morceaux) et un **mode présentation** (île discrète et invisible pendant un partage d'écran)
 - 🎨 Thèmes (dont un automatique qui suit Windows, avec flou), layouts et modules configurables par fichiers, rechargés à chaud
 
 Inspiré de [boring.notch](https://github.com/TheBoredTeam/boring.notch) et [coucou](https://github.com/Louis-CFM/coucou).
@@ -159,6 +160,7 @@ démarrage, masquer l'île, quitter.
 | `bw-net` | requêtes HTTP (client de Windows, `curl` ailleurs) |
 | `bw-power` | batterie du PC et appareils Bluetooth (événements de Windows, sans polling) |
 | `bw-weather` | météo du moment (open-meteo, sans clé) |
+| `bw-presence` | mode présentation : appels et partages d'écran en cours (registre de confidentialité de Windows) |
 | `bw-update` | mises à jour depuis les releases GitHub (empreinte vérifiée) |
 | `bw-app` | binaire : île Slint (`ui/island.slint`), intégration Win32, icône de notification |
 

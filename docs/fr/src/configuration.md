@@ -183,6 +183,31 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 | `units` | `"celsius"` | `"celsius"`, `"fahrenheit"` | unité des températures |
 | `refresh_minutes` | `30` | 10 à 180 | rafraîchissement (min) |
 
+## `[modules.mascot]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `true` | | afficher la [mascotte](mascotte.md) dans la pilule |
+| `always_animated` | `false` | | toujours animée (respire, cligne des yeux) ; sinon seulement quand il se passe quelque chose |
+| `music` | `true` | | danser sur les basses quand la musique joue |
+| `seasonal` | `true` | | déguisements et décorations de saison |
+| `sleep_after_minutes` | `10` | 1 à 240 | minutes sans saisie avant qu'elle s'endorme |
+
+## `[modules.gestures]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `true` | | [gestes](gestes.md) sur l'île (volume, morceaux, ne pas déranger) |
+| `volume_step` | `2` | 1 à 10 | % de volume par cran de molette |
+
+## `[modules.presentation]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `true` | | [mode présentation](presentation.md) : rien ne s'annonce pendant un appel ou un partage d'écran |
+| `hide_from_capture` | `true` | | l'île n'apparaît pas dans les partages d'écran, enregistrements et captures |
+| `call_apps` | Teams, Discord, Zoom… | | applications dont l'usage du micro veut dire « en appel » (morceau de nom) |
+
 ## `[modules.visualizer]`
 
 | Option | Défaut | Plage | Rôle |

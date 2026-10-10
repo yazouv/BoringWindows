@@ -179,6 +179,20 @@ impl Controller {
         ui.set_brightness_enabled(config.module_enabled(bw_volume::BRIGHTNESS_ID, false));
         ui.set_battery_enabled(config.module_enabled(bw_power::BATTERY_ID, true));
         ui.set_bluetooth_enabled(config.module_enabled(bw_power::BLUETOOTH_ID, true));
+        let gestures = crate::gestures::GesturesConfig::from_table(config.modules.get("gestures"))
+            .unwrap_or_default();
+        ui.set_gestures_enabled(gestures.enabled);
+        let presentation =
+            bw_presence::PresentationConfig::from_table(config.modules.get(bw_presence::MODULE_ID))
+                .unwrap_or_default();
+        ui.set_presentation_enabled(presentation.enabled);
+        ui.set_hide_from_capture(presentation.hide_from_capture);
+        let mascot = crate::mascot::MascotConfig::from_table(config.modules.get("mascot"))
+            .unwrap_or_default();
+        ui.set_mascot_enabled(mascot.enabled);
+        ui.set_mascot_always_animated(mascot.always_animated);
+        ui.set_mascot_music(mascot.music);
+        ui.set_mascot_seasonal(mascot.seasonal);
         let weather =
             bw_weather::WeatherConfig::from_table(config.modules.get(bw_weather::MODULE_ID))
                 .unwrap_or_default();
@@ -773,6 +787,34 @@ impl Controller {
             "modules.bluetooth.enabled" => Some((
                 vec!["modules", "bluetooth", "enabled"],
                 Value::Bool(ui.get_bluetooth_enabled()),
+            )),
+            "modules.gestures.enabled" => Some((
+                vec!["modules", "gestures", "enabled"],
+                Value::Bool(ui.get_gestures_enabled()),
+            )),
+            "modules.presentation.enabled" => Some((
+                vec!["modules", "presentation", "enabled"],
+                Value::Bool(ui.get_presentation_enabled()),
+            )),
+            "modules.presentation.hide_from_capture" => Some((
+                vec!["modules", "presentation", "hide_from_capture"],
+                Value::Bool(ui.get_hide_from_capture()),
+            )),
+            "modules.mascot.enabled" => Some((
+                vec!["modules", "mascot", "enabled"],
+                Value::Bool(ui.get_mascot_enabled()),
+            )),
+            "modules.mascot.always_animated" => Some((
+                vec!["modules", "mascot", "always_animated"],
+                Value::Bool(ui.get_mascot_always_animated()),
+            )),
+            "modules.mascot.music" => Some((
+                vec!["modules", "mascot", "music"],
+                Value::Bool(ui.get_mascot_music()),
+            )),
+            "modules.mascot.seasonal" => Some((
+                vec!["modules", "mascot", "seasonal"],
+                Value::Bool(ui.get_mascot_seasonal()),
             )),
             "theme.blur" => Some((vec!["theme", "blur"], Value::Bool(ui.get_blur()))),
             "theme.system_accent" => Some((

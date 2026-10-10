@@ -182,6 +182,31 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 | `units` | `"celsius"` | `"celsius"`, `"fahrenheit"` | temperature unit |
 | `refresh_minutes` | `30` | 10 to 180 | refresh interval (min) |
 
+## `[modules.mascot]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `true` | | show the [mascot](mascotte.md) in the pill |
+| `always_animated` | `false` | | always animated (breathes, blinks); otherwise only when something happens |
+| `music` | `true` | | dance to the bass while music plays |
+| `seasonal` | `true` | | seasonal costumes and decorations |
+| `sleep_after_minutes` | `10` | 1 to 240 | minutes without input before it falls asleep |
+
+## `[modules.gestures]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `true` | | [gestures](gestes.md) on the island (volume, tracks, do not disturb) |
+| `volume_step` | `2` | 1 to 10 | volume % per wheel notch |
+
+## `[modules.presentation]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `true` | | [presentation mode](presentation.md): nothing pops up during a call or screen sharing |
+| `hide_from_capture` | `true` | | the island doesn't appear in screen sharing, recordings and screenshots |
+| `call_apps` | Teams, Discord, Zoom… | | apps whose use of the microphone means "in a call" (part of a name) |
+
 ## `[modules.visualizer]`
 
 | Option | Default | Range | Purpose |

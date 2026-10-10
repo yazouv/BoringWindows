@@ -133,6 +133,37 @@ units = "celsius"
 # Rafraîchissement (minutes).
 refresh_minutes = 30
 
+[modules.mascot]
+# La mascotte : un petit blob dans la pilule qui réagit à Claude Code, danse sur
+# la musique, s'endort quand tu t'absentes et se déguise selon la saison.
+enabled = true
+# Toujours animée (respire, cligne des yeux) ; sinon seulement quand il se passe
+# quelque chose, pour que l'île ne consomme rien au repos.
+always_animated = false
+# Danser au rythme des basses quand la musique joue.
+music = true
+# Déguisements et décorations (Halloween, Noël, Nouvel An).
+seasonal = true
+# Minutes sans clavier ni souris avant qu'elle s'endorme.
+sleep_after_minutes = 10
+
+[modules.gestures]
+# Gestes sur l'île : molette pour le volume, glisser (pavé tactile, Maj + molette
+# ou souris) pour changer de morceau, appui long pour « ne pas déranger ».
+enabled = true
+# Pas de volume par cran de molette (%).
+volume_step = 2
+
+[modules.presentation]
+# Pendant un appel ou un partage d'écran : rien ne s'annonce et un point rouge
+# s'affiche dans la pilule.
+enabled = true
+# L'île n'apparaît pas dans les partages d'écran, enregistrements et captures
+# (les tiennes comprises).
+hide_from_capture = true
+# Applications dont l'usage du micro veut dire « en appel » (morceau de nom).
+call_apps = ["teams", "discord", "zoom", "slack", "webex", "skype", "chrome", "msedge", "firefox", "brave", "opera", "obs"]
+
 [modules.demo]
 # Module de démonstration : fait varier l'attention toutes les quelques secondes
 # pour tester les animations. À désactiver une fois les vrais modules en place.

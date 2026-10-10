@@ -5,6 +5,8 @@ mod clock;
 mod controller;
 mod demo;
 mod geometry;
+mod gestures;
+mod mascot;
 mod platform;
 mod shelf;
 #[cfg(test)]
