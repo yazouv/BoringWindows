@@ -72,8 +72,9 @@ normal-size taskbar, nothing changes.
 
 ## Changing the configuration
 
-The easiest way: right-click the icon › **Settings…**. A tabbed window
-(General, Appearance, Calendar, Claude Code, Music) edits the common settings; **every change is
+The easiest way: right-click the icon › **Settings…**. One page per topic,
+picked in the left column (General, Appearance, Notifications, Claude Code,
+Calendar, Music…), edits the common settings; **every change is
 saved and applied immediately**, there is no "OK" button. That's also where you
 add a calendar (per-service assistant, **Test** button), install the Claude
 Code hooks and run the diagnostic. The window can also open at startup:

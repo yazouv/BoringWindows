@@ -51,8 +51,8 @@ sous Windows 10, le clic ouvre l'application.
 
 ## Réglages
 
-Activé par défaut. Réglages › **Général** › « Afficher les notifications des
-applications dans l'île », ou dans `config.toml` :
+Activé par défaut. Réglages › **Notifications** › « Notifications des
+applications », ou dans `config.toml` :
 
 ```toml
 [modules.notifications]

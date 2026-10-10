@@ -19,7 +19,7 @@ L'alerte ne revient qu'une fois la charge nettement redescendue (10 points
 sous le seuil). Avec une alerte réglée, une mesure est prise toutes les
 5 secondes, île fermée comprise.
 
-Réglages › **Système** : coche ou décoche l'affichage, choisis le
+Réglages › **Système** : active ou désactive l'affichage, choisis le
 rafraîchissement et les seuils d'alerte. Ou dans `config.toml` :
 
 ```toml

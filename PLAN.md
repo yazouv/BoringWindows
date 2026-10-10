@@ -282,6 +282,10 @@ de vérité (versionnable, partageable), mais une interface l'édite pour nous.
       Agenda (assistant 6 services, guide détaillé, Parcourir…, Tester, nom par défaut),
       Claude Code (hooks, son, délai, diagnostic dans la fenêtre), Musique
 - [x] Musique : lecteurs vus récemment à cocher (liste des lecteurs lus depuis le lancement, plus ceux déjà ignorés)
+- [x] Refonte façon Réglages de Windows 11 : navigation à gauche avec icônes, une page
+      par sujet (Notifications regroupe volume, luminosité, batterie, Bluetooth, notifications
+      et mode présentation), réglages en tuiles avec interrupteurs, options dépendantes rangées
+      sous leur interrupteur, défilement par page, clair/sombre
 - [ ] Captures d'écran par service dans l'assistant
 - [x] Tailles de l'île (compacte / ouverte) et ordre des modules (priorité en mode compact)
 

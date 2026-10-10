@@ -46,7 +46,7 @@ l'écran ne font pas partie des thèmes : ils se règlent toujours dans `[theme]
   (`system_accent = true`) : l'accent suit celui choisi dans les paramètres de
   Windows, en plus clair sur les thèmes sombres et en plus foncé sur les
   thèmes clairs. Il change en même temps que Windows. La pochette reste
-  prioritaire quand la musique joue (onglet Musique).
+  prioritaire quand la musique joue (page Musique).
 - **« Flouter ce qui est derrière l'île »** (`blur = true`, activé dans
   `glass`) : ce qui est derrière l'île est flouté, comme les menus de Windows
   11. Le flou épouse la forme exacte de la pilule, animations comprises. Il ne

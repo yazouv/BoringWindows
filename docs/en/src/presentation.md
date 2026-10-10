@@ -27,8 +27,8 @@ still running.
 
 ## Settings
 
-Settings › **General** › "Presentation mode…" and "Hide the island from
-screen sharing…", or in `config.toml`:
+Settings › **Notifications** › "Presentation mode" and "Hide from
+capture", or in `config.toml`:
 
 ```toml
 [modules.presentation]

@@ -54,9 +54,6 @@ msgstr "Parcourir…"
 msgid "Calendar"
 msgstr "Agenda"
 
-msgid "Changes apply to the island right away. Picking a theme replaces the colors above with the theme's; your own themes go in the themes folder (one .toml file each, see the documentation). The accent color is replaced by the album art color while music plays (Music tab)."
-msgstr "Les changements s'appliquent tout de suite sur l'île. Choisir un thème remplace les couleurs ci-dessus par les siennes ; tes propres thèmes vont dans le dossier des thèmes (un fichier .toml chacun, voir la documentation). La couleur d'accent est remplacée par celle de la pochette quand la musique joue (onglet Musique)."
-
 msgid "Corner radius of the open island"
 msgstr "Arrondi de l'île ouverte"
 
@@ -74,12 +71,6 @@ msgstr "Général"
 
 msgid "Hide the island when an app is full screen"
 msgstr "Cacher l'île quand une application est en plein écran"
-
-msgid "Hooks installed ✓"
-msgstr "Hooks installés ✓"
-
-msgid "Hooks not installed"
-msgstr "Hooks non installés"
 
 msgid "ICS link"
 msgstr "Lien ICS"
@@ -143,9 +134,6 @@ msgstr "Service"
 
 msgid "Show all-day events"
 msgstr "Afficher les événements « toute la journée »"
-
-msgid "Sound when Claude is waiting for you (question, plan, permission)"
-msgstr "Son quand Claude t'attend (question, plan, permission)"
 
 msgid "Start BoringWindows with Windows"
 msgstr "Lancer BoringWindows au démarrage de Windows"
@@ -213,17 +201,11 @@ msgstr "Recherche…"
 msgid "Check for updates"
 msgstr "Rechercher une mise à jour"
 
-msgid "Players seen recently (tick to ignore)"
-msgstr "Lecteurs vus récemment (cocher pour ignorer)"
-
 msgid "Compact island size (px)"
 msgstr "Taille de l'île compacte (px)"
 
 msgid "Open island size (px)"
 msgstr "Taille de l'île ouverte (px)"
-
-msgid "Priority in the compact island (first wins)"
-msgstr "Priorité dans l'île compacte (le premier gagne)"
 
 msgid "Server address"
 msgstr "Adresse du serveur"
@@ -264,9 +246,6 @@ msgstr "Jouer un son à la fin"
 msgid "Durations (minutes)"
 msgstr "Durées (minutes)"
 
-msgid "Up to 5 durations, separated by commas (1 to 600). Open the island and pick one to start; 25 is the classic Pomodoro."
-msgstr "Jusqu'à 5 durées séparées par des virgules (1 à 600). Ouvre l'île et choisis-en une pour démarrer ; 25 est le Pomodoro classique."
-
 msgid "Custom view of the open island"
 msgstr "Vue personnelle de l'île ouverte"
 
@@ -297,9 +276,6 @@ msgstr "Afficher les changements de volume dans l'île"
 msgid "Show brightness changes in the island (laptops)"
 msgstr "Afficher les changements de luminosité dans l'île (portables)"
 
-msgid "Audio visualizer (uses some CPU while the island is open and music plays)"
-msgstr "Visualiseur audio (consomme un peu de CPU tant que l'île est ouverte et que la musique joue)"
-
 msgid "Run WASM plugins (third-party code, sandboxed)"
 msgstr "Lancer les plugins WASM (code tiers, dans un bac à sable)"
 
@@ -317,9 +293,6 @@ msgstr "Limite estimée, millions de tokens (0 = pas de jauge)"
 
 msgid "Window reset time (optional)"
 msgstr "Heure de reset de la fenêtre (facultatif)"
-
-msgid "Usage is an estimate from Claude Code only; your plan's window also counts claude.ai and the app. Type the reset time that /usage shows (HH:MM) to align the countdown."
-msgstr "La consommation est une estimation faite à partir de Claude Code seul ; la fenêtre de ton abonnement compte aussi claude.ai et l'application. Saisis l'heure de reset affichée par /usage (HH:MM) pour caler le compte à rebours."
 
 msgid "now"
 msgstr "à l'instant"
@@ -345,9 +318,6 @@ msgstr "Montrer l'expéditeur et le message des notifications"
 msgid "Do not disturb: notifications arrive here without popping up"
 msgstr "Ne pas déranger : les notifications arrivent ici sans s'annoncer"
 
-msgid "Clicking a notification opens the right place (Discord channel, tab…)"
-msgstr "Un clic sur une notification ouvre le bon endroit (salon Discord, onglet…)"
-
 msgid "Show the charger and battery level in the island (laptops)"
 msgstr "Afficher le chargeur et le niveau de batterie dans l'île (portables)"
 
@@ -363,23 +333,11 @@ msgstr "Utiliser la couleur d'accent de Windows"
 msgid "Weather"
 msgstr "Météo"
 
-msgid "Show the weather next to the date in the open island"
-msgstr "Afficher la météo à côté de la date dans l'île ouverte"
-
 msgid "City"
 msgstr "Ville"
 
 msgid "Unit"
 msgstr "Unité"
-
-msgid "Data from open-meteo.com, free and without an account; only the city name and its coordinates are sent. Hover the temperature to see the forecast of the day."
-msgstr "Données d'open-meteo.com, gratuit et sans compte ; seuls le nom de la ville et ses coordonnées sont envoyés. Survole la température pour voir les prévisions du jour."
-
-msgid "Gestures on the island: wheel for volume, swipe to change track, long press for do not disturb"
-msgstr "Gestes sur l'île : molette pour le volume, glisser pour changer de morceau, appui long pour ne pas déranger"
-
-msgid "Presentation mode: stay quiet during calls and screen sharing"
-msgstr "Mode présentation : rester discrète pendant les appels et les partages d'écran"
 
 msgid "Hide the island from screen sharing, recordings and screenshots"
 msgstr "Cacher l'île des partages d'écran, enregistrements et captures"
@@ -390,26 +348,182 @@ msgstr "Mascotte"
 msgid "Show the mascot in the island"
 msgstr "Afficher la mascotte dans l'île"
 
-msgid "Always animated (breathes and blinks, uses a little CPU)"
-msgstr "Toujours animée (respire et cligne des yeux, consomme un peu de CPU)"
-
 msgid "Dance to the music"
 msgstr "Danser sur la musique"
 
-msgid "Seasonal decorations (Halloween, Christmas, New Year)"
-msgstr "Décorations de saison (Halloween, Noël, Nouvel An)"
+msgid "A question, a plan or a permission"
+msgstr "Une question, un plan ou une autorisation"
 
-msgid "The mascot reacts to Claude Code (working, waiting for you, done), dances to the music, falls asleep when you are away and gets sleepy in the evening. By default it only moves when something happens, so the island uses no CPU at rest."
-msgstr "La mascotte réagit à Claude Code (travaille, t'attend, a fini), danse sur la musique, s'endort quand tu t'absentes et a sommeil le soir. Par défaut, elle ne bouge que quand il se passe quelque chose : l'île ne consomme rien au repos."
+msgid "Advanced"
+msgstr "Avancé"
+
+msgid "Always animated"
+msgstr "Toujours animée"
+
+msgid "An update is ready."
+msgstr "Une mise à jour est prête."
+
+msgid "App notifications"
+msgstr "Notifications des applications"
+
+msgid "Apps"
+msgstr "Applications"
+
+msgid "Audio visualizer"
+msgstr "Visualiseur audio"
+
+msgid "Battery"
+msgstr "Batterie"
+
+msgid "Blur"
+msgstr "Flou"
+
+msgid "Breathes and blinks, uses a little CPU. Otherwise it only moves when something happens."
+msgstr "Respire et cligne des yeux, utilise un peu de processeur. Sinon, elle ne bouge que quand il se passe quelque chose."
+
+msgid "Brightness"
+msgstr "Luminosité"
+
+msgid "Calls and screen sharing"
+msgstr "Appels et partage d'écran"
+
+msgid "Checks the whole chain, from the hooks to the island."
+msgstr "Vérifie toute la chaîne, des hooks jusqu'à l'île."
+
+msgid "Claude Code hooks"
+msgstr "Hooks Claude Code"
+
+msgid "Data from open-meteo.com, free and without an account; only the city name and its coordinates are sent."
+msgstr "Données d'open-meteo.com, gratuites et sans compte ; seuls le nom de la ville et ses coordonnées sont envoyés."
+
+msgid "Diagnostic"
+msgstr "Diagnostic"
+
+msgid "Empty"
+msgstr "Vider"
+
+msgid "Gestures"
+msgstr "Gestes"
+
+msgid "Halloween, Christmas, New Year"
+msgstr "Halloween, Noël, Nouvel An"
+
+msgid "Hide from capture"
+msgstr "Cacher des captures"
+
+msgid "Hide in full screen"
+msgstr "Cacher en plein écran"
+
+msgid "Installed"
+msgstr "Installés"
+
+msgid "Island"
+msgstr "Île"
+
+msgid "It reacts to Claude Code, dances to the music, falls asleep when you are away and gets sleepy in the evening."
+msgstr "Elle réagit à Claude Code, danse sur la musique, s'endort quand tu t'absentes et somnole le soir."
+
+msgid "Next to the date in the open island. Hover the temperature to see the forecast of the day."
+msgstr "À côté de la date dans l'île ouverte. Survole la température pour voir les prévisions du jour."
+
+msgid "Not installed"
+msgstr "Non installés"
+
+msgid "Notifications"
+msgstr "Notifications"
+
+msgid "Open the island and pick a duration to start."
+msgstr "Ouvre l'île et choisis une durée pour lancer le minuteur."
+
+msgid "Open the right place on click"
+msgstr "Ouvrir le bon endroit au clic"
+
+msgid "Permissions"
+msgstr "Autorisations"
+
+msgid "Picking a theme replaces the colors below with the theme's. Your own themes go in the themes folder."
+msgstr "Choisir un thème remplace les couleurs ci-dessous par les siennes. Tes propres thèmes vont dans le dossier des thèmes."
+
+msgid "Players"
+msgstr "Lecteurs"
+
+msgid "Players seen recently: turn one off to ignore it."
+msgstr "Lecteurs vus récemment : désactive-en un pour l'ignorer."
+
+msgid "Presentation mode"
+msgstr "Mode présentation"
+
+msgid "Priority in the compact island"
+msgstr "Priorité dans l'île compacte"
+
+msgid "Replaced by the album art color while music plays."
+msgstr "Remplacée par la couleur de la pochette pendant la musique."
+
+msgid "Seasonal decorations"
+msgstr "Décorations de saison"
+
+msgid "Show the weather"
+msgstr "Afficher la météo"
+
+msgid "Size and motion"
+msgstr "Taille et animation"
+
+msgid "Sound when Claude is waiting for you"
+msgstr "Son quand Claude t'attend"
+
+msgid "Startup and updates"
+msgstr "Démarrage et mises à jour"
+
+msgid "Stay quiet during calls and screen sharing"
+msgstr "Rester discrète pendant les appels et les partages d'écran"
 
 msgid "System"
 msgstr "Système"
 
+msgid "The Discord channel, the browser tab… instead of just the app"
+msgstr "Le salon Discord, l'onglet du navigateur… plutôt que l'application seule"
+
+msgid "Troubleshooting"
+msgstr "Dépannage"
+
+msgid "Type the reset time that /usage shows (HH:MM) to align the countdown."
+msgstr "Tape l'heure de réinitialisation affichée par /usage (HH:MM) pour caler le compte à rebours."
+
+msgid "Up to 5 durations, separated by commas (1 to 600). 25 is the classic Pomodoro."
+msgstr "Jusqu'à 5 durées, séparées par des virgules (1 à 600). 25, c'est le Pomodoro classique."
+
+msgid "Usage"
+msgstr "Utilisation"
+
+msgid "Usage is an estimate from Claude Code only; your plan's window also counts claude.ai and the app."
+msgstr "L'utilisation est estimée d'après Claude Code seul ; la fenêtre de ton forfait compte aussi claude.ai et l'application."
+
+msgid "Uses some CPU while the island is open and music plays"
+msgstr "Utilise un peu de processeur quand l'île est ouverte et que la musique joue"
+
+msgid "Volume"
+msgstr "Volume"
+
+msgid "WASM plugins"
+msgstr "Plugins WASM"
+
+msgid "Wheel for volume, swipe to change track, long press for do not disturb"
+msgstr "Molette pour le volume, glisser pour changer de morceau, appui long pour ne pas déranger"
+
+msgid "Width × height"
+msgstr "Largeur × hauteur"
+
+msgid "Wins when several modules want the island"
+msgstr "L'emporte quand plusieurs modules veulent l'île"
+
 msgid "CPU and memory"
 msgstr "Processeur et mémoire"
 
-msgid "Show the CPU and memory use next to the time in the open island"
-msgstr "Afficher l'usage du processeur et de la mémoire à côté de l'heure dans l'île ouverte"
+msgid "Show the CPU and memory use"
+msgstr "Afficher le processeur et la mémoire"
+
+msgid "Next to the time in the open island. Measured only while the island is open."
+msgstr "À côté de l'heure dans l'île ouverte. Mesurés seulement pendant que l'île est ouverte."
 
 msgid "Refresh (seconds)"
 msgstr "Rafraîchissement (secondes)"
@@ -423,8 +537,8 @@ msgstr "Alerte quand la mémoire reste au-dessus de"
 msgid "never"
 msgstr "jamais"
 
-msgid "Measured only while the island is open. With an alert, a measure is also taken every 5 seconds, and the pill names the app responsible after 30 seconds above the threshold."
-msgstr "Mesuré seulement pendant que l'île est ouverte. Avec une alerte, une mesure est aussi prise toutes les 5 secondes, et la pilule nomme l'application en cause après 30 secondes au-dessus du seuil."
+msgid "With an alert, a measure is also taken every 5 seconds, and the pill names the app responsible after 30 seconds above the threshold."
+msgstr "Avec une alerte, une mesure est aussi prise toutes les 5 secondes, et la pilule nomme l'application en cause après 30 secondes au-dessus du seuil."
 
 msgid "Keyboard shortcuts"
 msgstr "Raccourcis clavier"

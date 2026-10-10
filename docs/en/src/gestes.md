@@ -14,7 +14,7 @@ The island confirms each gesture: "Volume 46 %", "Next track"… in the header
 when it is open, in the pill otherwise. When the [volume](volume.md) module is
 on, its own display shows the volume.
 
-Settings › **General** › "Gestures on the island…", or in `config.toml`:
+Settings › **General** › "Gestures", or in `config.toml`:
 
 ```toml
 [modules.gestures]

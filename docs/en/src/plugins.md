@@ -6,7 +6,7 @@ that targets WASM (Rust, Zig, AssemblyScript, C…), and runs in a **sandbox**: 
 access to files, network or system, only the few functions below.
 
 Plugins are **off by default**: third-party code only runs if you ask for it
-(Settings › General › "Run WASM plugins", or `[modules.plugins] enabled = true`).
+(Settings › General › "WASM plugins", or `[modules.plugins] enabled = true`).
 
 ## Installing a plugin
 

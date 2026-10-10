@@ -31,8 +31,8 @@ que l'application tourne encore.
 
 ## Réglages
 
-Réglages › **Général** › « Mode présentation… » et « Cacher l'île des
-partages d'écran… », ou dans `config.toml` :
+Réglages › **Notifications** › « Mode présentation » et « Cacher des
+captures », ou dans `config.toml` :
 
 ```toml
 [modules.presentation]

@@ -30,9 +30,8 @@ On by default.
 
 ## Settings
 
-Settings › **General** › "Show the charger and battery level in the island
-(laptops)" and "Show Bluetooth devices connecting, with their battery level".
-Or in `config.toml`:
+Settings › **Notifications** › "Battery" and "Bluetooth". Or in
+`config.toml`:
 
 ```toml
 [modules.battery]

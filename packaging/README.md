@@ -2,7 +2,7 @@
 
 ## Installeur (Inno Setup)
 
-`installer/boringwindows.iss` est compilé par le job `installer` de
+`installer/boringwindows.iss` est compilé par le job Windows (étape « Installeur ») de
 `.github/workflows/release.yml` à chaque release et attaché sous
 `boringwindows-windows-x64-setup.exe` (+ `.sha256`). En local :
 
@@ -26,6 +26,6 @@ Installation par utilisateur, sans droits admin. La config
    `manifests/y/Yazouv/BoringWindows/<version>/`), ou utiliser
    `wingetcreate new <url de l'installeur>`.
 2. **Ensuite, automatique** : ajouter un secret `WINGET_TOKEN` (jeton GitHub
-   classique, portée `public_repo`) au dépôt ; le job `winget` de la release
+   classique, portée `public_repo`) au dépôt ; l'étape `winget` du job Windows de la release
    ouvre alors un PR de mise à jour avec `wingetcreate update`. Sans le secret,
    il ne fait rien.

@@ -18,7 +18,7 @@ chrome", with the app using the most. The alert only comes back once the load
 has clearly gone down (10 points below the threshold). With an alert set, a
 measure is taken every 5 seconds, even while the island is closed.
 
-Settings › **System**: tick or untick the display, pick the refresh rate and
+Settings › **System**: turn the display on or off, pick the refresh rate and
 the alert thresholds. Or in `config.toml`:
 
 ```toml
