@@ -1,0 +1,34 @@
+# Mises à jour automatiques : une PR groupée par semaine et par écosystème.
+# Les actions sont épinglées par SHA (commentaire `# vX.Y.Z`), Dependabot met
+# les deux à jour. Délai de 7 jours après publication : une version piégée a
+# le temps d'être retirée avant d'arriver ici.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
+
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    # Mineures et correctifs groupés ; une PR par version majeure, à relire.
+    groups:
+      cargo:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope

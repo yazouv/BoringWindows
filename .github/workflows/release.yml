@@ -2,32 +2,32 @@ name: Release
 
 # À chaque push sur main, release-please tient à jour une PR « chore: release x.y.z »
 # (version + CHANGELOG à partir des commits feat:/fix:…). Fusionner cette PR crée
-# la release et son tag ; les binaires Windows, macOS et Linux y sont alors attachés.
+# la release et son tag ; les binaires Windows, macOS et Linux y sont alors attachés
+# (build.yml).
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
+# Rien par défaut : chaque job demande seulement ce qu'il utilise.
+permissions: {}
 
 concurrency:
   group: release
   cancel-in-progress: false
 
-env:
-  CARGO_TERM_COLOR: always
-
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     outputs:
       created: ${{ steps.rp.outputs.release_created }}
       tag: ${{ steps.rp.outputs.tag_name }}
       pr: ${{ steps.rp.outputs.pr }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: rp
         with:
           config-file: release-please-config.json
@@ -35,14 +35,24 @@ jobs:
 
   # La PR de release change la version dans Cargo.toml : on aligne Cargo.lock
   # dans la même PR, sinon le premier `cargo build` le modifierait chez chacun.
+  # Puis on lance ses checks : une PR ouverte ou poussée avec le GITHUB_TOKEN ne
+  # déclenche aucun workflow, et les checks obligatoires bloqueraient la fusion.
   lockfile:
     needs: release-please
     if: needs.release-please.outputs.pr != '' && needs.release-please.outputs.created != 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    env:
+      BRANCH: ${{ fromJSON(needs.release-please.outputs.pr).headBranchName }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ fromJSON(needs.release-please.outputs.pr).headBranchName }}
+          ref: ${{ env.BRANCH }}
+          persist-credentials: false
       # Rust est déjà installé sur les runners Ubuntu : pas de toolchain à poser.
       - run: cargo update --workspace
       - name: Commit Cargo.lock
@@ -51,138 +61,48 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -am "chore: Cargo.lock à la version de la release"
+          gh auth setup-git
           git push
+      - name: Checks de la PR de release
+        run: |
+          gh workflow run ci.yml --ref "$BRANCH"
+          gh workflow run release-check.yml --ref "$BRANCH"
 
-  # Coût : les minutes macOS sont facturées 10 fois, Windows 2 fois celles de
-  # Linux (dépôts privés ; gratuites pour un dépôt public). D'où :
-  # - un seul job macOS pour les deux architectures : un runner au lieu de deux,
-  #   et les scripts de build et macros procédurales compilés une seule fois ;
-  # - installeur et winget dans le job Windows : pas de runner Windows de plus,
-  #   chacun facturé à la minute entamée.
   build:
     needs: release-please
     if: needs.release-please.outputs.created == 'true'
-    name: build (${{ matrix.name }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            name: windows-x64
-            targets: x86_64-pc-windows-msvc
-            toolchain-targets: x86_64-pc-windows-msvc
-          # Mac Intel compilé depuis le runner Apple Silicon (le SDK de Xcode
-          # contient les deux architectures).
-          - os: macos-latest
-            name: macos
-            targets: aarch64-apple-darwin x86_64-apple-darwin
-            toolchain-targets: aarch64-apple-darwin,x86_64-apple-darwin
-          # 22.04 : glibc plus ancienne, le binaire tourne sur plus de distributions.
-          - os: ubuntu-22.04
-            name: linux-x64
-            targets: x86_64-unknown-linux-gnu
-            toolchain-targets: x86_64-unknown-linux-gnu
-    runs-on: ${{ matrix.os }}
-    env:
-      TAG: ${{ needs.release-please.outputs.tag }}
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.release-please.outputs.tag }}
-      - name: Dépendances système (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libfontconfig1-dev libxkbcommon-dev
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.toolchain-targets }}
-      # Dépendances seulement (pas le code du dépôt). Cargo.lock change à chaque
-      # release (version du workspace) : la clé exacte ne correspond jamais, le
-      # cache de la release précédente est repris s'il a moins de 7 jours.
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: release-${{ matrix.name }}
-      - name: Compilation, paquet et empreinte
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir dist
-          for target in ${{ matrix.targets }}; do
-            cargo build --release --locked --target "$target"
-            case "$target" in
-              x86_64-pc-windows-msvc) asset=boringwindows-windows-x64.exe
-                cp "target/$target/release/boringwindows.exe" "dist/$asset" ;;
-              aarch64-apple-darwin) asset=boringwindows-macos-arm64.tar.gz ;;
-              x86_64-apple-darwin) asset=boringwindows-macos-x64.tar.gz ;;
-              x86_64-unknown-linux-gnu) asset=boringwindows-linux-x64.tar.gz ;;
-            esac
-            [ -f "dist/$asset" ] || tar -czf "dist/$asset" -C "target/$target/release" boringwindows
-            if command -v sha256sum >/dev/null; then
-              (cd dist && sha256sum "$asset" > "$asset.sha256")
-            else
-              (cd dist && shasum -a 256 "$asset" > "$asset.sha256")
-            fi
-            cat "dist/$asset.sha256"
-          done
-      - name: Ajout à la release
-        shell: bash
-        run: gh release upload "$TAG" dist/* --clobber
-
-      # Installeur Windows (Inno Setup). Un échec ici ne bloque pas la release :
-      # le .exe seul reste disponible.
-      - name: Installeur (Inno Setup)
-        id: installer
-        if: runner.os == 'Windows'
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
-          if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
-          if (-not (Test-Path $iscc)) {
-            choco install innosetup -y --no-progress
-            $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          }
-          $version = $env:TAG.TrimStart('v')
-          & $iscc "/DAppVersion=$version" "/DSourceExe=$PWD\dist\boringwindows-windows-x64.exe" installer\boringwindows.iss
-          if ($LASTEXITCODE -ne 0) { throw "iscc a échoué" }
-          $setup = "installer\Output\boringwindows-windows-x64-setup.exe"
-          $hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
-          "$hash  boringwindows-windows-x64-setup.exe" | Set-Content -Encoding ascii "$setup.sha256"
-          gh release upload $env:TAG $setup "$setup.sha256" --clobber
-
-      # winget : met à jour le paquet Yazouv.BoringWindows (le premier dépôt du
-      # paquet se fait à la main, voir packaging/README.md). Sans jeton, rien ne se passe.
-      - name: winget
-        if: runner.os == 'Windows' && steps.installer.outcome == 'success'
-        continue-on-error: true
-        shell: pwsh
-        env:
-          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
-        run: |
-          if (-not $env:WINGET_TOKEN) { Write-Host "WINGET_TOKEN absent : publication winget ignorée."; exit 0 }
-          $version = $env:TAG.TrimStart('v')
-          $url = "https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/boringwindows-windows-x64-setup.exe"
-          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
-          .\wingetcreate.exe update Yazouv.BoringWindows --version $version --urls $url --submit --token $env:WINGET_TOKEN
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/build.yml
+    with:
+      ref: ${{ needs.release-please.outputs.tag }}
+      tag: ${{ needs.release-please.outputs.tag }}
+    secrets:
+      WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
 
   # Liens de téléchargement en tête des notes de version.
   notes:
     needs: [release-please, build]
     if: ${{ !cancelled() && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Téléchargements dans les notes
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.release-please.outputs.tag }}
         run: |
           # L'installeur peut manquer (son étape n'est pas bloquante).
           INSTALLER=""
-          if gh release view "$TAG" --repo "${{ github.repository }}" --json assets -q '.assets[].name' | grep -qx boringwindows-windows-x64-setup.exe; then
+          if gh release view "$TAG" --json assets -q '.assets[].name' | grep -qx boringwindows-windows-x64-setup.exe; then
             INSTALLER=success
           fi
-          base="https://github.com/${{ github.repository }}/releases/download/$TAG"
-          body=$(gh release view "$TAG" --repo "${{ github.repository }}" --json body -q .body)
+          base="https://github.com/$GH_REPO/releases/download/$TAG"
+          body=$(gh release view "$TAG" --json body -q .body)
           win_rows="| Windows 10/11 (x64) | [boringwindows-windows-x64.exe]($base/boringwindows-windows-x64.exe) |"
           if [ "$INSTALLER" = "success" ]; then
             win_rows="| Windows 10/11 (x64), installeur | [boringwindows-windows-x64-setup.exe]($base/boringwindows-windows-x64-setup.exe) |
@@ -199,9 +119,10 @@ jobs:
           | Linux (x64) | [boringwindows-linux-x64.tar.gz]($base/boringwindows-linux-x64.tar.gz) |
 
           Déjà installé ? BoringWindows se met à jour tout seul (Réglages › Général).
-          Chaque fichier a son empreinte \`.sha256\`. macOS : binaire non signé, voir
+          Chaque fichier a son empreinte \`.sha256\` et une attestation de provenance :
+          \`gh attestation verify <fichier> --repo $GH_REPO\`. macOS : binaire non signé, voir
           la [documentation](https://yazouv.github.io/BoringWindows/installation.html).
 
           NOTES
           printf '%s\n' "$body" >> notes.md
-          gh release edit "$TAG" --repo "${{ github.repository }}" --notes-file notes.md
+          gh release edit "$TAG" --notes-file notes.md

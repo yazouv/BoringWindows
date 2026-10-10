@@ -3,7 +3,7 @@
 ## Installeur (Inno Setup)
 
 `installer/boringwindows.iss` est compilé par le job Windows (étape « Installeur ») de
-`.github/workflows/release.yml` à chaque release et attaché sous
+`.github/workflows/build.yml` à chaque release et attaché sous
 `boringwindows-windows-x64-setup.exe` (+ `.sha256`). En local :
 
 ```powershell

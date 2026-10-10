@@ -1,22 +1,26 @@
 name: CI
 
-# Format, clippy et tests.
+# Format, clippy, tests (Linux, Windows, macOS), failles des dépendances et
+# messages de commit. Les jobs de ce fichier sont les checks obligatoires de
+# la règle « Protect Main » : un renommage de job doit y être reporté.
 #
-# Runner : le runner auto-hébergé (`self-hosted`) pour main et les PR venant de
-# ce dépôt. Son dossier de compilation est conservé d'un run à l'autre : seuls
-# les fichiers modifiés sont recompilés, sans cache à télécharger.
-# Les PR venant de forks tournent sur les runners de GitHub : le dépôt est
-# public, et un runner auto-hébergé exécuterait le code de n'importe qui sur
-# la machine qui l'héberge.
+# Uniquement des runners de GitHub (gratuits pour un dépôt public). Pas de
+# runner auto-hébergé : le dépôt est public, et une PR de fork peut modifier
+# ce fichier pour y exécuter n'importe quoi.
 on:
-  # Toujours sur les PR (un check obligatoire doit pouvoir passer) ; sur main,
-  # pas pour la doc seule.
   pull_request:
     branches: [main]
   push:
     branches: [main]
     paths-ignore: ["docs/**", "**.md"]
+  # Lancé aussi par release.yml sur la PR de release : une PR ouverte avec le
+  # GITHUB_TOKEN ne déclenche aucun workflow, et ses checks obligatoires
+  # resteraient en attente.
   workflow_dispatch:
+  # Chaque lundi : nouvelles failles publiées (RustSec) et nouveaux lints de
+  # la dernière version stable de Rust, sans attendre la prochaine PR.
+  schedule:
+    - cron: "23 5 * * 1"
 
 # Lecture seule : les PR venant de forks n'ont accès à rien d'autre.
 permissions:
@@ -24,58 +28,104 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   check:
-    # Les PR de release-please ne changent que la version, le CHANGELOG et
-    # Cargo.lock : le code a déjà été vérifié sur sa propre PR. Job sauté
-    # (compté comme réussi si le check est obligatoire).
-    if: ${{ !startsWith(github.head_ref, 'release-please--') }}
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'self-hosted' || 'ubuntu-latest' }}
-    env:
-      # Auto-hébergé : compilation hors du dossier de travail (que `checkout`
-      # nettoie), conservée entre les runs.
-      CARGO_TARGET_DIR: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && format('{0}/../bw-target', github.workspace) || format('{0}/target', github.workspace) }}
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Dépendances système (Linux)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          if command -v cc >/dev/null && pkg-config --exists fontconfig xkbcommon 2>/dev/null; then exit 0; fi
-          packages="build-essential pkg-config libfontconfig1-dev libxkbcommon-dev curl ca-certificates git"
-          # `-n` : jamais d'invite de mot de passe (le job échoue au lieu d'attendre).
-          if ! sudo -n true 2>/dev/null; then
-            echo "::error title=Runner incomplet::Il manque des paquets sur le runner et sudo demande un mot de passe. Installe-les une fois, en root sur la machine du runner : apt-get update && apt-get install -y $packages"
-            exit 1
-          fi
-          sudo -n apt-get update
-          sudo -n apt-get install -y --no-install-recommends $packages
-
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
+      - name: Dépendances système
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libfontconfig1-dev libxkbcommon-dev
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: stable
           components: clippy, rustfmt
           # Depuis Linux, clippy vérifie aussi les types pour Windows et macOS.
-          targets: ${{ runner.os == 'Linux' && 'x86_64-pc-windows-msvc, aarch64-apple-darwin' || '' }}
-
-      # Cache seulement sur les runners de GitHub (machines neuves à chaque run).
-      - uses: Swatinem/rust-cache@v2
-        if: runner.environment == 'github-hosted'
+          targets: x86_64-pc-windows-msvc, aarch64-apple-darwin
+      # Écrit depuis main seulement : les PR le relisent sans le polluer.
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - run: cargo fmt --all --check
-      - name: clippy (système du runner)
+      - name: clippy (Linux)
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: clippy (Windows)
-        if: runner.os == 'Linux'
         run: cargo clippy --workspace --all-targets --locked --target x86_64-pc-windows-msvc -- -D warnings
       - name: clippy (macOS)
-        if: runner.os == 'Linux'
         run: cargo clippy --workspace --all-targets --locked --target aarch64-apple-darwin -- -D warnings
       - run: cargo test --workspace --locked
+
+  # Tests sur les vrais systèmes : `check` ne fait que vérifier les types pour
+  # Windows et macOS, et tout le code Win32/WinRT n'est testé qu'ici.
+  # Runners de GitHub, gratuits pour un dépôt public.
+  test:
+    name: test (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows
+          - os: macos-latest
+            name: macos
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo test --workspace --locked
+
+  # Failles connues (RustSec) et provenance des dépendances (crates.io
+  # seulement). Configuration : deny.toml.
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          command: check
+          command-arguments: advisories sources
+
+  # release-please calcule la version et le CHANGELOG à partir des messages de
+  # commit : un message hors Conventional Commits disparaît du CHANGELOG.
+  # Sauté hors PR (compté comme réussi pour le check obligatoire).
+  commits:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Conventional Commits
+        shell: bash
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          types='feat|fix|perf|docs|refactor|ci|chore|test|build|style|revert'
+          bad=0
+          while IFS= read -r line; do
+            sha=${line%% *}; subject=${line#* }
+            if ! grep -qE "^($types)(\([^)]+\))?!?: .+" <<<"$subject"; then
+              echo "::error title=Message de commit::$sha ne suit pas Conventional Commits (type: description, types : ${types//|/, })"
+              echo "  $sha $subject"
+              bad=1
+            fi
+          done < <(git log --no-merges --format='%h %s' "$BASE..$HEAD")
+          exit $bad

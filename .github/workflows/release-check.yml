@@ -1,0 +1,34 @@
+name: Release (essai)
+
+# Compile la release comme release.yml (build.yml), sans rien publier : les
+# binaires et l'installeur restent 7 jours en artefacts du run.
+# - sur les PR qui touchent la compilation de la release ou les dépendances ;
+# - sur la PR de release, lancé par release.yml (job `lockfile`) ;
+# - à la main (Actions › Release (essai) › Run workflow), sur n'importe quelle
+#   branche, pour récupérer un binaire de test.
+# Pas un check obligatoire : il ne tourne pas sur toutes les PR.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/build.yml"
+      - ".github/workflows/release.yml"
+      - ".github/workflows/release-check.yml"
+      - "installer/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "**/build.rs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    with:
+      ref: ${{ github.event.pull_request.head.sha || github.sha }}
