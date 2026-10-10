@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.6.0](https://github.com/yazouv/BoringWindows/compare/v0.5.0...v0.6.0) (2026-10-10)
+
+
+### Nouveautés
+
+* île vivante (onglets qui glissent, carrousel, mascotte interactive, bulle détachée) ([8d9e53e](https://github.com/yazouv/BoringWindows/commit/8d9e53e175ed78359aa2a3b66ee83f7f7b11a1e8))
+* île vivante (onglets qui glissent, carrousel, mascotte interactive, bulle détachée) ([c1e83bd](https://github.com/yazouv/BoringWindows/commit/c1e83bda15f62843c5a01a6663fbfc7007f138a5))
+
+
+### Corrections
+
+* plus de coordonnées, de lien complet ni d'identifiant de session dans les journaux ([b46c419](https://github.com/yazouv/BoringWindows/commit/b46c41993147244fad5cc8d6b80b9acac640ce7c))
+* plus de coordonnées, de lien complet ni d'identifiant de session dans les journaux ([0445d54](https://github.com/yazouv/BoringWindows/commit/0445d5499278a74c5d0d20618bdf0aa198c1c191))
+
 ## [0.5.0](https://github.com/yazouv/BoringWindows/compare/v0.4.0...v0.5.0) (2026-10-10)
 
 
