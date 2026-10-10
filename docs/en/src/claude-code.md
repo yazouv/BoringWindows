@@ -100,8 +100,8 @@ and does nothing: **Claude is never blocked**.
 Open the island and click the **Claude** tab (top right): it shows
 
 - an **estimate of your usage** over the current 5-hour window, with the time
-  until it renews (and a gauge if you set a limit);
-- your **4 latest conversations** (title, folder, age). Click one to reopen it: a
+  until it renews (and a round gauge if you set a limit);
+- your **4 latest conversations**, as cards (title, folder, age). Click one to reopen it: a
   terminal opens in its folder and runs `claude --resume <id>`.
 
 It is read from the transcripts Claude Code keeps locally

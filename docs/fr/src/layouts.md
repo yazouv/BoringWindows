@@ -45,11 +45,11 @@ que tu ne déclares pas sont ignorés.
 | `has-media-art`, `media-art` | bool, image | pochette |
 | `media-multi-source`, `media-can-previous`, `media-can-next`, `media-can-toggle`, `media-can-seek` | bool | ce que le lecteur permet |
 | `has-prompt`, `prompt-id`, `prompt-project`, `prompt-tool`, `prompt-detail` | bool, string | demande d'autorisation de Claude Code |
-| `claude-rows` | `[{ id, project, status: string, urgent, active: bool }]` | sessions Claude Code |
+| `claude-rows` | `[{ id, project, status, kind: string, urgent, active: bool }]` | sessions Claude Code (`kind` : `wait`, `work`, `done` ou `idle`) |
 | `agenda-rows` | `[{ title, time, location, relative, join-url: string, has-join, soon: bool }]` | prochains événements |
 | `viz-bars` | `[float]` | niveaux 0 à 1 du visualiseur (vide si éteint) |
 | `shelf-rows`, `shelf-more` | `[{ name, path: string }]`, string | fichiers de l'étagère (4 au plus), « +n » |
-| `recent-rows` | `[{ id, title, meta: string }]` | conversations Claude Code récentes (4 au plus) |
+| `recent-rows` | `[{ id, title, meta, project, ago: string }]` | conversations Claude Code récentes (4 au plus) |
 | `usage-text`, `usage-ratio`, `usage-has-limit` | string, float, bool | consommation estimée, part de la limite (0 à 1) |
 | `plugin-rows` | `[{ name, text: string, attention: int }]` | lignes des plugins WASM (2 au plus) |
 | `has-timer`, `timer-phase`, `timer-time`, `timer-progress`, `timer-presets` | bool, int, string, float, `[string]` | minuteur (phase : 0 prêt, 1 en cours, 2 pause, 3 terminé) |

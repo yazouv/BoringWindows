@@ -566,3 +566,12 @@ msgstr "Ne pas déranger"
 
 msgid "They work in every app. Combine Ctrl, Alt, Shift or Super (Windows key, Cmd on a Mac) with a key: A to Z, 0 to 9, F1 to F24, Space, Up, Down, Left, Right… Leave empty for no shortcut."
 msgstr "Ils marchent dans toutes les applications. Combine Ctrl, Alt, Shift ou Super (touche Windows, Cmd sur Mac) avec une touche : A à Z, 0 à 9, F1 à F24, Space, Up, Down, Left, Right… Laisse vide pour aucun raccourci."
+
+msgid "tokens"
+msgstr "tokens"
+
+msgid "resets in {}"
+msgstr "reset dans {}"
+
+msgid "No active usage window"
+msgstr "Aucune fenêtre de consommation en cours"

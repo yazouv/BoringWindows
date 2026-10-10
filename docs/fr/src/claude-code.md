@@ -101,8 +101,9 @@ rien faire : **Claude n'est jamais bloqué**.
 Ouvre l'île et clique sur l'onglet **Claude** (en haut à droite) : il affiche
 
 - une **estimation de ta consommation** sur la fenêtre de 5 h en cours, avec le
-  temps avant son renouvellement (et une jauge si tu fixes une limite) ;
-- tes **4 dernières conversations** (titre, dossier, ancienneté). Un clic rouvre
+  temps avant son renouvellement (et une jauge circulaire si tu fixes une
+  limite) ;
+- tes **4 dernières conversations**, en cartes (titre, dossier, ancienneté). Un clic rouvre
   la conversation : un terminal s'ouvre dans son dossier et lance
   `claude --resume <id>`.
 

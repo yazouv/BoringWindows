@@ -968,12 +968,28 @@ impl Controller {
                     r.title.as_str().into()
                 },
                 meta: format!("{} · {}", r.project, ago(r.last_at, now)).into(),
+                project: r.project.as_str().into(),
+                ago: ago(r.last_at, now).into(),
             })
             .collect();
         self.ui.set_recent_rows(ModelRc::new(VecModel::from(rows)));
 
         let usage = &snapshot.usage;
         let limit = snapshot.limit_tokens;
+        self.ui.set_usage_active(usage.window_end.is_some());
+        self.ui.set_usage_used(compact_tokens(usage.tokens).into());
+        self.ui.set_usage_limit(if limit > 0 {
+            compact_tokens(limit).into()
+        } else {
+            Default::default()
+        });
+        self.ui.set_usage_reset(
+            usage
+                .window_end
+                .map(|end| duration_text((end - now).to_std().unwrap_or_default()))
+                .unwrap_or_default()
+                .into(),
+        );
         self.ui.set_usage_text(match usage.window_end {
             Some(end) => {
                 let h = config.window_hours;
@@ -1469,12 +1485,21 @@ impl Controller {
             };
             let mut sessions: Vec<_> = s.sessions.iter().collect();
             sessions.sort_by_key(|s| rank(s.kind));
-            claude.extend(sessions.into_iter().map(|s| ClaudeRow {
-                id: s.id.as_str().into(),
-                project: s.project.as_str().into(),
-                status: s.status.as_str().into(),
-                urgent: rank(s.kind) == 0,
-                active: s.kind != SessionKind::Idle,
+            claude.extend(sessions.into_iter().map(|s| {
+                ClaudeRow {
+                    id: s.id.as_str().into(),
+                    project: s.project.as_str().into(),
+                    status: s.status.as_str().into(),
+                    urgent: rank(s.kind) == 0,
+                    active: s.kind != SessionKind::Idle,
+                    kind: match s.kind {
+                        SessionKind::Permission | SessionKind::NeedsYou => "wait",
+                        SessionKind::Working => "work",
+                        SessionKind::Done => "done",
+                        SessionKind::Idle => "idle",
+                    }
+                    .into(),
+                }
             }));
         }
 

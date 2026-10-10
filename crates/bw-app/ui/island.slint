@@ -11,6 +11,8 @@ export struct ClaudeRow {
     status: string,
     urgent: bool,
     active: bool,
+    /// wait | work | done | idle
+    kind: string,
 }
 
 export struct ClaudePrompt {
@@ -33,7 +35,10 @@ export struct AgendaRow {
 export struct RecentRow {
     id: string,
     title: string,
+    /// « projet · il y a 2 h » (vues personnelles) ; `project` et `ago` séparés.
     meta: string,
+    project: string,
+    ago: string,
 }
 
 export struct PluginRow {
@@ -863,6 +868,104 @@ component Avatar inherits Rectangle {
     }
 }
 
+// Pastille d'état d'une session Claude : irisée (comme le halo) quand il
+// travaille, « ! » quand il attend, coche quand il a fini, grise au repos.
+component ClaudeBadge inherits Rectangle {
+    // wait | work | done | idle
+    in property <string> kind;
+    in property <color> ink;
+    in property <color> accent;
+    in property <color> ok;
+    // Dégradé du halo (tourne avec lui).
+    in property <brush> iris;
+    width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    background: root.kind == "work" ? root.iris
+        : root.kind == "wait" ? root.accent
+        : root.kind == "done" ? root.ok : root.ink.with-alpha(0.16);
+
+    if root.kind == "work": Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        background: white.with-alpha(0.92);
+    }
+
+    if root.kind == "wait": Text {
+        text: "!";
+        color: white;
+        font-size: 12px;
+        font-weight: 900;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    if root.kind == "done": Path {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: 11px;
+        height: 11px;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        fill: transparent;
+        stroke: white;
+        stroke-width: 2.4px;
+        commands: "M4 12.5 L9.5 18 L20 6.5";
+    }
+
+    if root.kind == "idle": Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: 6px;
+        height: 6px;
+        border-radius: 3px;
+        background: root.ink.with-alpha(0.55);
+    }
+}
+
+// Jauge circulaire : un arc de 0 à `ratio` (sens horaire depuis le haut), qui
+// se remplit à l'apparition.
+component UsageRing inherits Rectangle {
+    in property <float> ratio;
+    in property <color> ink;
+    in property <color> track;
+    // Couleur du disque central (le fond de l'île).
+    in property <color> hole;
+    in property <string> label;
+    in property <color> label-color;
+    width: 60px;
+    height: 60px;
+    border-radius: self.width / 2;
+
+    property <bool> grown;
+    init => { self.grown = true; }
+    property <float> fill: self.grown ? clamp(root.ratio, 0, 1) : 0;
+    animate fill { duration: 700ms; delay: 120ms; easing: ease-out-quint; }
+    property <angle> end: root.fill * 360deg;
+    background: @conic-gradient(root.ink 0deg, root.ink root.end, root.track root.end, root.track 360deg);
+
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: parent.width - 12px;
+        height: self.width;
+        border-radius: self.width / 2;
+        background: root.hole;
+
+        Text {
+            text: root.label;
+            color: root.label-color;
+            font-size: 14px;
+            font-weight: 800;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}
+
 component TabChip inherits Rectangle {
     in property <string> text;
     in property <bool> active;
@@ -956,6 +1059,12 @@ export component Island inherits Window {
     in-out property <int> tab;
     in property <[RecentRow]> recent-rows;
     in property <string> usage-text;
+    // Carte de consommation : fenêtre en cours, jetons utilisés, limite et
+    // temps avant la remise à zéro.
+    in property <bool> usage-active;
+    in property <string> usage-used;
+    in property <string> usage-limit;
+    in property <string> usage-reset;
     in property <float> usage-ratio;
     in property <bool> usage-has-limit;
     callback recent-open(string /* id de session */);
@@ -1036,6 +1145,8 @@ export component Island inherits Window {
     property <color> glow-b: #B57CFF;
     property <color> glow-c: #FF7AB6;
     property <color> glow-d: #FFB86B;
+    // Dégradé irisé du halo, qui tourne avec lui (pastilles des sessions).
+    property <brush> iris: @conic-gradient(from root.glow-t * 110deg, root.glow-a 0deg, root.glow-b 90deg, root.glow-c 180deg, root.glow-d 270deg, root.glow-a 360deg);
     // Temps du halo (s) et avancée de la vague de fin (0 à 1, 1 : finie).
     property <float> glow-t;
     property <float> sweep: 1;
@@ -2197,41 +2308,58 @@ export component Island inherits Window {
                             }
                         }
 
-                        // Sessions Claude Code en cours (clic : ramène le terminal).
+                        // Sessions Claude Code en cours, en pastilles (clic : ramène
+                        // le terminal) ; celle qui t'attend est teintée de l'accent.
                         if !root.has-prompt && root.claude-rows.length > 0: VerticalLayout {
                             spacing: 2px;
 
                             for row in root.claude-rows: Rectangle {
                                 height: 24px;
-                                border-radius: 6px;
-                                background: row-ta.has-hover ? root.fg.with-alpha(0.08) : transparent;
+                                border-radius: 8px;
+                                background: row.kind == "wait" ? root.accent.with-alpha(row-ta.has-hover ? 0.24 : 0.14)
+                                    : root.fg.with-alpha(row-ta.has-hover ? 0.1 : 0.05);
+                                animate background { duration: 120ms; }
 
                                 HorizontalLayout {
-                                    padding-left: 6px;
-                                    padding-right: 6px;
+                                    padding-left: 4px;
+                                    padding-right: 8px;
                                     spacing: 8px;
 
-                                    Dot {
+                                    ClaudeBadge {
                                         y: (parent.height - self.height) / 2;
-                                        background: row.urgent ? root.accent
-                                            : row.active ? root.fg.with-alpha(0.7) : root.fg.with-alpha(0.25);
+                                        kind: row.kind;
+                                        ink: root.fg;
+                                        accent: root.accent;
+                                        ok: root.ok-color;
+                                        iris: root.iris;
                                     }
 
                                     Text {
                                         text: row.project;
                                         color: root.fg;
-                                        font-size: 13px;
-                                        font-weight: 600;
+                                        font-size: 12.5px;
+                                        font-weight: 650;
                                         vertical-alignment: center;
                                     }
 
                                     Text {
                                         text: row.status;
-                                        color: row.urgent ? root.accent : root.fg.with-alpha(0.6);
-                                        font-size: 13px;
+                                        color: row.kind == "wait" ? root.accent : root.fg.with-alpha(0.6);
+                                        font-size: 12px;
                                         vertical-alignment: center;
                                         overflow: elide;
                                         horizontal-stretch: 1;
+                                    }
+
+                                    // Au survol : on peut y aller.
+                                    Text {
+                                        text: "›";
+                                        color: root.fg.with-alpha(0.7);
+                                        font-size: 16px;
+                                        font-weight: 600;
+                                        vertical-alignment: center;
+                                        opacity: row-ta.has-hover ? 1 : 0;
+                                        animate opacity { duration: 120ms; }
                                     }
                                 }
 
@@ -2250,103 +2378,216 @@ export component Island inherits Window {
                     }
                 }
 
-                // Onglet Claude : consommation estimée et conversations récentes.
-                if root.tab == 1: VerticalLayout {
-                    spacing: 3px;
-                    alignment: start;
+                // Onglet Claude : carte de consommation (jauge circulaire) et
+                // conversations récentes en cartes (clic : la reprendre).
+                if root.tab == 1: HorizontalLayout {
+                    spacing: 10px;
                     vertical-stretch: 1;
 
-                    Text {
-                        text: root.usage-text;
-                        color: root.fg.with-alpha(0.8);
-                        font-size: 12px;
-                        overflow: elide;
-                    }
+                    Rectangle {
+                        width: 128px;
+                        border-radius: 14px;
+                        border-width: 1px;
+                        border-color: root.fg.with-alpha(0.07);
+                        background: @linear-gradient(160deg, root.accent.with-alpha(0.18) 0%, root.fg.with-alpha(0.04) 75%);
 
-                    if root.usage-has-limit: Rectangle {
-                        height: 4px;
-                        border-radius: 2px;
-                        background: root.fg.with-alpha(0.15);
+                        VerticalLayout {
+                            padding: 8px;
+                            spacing: 4px;
+                            alignment: center;
 
-                        Rectangle {
-                            x: 0;
-                            width: parent.width * clamp(root.usage-ratio, 0, 1);
-                            border-radius: 2px;
-                            background: root.usage-ratio > 0.85 ? root.alert-color : root.accent;
-                        }
-                    }
+                            // Avec une limite : la part utilisée, en jauge.
+                            if root.usage-active && root.usage-has-limit: HorizontalLayout {
+                                alignment: center;
 
-                    for item in root.recent-rows: Rectangle {
-                        height: 20px;
-                        border-radius: 6px;
-                        background: recent-ta.has-hover ? root.fg.with-alpha(0.12) : transparent;
+                                UsageRing {
+                                    ratio: root.usage-ratio;
+                                    ink: root.usage-ratio > 0.85 ? root.alert-color : root.accent;
+                                    track: root.fg.with-alpha(0.12);
+                                    hole: root.bg.with-alpha(1);
+                                    label: Math.round(clamp(root.usage-ratio, 0, 9.99) * 100) + "%";
+                                    label-color: root.fg;
+                                }
+                            }
 
-                        recent-ta := TouchArea {
-                            clicked => { root.recent-open(item.id); }
-                        }
-
-                        HorizontalLayout {
-                            padding-left: 8px;
-                            padding-right: 8px;
-                            spacing: 10px;
-
-                            Text {
-                                text: item.title;
+                            // Sans limite : les jetons en grand.
+                            if root.usage-active && !root.usage-has-limit: Text {
+                                text: root.usage-used;
                                 color: root.fg;
-                                font-size: 12px;
-                                vertical-alignment: center;
-                                overflow: elide;
-                                horizontal-stretch: 1;
+                                font-size: 26px;
+                                font-weight: 800;
+                                horizontal-alignment: center;
                             }
 
-                            Text {
-                                text: item.meta;
-                                color: root.fg.with-alpha(0.5);
+                            if root.usage-active: Text {
+                                text: root.usage-has-limit ? root.usage-used + " / " + root.usage-limit : @tr("tokens");
+                                color: root.fg.with-alpha(0.8);
                                 font-size: 11px;
-                                vertical-alignment: center;
-                                horizontal-alignment: right;
+                                font-weight: 600;
+                                horizontal-alignment: center;
+                                overflow: elide;
+                            }
+
+                            if root.usage-active: Text {
+                                text: @tr("resets in {}", root.usage-reset);
+                                color: root.fg.with-alpha(0.5);
+                                font-size: 10.5px;
+                                horizontal-alignment: center;
+                                overflow: elide;
+                            }
+
+                            if !root.usage-active: Text {
+                                text: @tr("No active usage window");
+                                color: root.fg.with-alpha(0.55);
+                                font-size: 11px;
+                                wrap: word-wrap;
+                                horizontal-alignment: center;
                             }
                         }
                     }
 
-                    if root.recent-rows.length == 0: Text {
-                        text: @tr("No conversation found");
-                        color: root.fg.with-alpha(0.5);
-                        font-size: 12px;
+                    // Deux colonnes de cartes, qui arrivent l'une après l'autre.
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        property <length> gap: 8px;
+                        property <length> cw: (self.width - self.gap) / 2;
+                        property <length> ch: (self.height - self.gap) / 2;
+
+                        for item[i] in root.recent-rows: Rectangle {
+                            property <bool> shown;
+                            init => { self.shown = true; }
+                            x: Math.mod(i, 2) * (parent.cw + parent.gap);
+                            y: Math.floor(i / 2) * (parent.ch + parent.gap) + (self.shown ? 0px : 8px);
+                            width: parent.cw;
+                            height: parent.ch;
+                            opacity: self.shown ? 1 : 0;
+                            animate opacity, y { duration: 280ms; delay: i * 50ms; easing: ease-out-quint; }
+                            border-radius: 12px;
+                            border-width: 1px;
+                            border-color: recent-ta.has-hover ? root.accent.with-alpha(0.55) : root.fg.with-alpha(0.06);
+                            background: root.fg.with-alpha(recent-ta.has-hover ? 0.1 : 0.05);
+                            animate border-color, background { duration: 150ms; }
+
+                            recent-ta := TouchArea {
+                                clicked => { root.recent-open(item.id); }
+                            }
+
+                            VerticalLayout {
+                                padding: 7px;
+                                padding-left: 10px;
+                                padding-right: 10px;
+                                spacing: 2px;
+
+                                HorizontalLayout {
+                                    spacing: 5px;
+
+                                    Rectangle {
+                                        width: 6px;
+                                        height: 6px;
+                                        y: (parent.height - self.height) / 2;
+                                        border-radius: 3px;
+                                        background: root.accent;
+                                    }
+
+                                    Text {
+                                        text: item.project;
+                                        color: root.fg.with-alpha(0.6);
+                                        font-size: 10.5px;
+                                        font-weight: 600;
+                                        overflow: elide;
+                                        horizontal-stretch: 1;
+                                    }
+
+                                    Text {
+                                        text: item.ago;
+                                        color: root.fg.with-alpha(0.4);
+                                        font-size: 10.5px;
+                                    }
+                                }
+
+                                Text {
+                                    text: item.title;
+                                    color: root.fg;
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    wrap: word-wrap;
+                                    overflow: elide;
+                                    vertical-stretch: 1;
+                                }
+                            }
+
+                            // Reprendre : un bouton lecture au survol.
+                            Rectangle {
+                                x: parent.width - self.width - 6px;
+                                y: parent.height - self.height - 6px;
+                                width: 20px;
+                                height: 20px;
+                                border-radius: 10px;
+                                background: root.accent;
+                                opacity: recent-ta.has-hover ? 1 : 0;
+                                animate opacity { duration: 150ms; }
+
+                                Path {
+                                    x: 7px;
+                                    y: 5.5px;
+                                    width: 8px;
+                                    height: 9px;
+                                    viewbox-width: 8;
+                                    viewbox-height: 9;
+                                    fill: white;
+                                    commands: "M0 0 L8 4.5 L0 9 Z";
+                                }
+                            }
+                        }
+
+                        if root.recent-rows.length == 0: Text {
+                            width: parent.width;
+                            height: parent.height;
+                            text: @tr("No conversation found");
+                            color: root.fg.with-alpha(0.5);
+                            font-size: 12px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
                     }
                 }
 
-                // Onglet des notifications : les dernières, un clic ouvre l'application.
-                if root.tab == 2: VerticalLayout {
-                    spacing: 2px;
-                    alignment: start;
+                // Onglet des notifications : des cartes sur deux colonnes, à la
+                // couleur de l'application. Un clic ouvre l'application, × la retire.
+                if root.tab == 2: Rectangle {
                     vertical-stretch: 1;
+                    property <length> gap: 8px;
+                    property <length> cw: (self.width - self.gap) / 2;
+                    property <length> ch: (self.height - self.gap) / 2;
 
-                    if root.dnd: Text {
-                        height: 22px;
-                        text: @tr("Do not disturb: notifications arrive here without popping up");
-                        color: root.accent;
-                        font-size: 12px;
-                        vertical-alignment: center;
-                        overflow: elide;
-                    }
-
-                    for item in root.notif-rows: Rectangle {
-                        height: 26px;
-                        border-radius: 8px;
-                        background: notif-ta.has-hover || close-ta.has-hover ? root.fg.with-alpha(0.08) : transparent;
+                    for item[i] in root.notif-rows: Rectangle {
+                        property <bool> shown;
+                        property <bool> hover: notif-ta.has-hover || close-ta.has-hover;
+                        init => { self.shown = true; }
+                        x: Math.mod(i, 2) * (parent.cw + parent.gap);
+                        y: Math.floor(i / 2) * (parent.ch + parent.gap) + (self.shown ? 0px : 8px);
+                        width: parent.cw;
+                        height: parent.ch;
+                        opacity: self.shown ? 1 : 0;
+                        animate opacity, y { duration: 280ms; delay: i * 50ms; easing: ease-out-quint; }
+                        border-radius: 14px;
+                        border-width: 1px;
+                        border-color: item.tint.with-alpha(self.hover ? 0.6 : 0.25);
+                        background: @linear-gradient(120deg, item.tint.with-alpha(self.hover ? 0.32 : 0.2) 0%, root.fg.with-alpha(0.04) 75%);
+                        clip: true;
 
                         notif-ta := TouchArea {
                             clicked => { root.notif-action("open:" + item.id); }
                         }
 
                         HorizontalLayout {
-                            padding-left: 6px;
-                            padding-right: 4px;
-                            spacing: 8px;
+                            padding: 8px;
+                            padding-left: 9px;
+                            padding-right: 10px;
+                            spacing: 9px;
 
                             Avatar {
-                                size: 18px;
+                                size: 30px;
                                 y: (parent.height - self.height) / 2;
                                 initial: item.initial;
                                 tint: item.tint;
@@ -2354,63 +2595,118 @@ export component Island inherits Window {
                                 icon: item.icon;
                             }
 
-                            Text {
-                                text: item.app;
-                                color: item.tint;
-                                font-size: 12px;
-                                font-weight: 700;
-                                vertical-alignment: center;
-                            }
-
-                            if item.title != "": Text {
-                                text: item.title;
-                                color: root.fg;
-                                font-size: 12px;
-                                font-weight: 600;
-                                vertical-alignment: center;
-                                overflow: elide;
-                                max-width: 140px;
-                            }
-
-                            Text {
-                                text: item.body;
-                                color: root.fg.with-alpha(0.6);
-                                font-size: 12px;
-                                vertical-alignment: center;
-                                overflow: elide;
+                            VerticalLayout {
+                                alignment: center;
+                                spacing: 1px;
                                 horizontal-stretch: 1;
-                            }
 
-                            Text {
-                                text: item.ago;
-                                color: root.fg.with-alpha(0.45);
-                                font-size: 11px;
-                                vertical-alignment: center;
-                            }
+                                HorizontalLayout {
+                                    spacing: 6px;
 
-                            Rectangle {
-                                width: 18px;
-                                opacity: notif-ta.has-hover || close-ta.has-hover ? 1 : 0;
+                                    Text {
+                                        text: item.app;
+                                        color: item.tint.brighter(0.25);
+                                        font-size: 10.5px;
+                                        font-weight: 700;
+                                        overflow: elide;
+                                        horizontal-stretch: 1;
+                                    }
+
+                                    Text {
+                                        text: item.ago;
+                                        color: root.fg.with-alpha(0.45);
+                                        font-size: 10px;
+                                    }
+                                }
 
                                 Text {
-                                    text: "×";
-                                    color: close-ta.has-hover ? root.accent : root.fg.with-alpha(0.7);
-                                    font-size: 14px;
-                                    horizontal-alignment: center;
-                                    vertical-alignment: center;
+                                    text: item.title != "" ? item.title : item.body;
+                                    color: root.fg;
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    overflow: elide;
                                 }
 
-                                close-ta := TouchArea {
-                                    clicked => { root.notif-action("remove:" + item.id); }
+                                if item.title != "" && item.body != "": Text {
+                                    text: item.body;
+                                    color: root.fg.with-alpha(0.65);
+                                    font-size: 11px;
+                                    overflow: elide;
                                 }
+                            }
+                        }
+
+                        // × : retirer la notification (au survol).
+                        Rectangle {
+                            x: parent.width - self.width - 5px;
+                            y: 5px;
+                            width: 18px;
+                            height: 18px;
+                            border-radius: 9px;
+                            background: close-ta.has-hover ? root.fg.with-alpha(0.3) : root.bg.with-alpha(0.7);
+                            opacity: parent.hover ? 1 : 0;
+                            animate opacity { duration: 120ms; }
+
+                            Text {
+                                text: "×";
+                                color: root.fg;
+                                font-size: 13px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            close-ta := TouchArea {
+                                clicked => { root.notif-action("remove:" + item.id); }
                             }
                         }
                     }
 
-                    if root.notif-rows.length == 0: Text {
+                    // Ne pas déranger : une carte de plus, à la suite des autres.
+                    if root.dnd: Rectangle {
+                        property <int> i: root.notif-rows.length;
+                        x: Math.mod(self.i, 2) * (parent.cw + parent.gap);
+                        y: Math.floor(self.i / 2) * (parent.ch + parent.gap);
+                        width: parent.cw;
+                        height: parent.ch;
+                        border-radius: 14px;
+                        border-width: 1px;
+                        border-color: root.accent.with-alpha(0.3);
+                        background: root.accent.with-alpha(0.1);
+
+                        HorizontalLayout {
+                            padding: 10px;
+                            spacing: 10px;
+
+                            Path {
+                                width: 20px;
+                                height: 20px;
+                                y: (parent.height - self.height) / 2;
+                                viewbox-width: 24;
+                                viewbox-height: 24;
+                                fill: root.accent;
+                                commands: "M 20.5 14.5 A 9 9 0 1 1 9.5 3.5 A 7 7 0 0 0 20.5 14.5 Z";
+                            }
+
+                            Text {
+                                text: @tr("Do not disturb: notifications arrive here without popping up");
+                                color: root.accent;
+                                font-size: 11.5px;
+                                wrap: word-wrap;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+                        }
+                    }
+
+                    if root.notif-rows.length == 0 && !root.dnd: Text {
+                        width: parent.width;
+                        height: parent.height;
                         text: @tr("No notifications");
                         color: root.fg.with-alpha(0.5);
                         font-size: 12px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
                     }
                 }
             }
@@ -2421,7 +2717,7 @@ export component Island inherits Window {
             property <bool> comet: root.claude-glow != "work" && root.claude-glow != "wait";
             property <brush> ink: root.claude-glow == "wait" ? root.accent
                 : self.comet ? @conic-gradient(from root.sweep * 360deg, transparent 0deg, transparent 200deg, root.ok-color 345deg, transparent 360deg)
-                : @conic-gradient(from root.glow-t * 110deg, root.glow-a 0deg, root.glow-b 90deg, root.glow-c 180deg, root.glow-d 270deg, root.glow-a 360deg);
+                : root.iris;
             opacity: root.claude-glow == "wait" ? 0.55 + 0.45 * Math.sin(root.glow-t * 1.6 * 360deg)
                 : self.comet ? Math.min(1, (1 - root.sweep) * 5) : 1;
 

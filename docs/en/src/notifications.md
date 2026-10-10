@@ -13,8 +13,9 @@ right of the pill.
 Open the island and click the **Notifs** tab (top right), or open the island
 while a notification is showing: it opens straight on that tab.
 
-- The 4 latest notifications, with their age.
-- **Click** a row to land **in the right place**, like clicking the Windows
+- The 4 latest notifications, as cards on two columns in their app's color,
+  with their age.
+- **Click** a card to land **in the right place**, like clicking the Windows
   notification: the right Discord channel, the right Firefox tab, the right
   email… (see below).
 - The **×** that shows on hover clears the notification, from the Windows
