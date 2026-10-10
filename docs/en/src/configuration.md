@@ -51,6 +51,7 @@ name = "Work"
 | `font` | `""` | name of an installed font | island font (empty: system font) |
 | `corner_radius` | from the theme | 0 to 500 | corner rounding of the open island |
 | `blur` | from the theme (`true` in `glass`) | `true` / `false` | blur what is behind the island (Windows 11), visible through a translucent background |
+| `glow` | `true` | `true` / `false` | animated glow around the island while Claude works or waits for you |
 | `system_accent` | `false` | `true` / `false` | Windows accent colour instead of `accent` |
 | `animation_ms` | `240` | 0 to 2000 | animation duration, `0` for none |
 | `top_offset` | `0.0` | 0 to 500 | offset from the top of the screen; above 0, the top corners are rounded too |
@@ -61,7 +62,7 @@ Sizes (in pixels, before Windows scaling):
 |---|---|---|
 | `[theme.compact]` | `width = 190.0`, `height = 32.0` | idle pill |
 | `[theme.attention]` | `width = 300.0`, `height = 36.0` | pill when a module has something to say |
-| `[theme.expanded]` | `width = 520.0`, `height = 170.0` | open island; must be at least as big as the other two |
+| `[theme.expanded]` | `width = 580.0`, `height = 170.0` | open island; must be at least as big as the other two |
 
 Width between 16 and 4000, height between 8 and 2000.
 

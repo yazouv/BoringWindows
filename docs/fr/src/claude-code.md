@@ -43,6 +43,11 @@ ramener son terminal (Windows Terminal, VS Code…) au premier plan.
 
 Un **son système** retentit chaque fois que Claude se met à t'attendre.
 
+Un **halo** entoure aussi l'île : un contour irisé qui tourne pendant que
+Claude travaille, orange et qui pulse quand il t'attend, et une vague verte
+qui en fait le tour une fois quand il a fini. Pour l'enlever : Réglages ›
+**Apparence** › **Halo de Claude**, ou `glow = false` dans `[theme]`.
+
 ## Répondre à une demande de permission
 
 Quand Claude veut lancer une commande qui demande ton accord, survole l'île :
@@ -96,8 +101,9 @@ rien faire : **Claude n'est jamais bloqué**.
 Ouvre l'île et clique sur l'onglet **Claude** (en haut à droite) : il affiche
 
 - une **estimation de ta consommation** sur la fenêtre de 5 h en cours, avec le
-  temps avant son renouvellement (et une jauge si tu fixes une limite) ;
-- tes **4 dernières conversations** (titre, dossier, ancienneté). Un clic rouvre
+  temps avant son renouvellement (et une jauge circulaire si tu fixes une
+  limite) ;
+- tes **4 dernières conversations**, en cartes (titre, dossier, ancienneté). Un clic rouvre
   la conversation : un terminal s'ouvre dans son dossier et lance
   `claude --resume <id>`.
 

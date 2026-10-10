@@ -15,8 +15,9 @@ Ouvre l'île et clique sur l'onglet **Notifs** (en haut à droite), ou ouvre
 l'île pendant qu'une notification s'affiche : elle s'ouvre directement sur cet
 onglet.
 
-- Les 4 dernières notifications, avec leur ancienneté.
-- Un **clic** sur une ligne t'amène **au bon endroit**, comme un clic sur la
+- Les 4 dernières notifications, en cartes sur deux colonnes à la couleur de
+  leur application, avec leur ancienneté.
+- Un **clic** sur une carte t'amène **au bon endroit**, comme un clic sur la
   notification de Windows : le bon salon Discord, le bon onglet Firefox, le bon
   mail… (voir plus bas).
 - La **×** au survol efface la notification, aussi du centre de notifications

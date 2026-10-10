@@ -51,6 +51,12 @@ const TAB_NOTIFICATIONS: i32 = 2;
 /// marge après sa fin.
 const BLUR_FRAME: Duration = Duration::from_millis(16);
 const BLUR_TAIL: Duration = Duration::from_millis(80);
+
+/// Temps que met la pilule à se poser : `island.slint` l'anime avec un ressort
+/// de période `anim × 1,7` et de rebond 0,3, posé (à 0,1 %) vers 1,6 période.
+fn spring_settle(animation_ms: u32) -> Duration {
+    Duration::from_millis(u64::from(animation_ms) * 11 / 4)
+}
 /// Île ouverte par raccourci : elle se referme après ce délai si la souris
 /// ne vient pas dessus.
 const HOTKEY_OPEN: Duration = Duration::from_secs(6);
@@ -570,7 +576,7 @@ impl Controller {
         }
 
         let theme = self.theme();
-        let animation = Duration::from_millis(theme.animation_ms.into());
+        let animation = spring_settle(theme.animation_ms);
         if self.blur.get() {
             // Le flou remplit toute la région : elle suit la pilule pendant
             // l'animation, sinon il déborderait de la forme dessinée.
@@ -582,10 +588,10 @@ impl Controller {
             return;
         }
         // Pendant l'animation, la zone cliquable couvre l'ancienne et la
-        // nouvelle forme ; elle est ajustée à la fin.
+        // nouvelle forme, plus le dépassement du ressort ; elle est ajustée à
+        // la fin.
         let scale = self.ui.window().scale_factor();
-        let during =
-            geometry::pill_rect(&theme, old, scale).union(geometry::pill_rect(&theme, new, scale));
+        let during = geometry::transition_rect(&theme, old, new, scale);
         self.with_platform(|p| p.set_hit_region(during));
         self.schedule_region_sync(animation);
     }
@@ -738,6 +744,7 @@ impl Controller {
         ui.set_corner_radius(t.corner_radius);
         ui.set_top_offset(t.top_offset);
         ui.set_anim(t.animation_ms.into());
+        ui.set_glow_enabled(t.glow);
         ui.set_bg(color(t.background));
         ui.set_fg(color(t.foreground));
         ui.set_border(color(t.border));
@@ -961,12 +968,28 @@ impl Controller {
                     r.title.as_str().into()
                 },
                 meta: format!("{} · {}", r.project, ago(r.last_at, now)).into(),
+                project: r.project.as_str().into(),
+                ago: ago(r.last_at, now).into(),
             })
             .collect();
         self.ui.set_recent_rows(ModelRc::new(VecModel::from(rows)));
 
         let usage = &snapshot.usage;
         let limit = snapshot.limit_tokens;
+        self.ui.set_usage_active(usage.window_end.is_some());
+        self.ui.set_usage_used(compact_tokens(usage.tokens).into());
+        self.ui.set_usage_limit(if limit > 0 {
+            compact_tokens(limit).into()
+        } else {
+            Default::default()
+        });
+        self.ui.set_usage_reset(
+            usage
+                .window_end
+                .map(|end| duration_text((end - now).to_std().unwrap_or_default()))
+                .unwrap_or_default()
+                .into(),
+        );
         self.ui.set_usage_text(match usage.window_end {
             Some(end) => {
                 let h = config.window_hours;
@@ -1240,21 +1263,7 @@ impl Controller {
         if !self.viz_active.get() {
             return;
         }
-        if self.expanded.get() {
-            // Barres à zéro : elles disparaissent au lieu de rester à plat.
-            let flat = snapshot.bands.iter().all(|b| *b <= 0.001);
-            let bars = if flat {
-                ModelRc::default()
-            } else {
-                ModelRc::new(VecModel::from(snapshot.bands.clone()))
-            };
-            self.ui.set_viz_bars(bars);
-            self.sync_custom_view();
-            return;
-        }
-        // Pilule fermée : les basses (premières bandes) font danser la
-        // mascotte, et la pilule quand elle montre la musique (sans flou :
-        // le fond flouté ne suit pas ces petites variations).
+        // Les basses (premières bandes) font danser la mascotte.
         let low = &snapshot.bands[..snapshot.bands.len().min(3)];
         let bass = if low.is_empty() {
             0.0
@@ -1262,6 +1271,19 @@ impl Controller {
             (low.iter().sum::<f32>() / low.len() as f32).clamp(0.0, 1.0)
         };
         self.ui.set_mascot_level(bass);
+        if self.expanded.get() {
+            // Toujours autant de barres, même à plat : l'île les estompe
+            // (`viz-quiet`) au lieu de les retirer, ce qui décalerait ce qui
+            // les entoure à chaque silence.
+            let flat = snapshot.bands.iter().all(|b| *b <= 0.001);
+            self.ui.set_viz_quiet(flat);
+            self.ui
+                .set_viz_bars(ModelRc::new(VecModel::from(snapshot.bands.clone())));
+            self.sync_custom_view();
+            return;
+        }
+        // Pilule fermée : la pilule danse aussi quand elle montre la musique
+        // (sans flou : le fond flouté ne suit pas ces petites variations).
         let music_pill = self.ui.get_mascot_place() == "right" && !self.blur.get();
         self.ui.set_pill_bounce(if music_pill { bass } else { 1.0 });
     }
@@ -1463,12 +1485,21 @@ impl Controller {
             };
             let mut sessions: Vec<_> = s.sessions.iter().collect();
             sessions.sort_by_key(|s| rank(s.kind));
-            claude.extend(sessions.into_iter().map(|s| ClaudeRow {
-                id: s.id.as_str().into(),
-                project: s.project.as_str().into(),
-                status: s.status.as_str().into(),
-                urgent: rank(s.kind) == 0,
-                active: s.kind != SessionKind::Idle,
+            claude.extend(sessions.into_iter().map(|s| {
+                ClaudeRow {
+                    id: s.id.as_str().into(),
+                    project: s.project.as_str().into(),
+                    status: s.status.as_str().into(),
+                    urgent: rank(s.kind) == 0,
+                    active: s.kind != SessionKind::Idle,
+                    kind: match s.kind {
+                        SessionKind::Permission | SessionKind::NeedsYou => "wait",
+                        SessionKind::Working => "work",
+                        SessionKind::Done => "done",
+                        SessionKind::Idle => "idle",
+                    }
+                    .into(),
+                }
             }));
         }
 
@@ -1796,11 +1827,6 @@ impl Controller {
             mascot::Season::None
         };
         self.ui.set_season(season.name().into());
-        if !config.enabled {
-            self.ui.set_mascot_place("".into());
-            self.ui.set_mascot_animated(false);
-            return;
-        }
 
         let claude = self.claude.borrow().as_ref().and_then(|s| {
             let any = |f: fn(SessionKind) -> bool| s.sessions.iter().any(|v| f(v.kind));
@@ -1814,6 +1840,22 @@ impl Controller {
                 None
             }
         });
+        // Halo de l'île (`theme.glow`), indépendant de la mascotte.
+        self.ui.set_claude_glow(
+            match claude {
+                Some(ClaudeState::Waiting) => "wait",
+                Some(ClaudeState::Working) => "work",
+                Some(ClaudeState::Done) => "done",
+                None => "",
+            }
+            .into(),
+        );
+        self.ui.set_mascot_enabled(config.enabled);
+        if !config.enabled {
+            self.ui.set_mascot_place("".into());
+            self.ui.set_mascot_animated(false);
+            return;
+        }
         let mood = mascot::mood(claude, self.music_playing(), self.away.get(), now.hour());
 
         // Au repos, au centre ; à la place du point quand Claude a la pilule ;

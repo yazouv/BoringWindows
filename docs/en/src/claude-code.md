@@ -42,6 +42,11 @@ terminal (Windows Terminal, VS Code…) to the front.
 
 A **system sound** plays every time Claude starts waiting for you.
 
+A **glow** also surrounds the island: an iridescent outline that turns while
+Claude works, orange and pulsing when it is waiting for you, and a green wave
+that goes around once when it is done. To turn it off: Settings ›
+**Appearance** › **Claude glow**, or `glow = false` under `[theme]`.
+
 ## Answering a permission request
 
 When Claude wants to run a command that needs your approval, hover the island:
@@ -95,8 +100,8 @@ and does nothing: **Claude is never blocked**.
 Open the island and click the **Claude** tab (top right): it shows
 
 - an **estimate of your usage** over the current 5-hour window, with the time
-  until it renews (and a gauge if you set a limit);
-- your **4 latest conversations** (title, folder, age). Click one to reopen it: a
+  until it renews (and a round gauge if you set a limit);
+- your **4 latest conversations**, as cards (title, folder, age). Click one to reopen it: a
   terminal opens in its folder and runs `claude --resume <id>`.
 
 It is read from the transcripts Claude Code keeps locally

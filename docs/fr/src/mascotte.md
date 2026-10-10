@@ -17,6 +17,14 @@ passe :
 Quand Claude occupe la pilule, la mascotte prend la place du point de statut ;
 quand c'est la musique, elle se met à droite.
 
+Dans l'**île ouverte**, elle s'affiche en grand à gauche de l'onglet Accueil,
+et arrive avec un rebond. En grand, elle a plus de détails : une pousse sur la
+tête qui se balance, des joues, des reflets dans les yeux, des bras (levés de
+joie, en l'air quand Claude t'attend, qui tapent quand il travaille), des
+pieds, une bouche selon son humeur, des notes de musique quand elle danse et
+des « z » qui s'envolent quand elle dort. Elle s'anime tant que l'île est
+ouverte.
+
 ## Saisons
 
 Elle se déguise, et l'île ouverte se décore :

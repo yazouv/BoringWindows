@@ -124,6 +124,8 @@ pub struct Theme {
     /// Flou de ce qui est derrière l'île (Windows), visible à travers un fond
     /// translucide.
     pub blur: bool,
+    /// Halo animé autour de l'île pendant que Claude travaille ou attend.
+    pub glow: bool,
     /// Couleur d'accent de Windows à la place de celle du thème.
     pub system_accent: bool,
     pub animation_ms: u32,
@@ -149,12 +151,13 @@ impl Default for Theme {
             font: String::new(),
             corner_radius: 22.0,
             blur: false,
+            glow: true,
             system_accent: false,
             animation_ms: 240,
             top_offset: 0.0,
             compact: Size::new(190.0, 32.0),
             attention: Size::new(300.0, 36.0),
-            expanded: Size::new(520.0, 170.0),
+            expanded: Size::new(580.0, 170.0),
         }
     }
 }

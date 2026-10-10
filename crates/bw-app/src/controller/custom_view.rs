@@ -233,6 +233,7 @@ impl Controller {
                             ("status", s(&r.status)),
                             ("urgent", Value::Bool(r.urgent)),
                             ("active", Value::Bool(r.active)),
+                            ("kind", s(&r.kind)),
                         ])
                     })
                     .collect(),
@@ -278,6 +279,8 @@ impl Controller {
                             ("id", s(&r.id)),
                             ("title", s(&r.title)),
                             ("meta", s(&r.meta)),
+                            ("project", s(&r.project)),
+                            ("ago", s(&r.ago)),
                         ])
                     })
                     .collect(),

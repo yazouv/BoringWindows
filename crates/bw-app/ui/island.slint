@@ -11,6 +11,8 @@ export struct ClaudeRow {
     status: string,
     urgent: bool,
     active: bool,
+    /// wait | work | done | idle
+    kind: string,
 }
 
 export struct ClaudePrompt {
@@ -33,7 +35,10 @@ export struct AgendaRow {
 export struct RecentRow {
     id: string,
     title: string,
+    /// « projet · il y a 2 h » (vues personnelles) ; `project` et `ago` séparés.
     meta: string,
+    project: string,
+    ago: string,
 }
 
 export struct PluginRow {
@@ -174,40 +179,56 @@ component BatteryGauge inherits Rectangle {
     }
 }
 
-// Œil de la mascotte, selon l'humeur.
+// Œil de la mascotte, selon l'humeur. `k` : taille d'une unité du dessin.
 component MascotEye inherits Rectangle {
     // open | closed | happy | half | big
     in property <string> kind;
     in property <color> ink;
-    width: 4px;
-    height: 5px;
+    in property <length> k: 1px;
+    // Petit reflet dans l'œil (grande mascotte).
+    in property <bool> shine;
+    in property <color> shine-color: white;
+    width: 4 * root.k;
+    height: 5 * root.k;
 
     if root.kind == "happy": Path {
-        width: 3.6px;
-        height: 2.6px;
-        y: 1.5px;
+        width: 3.6 * root.k;
+        height: 2.6 * root.k;
+        y: 1.5 * root.k;
         viewbox-width: 4;
         viewbox-height: 3;
         fill: transparent;
         stroke: root.ink;
-        stroke-width: 1.3px;
+        stroke-width: 1.3 * root.k;
         commands: "M0 3 L2 0.6 L4 3";
     }
 
     if root.kind != "happy": Rectangle {
-        property <length> h: root.kind == "closed" ? 1.3px : root.kind == "half" ? 2px
-            : root.kind == "big" ? 4.6px : 3.6px;
-        width: root.kind == "big" ? 3.4px : 2.8px;
+        property <length> h: root.k * (root.kind == "closed" ? 1.3 : root.kind == "half" ? 2 : root.kind == "big" ? 4.6 : 3.6);
+        width: root.k * (root.kind == "big" ? 3.4 : 2.8);
         height: self.h;
         x: (parent.width - self.width) / 2;
-        y: parent.height - self.h - (root.kind == "closed" ? 1px : 0px);
+        y: parent.height - self.h - (root.kind == "closed" ? root.k : 0px);
         border-radius: Math.min(self.width, self.h) / 2;
         background: root.ink;
+
+        if root.shine && (root.kind == "open" || root.kind == "big"): Rectangle {
+            x: parent.width * 0.5;
+            y: parent.height * 0.14;
+            width: parent.width * 0.4;
+            height: self.width;
+            border-radius: self.width / 2;
+            background: root.shine-color;
+        }
     }
 }
 
-// La mascotte : un petit blob à yeux. Elle ne s'anime que si `animated`
-// (le minuteur interne ne tourne pas sinon : rien n'est redessiné au repos).
+// La mascotte : un blob à yeux. Elle ne s'anime que si `animated` (le
+// minuteur interne ne tourne pas sinon : rien n'est redessiné au repos).
+// Dessinée sur une grille de 26 × 24 unités, sa taille suit `width`. En grand
+// (île ouverte), elle gagne des détails : pousse sur la tête, joues, reflets
+// dans les yeux, sourcils, bras, pieds, bouche selon l'humeur, ombre au sol,
+// notes de musique et « z » qui s'envolent.
 component Mascot inherits Rectangle {
     // idle | morning | evening | sleep | work | wait | happy | music
     in property <string> mood: "idle";
@@ -220,7 +241,11 @@ component Mascot inherits Rectangle {
     in property <color> eye-color: black;
     in property <color> accent: #ff8a3d;
     width: 26px;
-    height: 24px;
+    height: self.width * 24 / 26;
+
+    // Une unité du dessin ; la version détaillée à partir de 1,8 px.
+    property <length> k: self.width / 26;
+    property <bool> big: self.k >= 1.8px;
 
     // Temps écoulé (s), avancé seulement pendant l'animation.
     property <float> t;
@@ -231,80 +256,291 @@ component Mascot inherits Rectangle {
     }
 
     property <bool> calm: root.mood == "idle" || root.mood == "morning" || root.mood == "evening";
-    property <bool> blink: root.animated && root.calm && Math.mod(root.t, 3.7) < 0.14;
-    property <length> hop: !root.animated ? 0px
-        : root.mood == "wait" ? -Math.abs(Math.sin(root.t * 2 * 360deg)) * 3px
-        : root.mood == "happy" ? -Math.abs(Math.sin(root.t * 1.2 * 360deg)) * 2.5px
-        : root.mood == "work" ? Math.sin(root.t * 1.6 * 360deg) * 1px
-        : root.mood == "music" ? -root.level * 4px
-        : 0px;
-    // Respiration lente.
-    property <length> breath: root.animated && root.calm ? Math.sin(root.t * 0.25 * 360deg) * 0.7px : 0px;
-    property <length> look: root.animated && root.mood == "work" ? Math.sin(root.t * 0.8 * 360deg) * 1.3px : 0px;
+    property <bool> blink: root.animated && (root.calm || root.big) && Math.mod(root.t, 3.7) < 0.14;
+    // Basses lissées : la mascotte danse au lieu de trembler.
+    property <float> beat: root.level;
+    animate beat { duration: 140ms; easing: ease-out; }
+    // Rebond des sauts (0 au sol, 1 en haut).
+    property <float> bounce: root.mood == "wait" ? Math.abs(Math.sin(root.t * 2 * 360deg))
+        : root.mood == "happy" ? Math.abs(Math.sin(root.t * 1.2 * 360deg)) : 0;
+    // Décalages en unités (négatif : vers le haut).
+    property <float> hop: !root.animated ? 0
+        : root.mood == "wait" ? -root.bounce * 3
+        : root.mood == "happy" ? -root.bounce * 2.5
+        : root.mood == "work" ? Math.sin(root.t * 1.6 * 360deg)
+        : root.mood == "music" ? -root.beat * (root.big ? 2.5 : 4)
+        : 0;
+    // Respiration lente (plus ample quand elle dort, en grand).
+    property <float> breath: !root.animated ? 0
+        : root.calm ? Math.sin(root.t * 0.25 * 360deg) * 0.7
+        : root.big && root.mood == "sleep" ? Math.sin(root.t * 0.18 * 360deg) * 1.1 : 0;
+    // Écrasée à l'atterrissage (en grand) : plus large, moins haute.
+    property <float> squash: root.big && root.animated && (root.mood == "wait" || root.mood == "happy")
+        ? Math.max(0, 1 - root.bounce * 4) * 1.6 : 0;
+    property <float> look: root.animated && root.mood == "work" ? Math.sin(root.t * 0.8 * 360deg) * 1.3 : 0;
     property <string> eyes: root.blink || root.mood == "sleep" ? "closed"
         : root.mood == "happy" || root.mood == "music" || root.mood == "morning" ? "happy"
         : root.mood == "evening" ? "half"
         : root.mood == "wait" ? "big" : "open";
+    property <color> tone: root.mood == "wait" ? root.accent : root.body-color;
+    // Ombre du corps : sa couleur mêlée à celle des yeux (thèmes clairs et sombres).
+    property <color> shade: root.tone.mix(root.eye-color, 0.8);
+    property <bool> hat: root.season == "halloween" || root.season == "christmas" || root.season == "newyear";
+    // Bras : levés de joie, en l'air quand Claude attend, qui tapent quand il travaille.
+    property <angle> arm: root.mood == "happy" || root.mood == "music" ? 135deg + Math.sin(root.t * 2.4 * 360deg) * 22deg
+        : root.mood == "wait" ? 150deg + Math.sin(root.t * 4 * 360deg) * 10deg
+        : root.mood == "work" ? 35deg + Math.sin(root.t * 5 * 360deg) * 12deg
+        : root.mood == "sleep" ? 8deg
+        : 18deg + root.breath * 4deg;
+
+    // Ombre au sol, plus petite quand elle saute.
+    if root.big: Rectangle {
+        width: root.k * (15 + root.hop * 1.6);
+        height: root.k * 1.6;
+        x: (root.width - self.width) / 2;
+        y: root.k * 23.4;
+        border-radius: self.height / 2;
+        background: root.body-color.with-alpha(0.12);
+    }
+
+    // Bras (derrière le corps), accrochés à l'épaule.
+    if root.big: Rectangle {
+        width: root.k * 3;
+        height: root.k * 5.5;
+        x: body.x - root.k * 1.4;
+        y: body.y + body.height * 0.42;
+        border-radius: root.k * 1.5;
+        background: root.shade;
+        transform-origin: { x: self.width, y: root.k * 1 };
+        transform-rotation: root.arm;
+    }
+
+    if root.big: Rectangle {
+        width: root.k * 3;
+        height: root.k * 5.5;
+        x: body.x + body.width - root.k * 1.6;
+        y: body.y + body.height * 0.42;
+        border-radius: root.k * 1.5;
+        background: root.shade;
+        transform-origin: { x: 0px, y: root.k * 1 };
+        transform-rotation: -root.arm;
+    }
 
     body := Rectangle {
-        x: 4px;
-        y: 9px + root.hop - root.breath;
-        width: 18px;
-        height: 14px + root.breath;
-        border-radius: 7px;
-        background: root.mood == "wait" ? root.accent : root.body-color;
-        animate background { duration: 200ms; }
+        width: root.k * (18 + root.squash);
+        height: root.k * (14 + root.breath - root.squash * 0.8);
+        x: (root.width - self.width) / 2;
+        y: root.k * (23 + root.hop) - self.height;
+        border-radius: root.k * 7;
+        background: root.big ? @linear-gradient(180deg, root.tone 0%, root.tone 40%, root.shade 100%) : root.tone;
 
         // Reflet.
         Rectangle {
-            x: 4px;
-            y: 2.5px;
-            width: 4px;
-            height: 2px;
-            border-radius: 1px;
+            x: root.k * 4;
+            y: root.k * 2.5;
+            width: root.k * (root.big ? 4.5 : 4);
+            height: root.k * 2;
+            border-radius: root.k;
             background: white.with-alpha(0.35);
         }
 
-        MascotEye {
-            x: 3.5px + root.look;
-            y: 3px;
-            kind: root.eyes;
-            ink: root.eye-color;
+        // Joues.
+        if root.big && root.mood != "work" && root.mood != "wait": Rectangle {
+            x: root.k * 1.6;
+            y: root.k * 7.4;
+            width: root.k * 3.2;
+            height: root.k * 1.7;
+            border-radius: self.height / 2;
+            background: root.accent.with-alpha(0.4);
+        }
+
+        if root.big && root.mood != "work" && root.mood != "wait": Rectangle {
+            x: parent.width - root.k * 4.8;
+            y: root.k * 7.4;
+            width: root.k * 3.2;
+            height: root.k * 1.7;
+            border-radius: self.height / 2;
+            background: root.accent.with-alpha(0.4);
         }
 
         MascotEye {
-            x: 10.5px + root.look;
-            y: 3px;
+            x: parent.width / 2 - root.k * (5.5 - root.look);
+            y: root.k * 3;
+            k: root.k;
             kind: root.eyes;
             ink: root.eye-color;
+            shine: root.big;
+            shine-color: root.tone;
         }
 
-        // Sourire quand Claude a fini ou que la musique joue.
-        if root.mood == "happy" || root.mood == "music": Path {
-            x: 7px;
-            y: 9.5px;
-            width: 4px;
-            height: 2px;
+        MascotEye {
+            x: parent.width / 2 + root.k * (1.5 + root.look);
+            y: root.k * 3;
+            k: root.k;
+            kind: root.eyes;
+            ink: root.eye-color;
+            shine: root.big;
+            shine-color: root.tone;
+        }
+
+        // Sourcils : froncés au travail, levés quand Claude attend.
+        if root.big && (root.mood == "work" || root.mood == "wait"): Rectangle {
+            x: parent.width / 2 - root.k * (5.8 - root.look);
+            y: root.k * (root.mood == "wait" ? 0.6 : 1.5);
+            width: root.k * 3.2;
+            height: root.k * 0.8;
+            border-radius: self.height / 2;
+            background: root.eye-color;
+            transform-rotation: root.mood == "wait" ? -14deg : 14deg;
+        }
+
+        if root.big && (root.mood == "work" || root.mood == "wait"): Rectangle {
+            x: parent.width / 2 + root.k * (1.4 + root.look);
+            y: root.k * (root.mood == "wait" ? 0.6 : 1.5);
+            width: root.k * 3.2;
+            height: root.k * 0.8;
+            border-radius: self.height / 2;
+            background: root.eye-color;
+            transform-rotation: root.mood == "wait" ? 14deg : -14deg;
+        }
+
+        // Bouche. Petite : un sourire quand Claude a fini ou que la musique joue.
+        if !root.big && (root.mood == "happy" || root.mood == "music"): Path {
+            x: root.k * 7;
+            y: root.k * 9.5;
+            width: root.k * 4;
+            height: root.k * 2;
             viewbox-width: 4;
             viewbox-height: 2;
             fill: transparent;
             stroke: root.eye-color;
-            stroke-width: 1.1px;
+            stroke-width: root.k * 1.1;
             commands: "M0 0 Q2 2.4 4 0";
         }
+
+        // Grande : bouche ouverte avec la langue, de joie.
+        if root.big && (root.mood == "happy" || root.mood == "music"): Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: root.k * 8.6;
+            width: root.k * 4.6;
+            height: root.k * 3;
+
+            Path {
+                viewbox-width: 6;
+                viewbox-height: 4;
+                fill: root.eye-color;
+                commands: "M0 0 L6 0 Q6 4 3 4 Q0 4 0 0 Z";
+            }
+
+            Rectangle {
+                x: (parent.width - self.width) / 2;
+                y: parent.height * 0.55;
+                width: parent.width * 0.5;
+                height: parent.height * 0.36;
+                border-radius: self.height / 2;
+                background: root.accent;
+            }
+        }
+
+        // Grande, au calme : un sourire.
+        if root.big && root.calm: Path {
+            x: (parent.width - self.width) / 2;
+            y: root.k * 9.2;
+            width: root.k * (root.mood == "evening" ? 3 : 4);
+            height: root.k * (root.mood == "evening" ? 1.2 : 1.9);
+            viewbox-width: 4;
+            viewbox-height: 2;
+            fill: transparent;
+            stroke: root.eye-color;
+            stroke-width: root.k * 0.9;
+            commands: "M0 0 Q2 2.4 4 0";
+        }
+
+        // Concentrée : bouche plate et bout de langue qui dépasse.
+        if root.big && root.mood == "work": Rectangle {
+            x: parent.width / 2 - root.k * 1.6;
+            y: root.k * 9.6;
+            width: root.k * 2.8;
+            height: root.k * 0.8;
+            border-radius: self.height / 2;
+            background: root.eye-color;
+
+            Rectangle {
+                x: parent.width - root.k * 0.6;
+                y: root.k * 0.3;
+                width: root.k * 1.3;
+                height: root.k * 1.4;
+                border-radius: self.width / 2;
+                background: root.accent;
+            }
+        }
+
+        // Claude attend : bouche en « o ».
+        if root.big && root.mood == "wait": Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: root.k * 8.6;
+            width: root.k * 2.2;
+            height: root.k * 2.6;
+            border-radius: self.width / 2;
+            border-width: root.k * 0.8;
+            border-color: root.eye-color;
+        }
+
+        // Endormie : petite bouche ronde.
+        if root.big && root.mood == "sleep": Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: root.k * 9.4;
+            width: root.k * 1.5;
+            height: root.k * 1.2;
+            border-radius: self.height / 2;
+            background: root.eye-color.with-alpha(0.8);
+        }
+    }
+
+    // Pieds, qui tapent la mesure quand elle travaille.
+    if root.big: Rectangle {
+        width: root.k * 4.6;
+        height: root.k * 2.4;
+        x: body.x + root.k * 2.4;
+        y: body.y + body.height - root.k * (1.6 + (root.mood == "work" && root.animated ? Math.max(0, Math.sin(root.t * 3 * 360deg)) * 0.9 : 0));
+        border-radius: self.height / 2;
+        background: root.shade;
+    }
+
+    if root.big: Rectangle {
+        width: root.k * 4.6;
+        height: root.k * 2.4;
+        x: body.x + body.width - self.width - root.k * 2.4;
+        y: body.y + body.height - root.k * (1.6 + (root.mood == "work" && root.animated ? Math.max(0, -Math.sin(root.t * 3 * 360deg)) * 0.9 : 0));
+        border-radius: self.height / 2;
+        background: root.shade;
+    }
+
+    // Pousse sur la tête, qui se balance (sauf sous un chapeau de saison).
+    if root.big && !root.hat: Path {
+        width: root.k * 7;
+        height: root.k * 6;
+        x: body.x + (body.width - self.width) / 2;
+        y: body.y - self.height + root.k * 0.6;
+        viewbox-width: 7;
+        viewbox-height: 6;
+        fill: root.accent;
+        transform-origin: { x: self.width / 2, y: self.height };
+        transform-rotation: root.animated ? Math.sin(root.t * 0.6 * 360deg) * 9deg + root.hop * 3deg : 0deg;
+        commands: "M3.15 6 L3.15 3.3 L3.85 3.3 L3.85 6 Z M3.5 3.5 C2.6 1.2 0.8 0.7 0 1.3 C0.6 3.3 2.2 3.9 3.5 3.5 Z M3.5 3.5 C4.4 1.2 6.2 0.7 7 1.3 C6.4 3.3 4.8 3.9 3.5 3.5 Z";
     }
 
     // Chapeaux de saison.
     if root.season == "halloween": Rectangle {
-        x: body.x + 2px;
-        y: body.y - 8px;
-        width: 14px;
-        height: 9px;
+        x: body.x + root.k * 2;
+        y: body.y - root.k * 8;
+        width: root.k * 14;
+        height: root.k * 9;
 
         Path {
-            width: 9px;
-            height: 8px;
-            x: 2.5px;
+            width: root.k * 9;
+            height: root.k * 8;
+            x: root.k * 2.5;
             viewbox-width: 9;
             viewbox-height: 8;
             fill: #4B2470;
@@ -312,30 +548,30 @@ component Mascot inherits Rectangle {
         }
 
         Rectangle {
-            x: 3.5px;
-            y: 6px;
-            width: 7px;
-            height: 1.2px;
+            x: root.k * 3.5;
+            y: root.k * 6;
+            width: root.k * 7;
+            height: root.k * 1.2;
             background: #FF8C1A;
         }
 
         Rectangle {
-            y: 7.5px;
-            height: 1.5px;
-            border-radius: 0.75px;
+            y: root.k * 7.5;
+            height: root.k * 1.5;
+            border-radius: root.k * 0.75;
             background: #2E1446;
         }
     }
 
     if root.season == "christmas": Rectangle {
-        x: body.x + 3px;
-        y: body.y - 7px;
-        width: 14px;
-        height: 8px;
+        x: body.x + root.k * 3;
+        y: body.y - root.k * 7;
+        width: root.k * 14;
+        height: root.k * 8;
 
         Path {
-            width: 11px;
-            height: 7px;
+            width: root.k * 11;
+            height: root.k * 7;
             viewbox-width: 11;
             viewbox-height: 7;
             fill: #E53935;
@@ -343,34 +579,34 @@ component Mascot inherits Rectangle {
         }
 
         Rectangle {
-            x: 7.5px;
-            y: -1.5px;
-            width: 3.4px;
-            height: 3.4px;
-            border-radius: 1.7px;
+            x: root.k * 7.5;
+            y: -root.k * 1.5;
+            width: root.k * 3.4;
+            height: root.k * 3.4;
+            border-radius: root.k * 1.7;
             background: white;
         }
 
         Rectangle {
-            x: -0.5px;
-            y: 5.6px;
-            width: 12px;
-            height: 2px;
-            border-radius: 1px;
+            x: -root.k * 0.5;
+            y: root.k * 5.6;
+            width: root.k * 12;
+            height: root.k * 2;
+            border-radius: root.k;
             background: white;
         }
     }
 
     if root.season == "newyear": Rectangle {
-        x: body.x + 5px;
-        y: body.y - 8px;
-        width: 8px;
-        height: 9px;
+        x: body.x + root.k * 5;
+        y: body.y - root.k * 8;
+        width: root.k * 8;
+        height: root.k * 9;
 
         Path {
-            width: 8px;
-            height: 8px;
-            y: 1px;
+            width: root.k * 8;
+            height: root.k * 8;
+            y: root.k;
             viewbox-width: 8;
             viewbox-height: 8;
             fill: #FFD60A;
@@ -378,17 +614,17 @@ component Mascot inherits Rectangle {
         }
 
         Rectangle {
-            x: 2.5px;
+            x: root.k * 2.5;
             y: 0px;
-            width: 3px;
-            height: 3px;
-            border-radius: 1.5px;
+            width: root.k * 3;
+            height: root.k * 3;
+            border-radius: root.k * 1.5;
             background: #FF375F;
         }
     }
 
-    // Sommeil : un petit « z ».
-    if root.mood == "sleep": Text {
+    // Sommeil : des « z » (qui s'envolent, en grand).
+    if root.mood == "sleep" && !root.big: Text {
         x: body.x + body.width - 2px;
         y: body.y - 9px;
         text: "z";
@@ -397,13 +633,38 @@ component Mascot inherits Rectangle {
         font-weight: 700;
     }
 
+    if root.mood == "sleep" && root.big: Rectangle {
+        for i in 3: Text {
+            property <float> p: Math.mod(root.t * 0.3 + i / 3, 1);
+            x: body.x + body.width - root.k * (1 - self.p * 5);
+            y: body.y - root.k * (2 + self.p * 9);
+            text: "z";
+            color: root.body-color.with-alpha(0.75 * Math.sin(self.p * 180deg));
+            font-size: root.k * (4 + self.p * 3);
+            font-weight: 800;
+        }
+    }
+
+    // Musique : des notes qui s'envolent.
+    if root.mood == "music" && root.big && root.animated: Rectangle {
+        for i in 2: Text {
+            property <float> p: Math.mod(root.t * 0.45 + i / 2, 1);
+            x: i == 0 ? body.x + body.width + root.k * (0.5 + self.p * 2) : body.x - root.k * (4 + self.p * 2);
+            y: body.y + root.k * (4 - self.p * 10);
+            text: i == 0 ? "♪" : "♫";
+            color: root.accent.with-alpha(Math.sin(self.p * 180deg));
+            font-size: root.k * 5.5;
+            font-weight: 700;
+        }
+    }
+
     // Claude t'attend : un « ! ».
     if root.mood == "wait": Text {
-        x: body.x + body.width + 1px;
-        y: body.y - 6px + root.hop / 2;
+        x: body.x + body.width + root.k;
+        y: body.y - root.k * (6 - root.hop / 2);
         text: "!";
         color: root.accent;
-        font-size: 11px;
+        font-size: root.k * 11;
         font-weight: 900;
     }
 }
@@ -607,6 +868,104 @@ component Avatar inherits Rectangle {
     }
 }
 
+// Pastille d'état d'une session Claude : irisée (comme le halo) quand il
+// travaille, « ! » quand il attend, coche quand il a fini, grise au repos.
+component ClaudeBadge inherits Rectangle {
+    // wait | work | done | idle
+    in property <string> kind;
+    in property <color> ink;
+    in property <color> accent;
+    in property <color> ok;
+    // Dégradé du halo (tourne avec lui).
+    in property <brush> iris;
+    width: 18px;
+    height: 18px;
+    border-radius: 9px;
+    background: root.kind == "work" ? root.iris
+        : root.kind == "wait" ? root.accent
+        : root.kind == "done" ? root.ok : root.ink.with-alpha(0.16);
+
+    if root.kind == "work": Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        background: white.with-alpha(0.92);
+    }
+
+    if root.kind == "wait": Text {
+        text: "!";
+        color: white;
+        font-size: 12px;
+        font-weight: 900;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    if root.kind == "done": Path {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: 11px;
+        height: 11px;
+        viewbox-width: 24;
+        viewbox-height: 24;
+        fill: transparent;
+        stroke: white;
+        stroke-width: 2.4px;
+        commands: "M4 12.5 L9.5 18 L20 6.5";
+    }
+
+    if root.kind == "idle": Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: 6px;
+        height: 6px;
+        border-radius: 3px;
+        background: root.ink.with-alpha(0.55);
+    }
+}
+
+// Jauge circulaire : un arc de 0 à `ratio` (sens horaire depuis le haut), qui
+// se remplit à l'apparition.
+component UsageRing inherits Rectangle {
+    in property <float> ratio;
+    in property <color> ink;
+    in property <color> track;
+    // Couleur du disque central (le fond de l'île).
+    in property <color> hole;
+    in property <string> label;
+    in property <color> label-color;
+    width: 60px;
+    height: 60px;
+    border-radius: self.width / 2;
+
+    property <bool> grown;
+    init => { self.grown = true; }
+    property <float> fill: self.grown ? clamp(root.ratio, 0, 1) : 0;
+    animate fill { duration: 700ms; delay: 120ms; easing: ease-out-quint; }
+    property <angle> end: root.fill * 360deg;
+    background: @conic-gradient(root.ink 0deg, root.ink root.end, root.track root.end, root.track 360deg);
+
+    Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: parent.width - 12px;
+        height: self.width;
+        border-radius: self.width / 2;
+        background: root.hole;
+
+        Text {
+            text: root.label;
+            color: root.label-color;
+            font-size: 14px;
+            font-weight: 800;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}
+
 component TabChip inherits Rectangle {
     in property <string> text;
     in property <bool> active;
@@ -666,7 +1025,7 @@ export component Island inherits Window {
     in property <length> compact-height: 32px;
     in property <length> attention-width: 300px;
     in property <length> attention-height: 36px;
-    in property <length> expanded-width: 520px;
+    in property <length> expanded-width: 580px;
     in property <length> expanded-height: 170px;
     // Pilule qui annonce une notification (calculée côté Rust).
     in property <length> notif-width: 380px;
@@ -700,6 +1059,12 @@ export component Island inherits Window {
     in-out property <int> tab;
     in property <[RecentRow]> recent-rows;
     in property <string> usage-text;
+    // Carte de consommation : fenêtre en cours, jetons utilisés, limite et
+    // temps avant la remise à zéro.
+    in property <bool> usage-active;
+    in property <string> usage-used;
+    in property <string> usage-limit;
+    in property <string> usage-reset;
     in property <float> usage-ratio;
     in property <bool> usage-has-limit;
     callback recent-open(string /* id de session */);
@@ -709,6 +1074,8 @@ export component Island inherits Window {
         }
     }
     in property <[float]> viz-bars;
+    // Silence : barres estompées (mais gardées, pour ne rien décaler).
+    in property <bool> viz-quiet;
     in property <[PluginRow]> plugin-rows;
     in property <[ShelfRow]> shelf-rows;
     in property <string> shelf-more;
@@ -743,6 +1110,8 @@ export component Island inherits Window {
     // Mascotte : où elle se tient dans la pilule fermée (center | left |
     // right, vide : cachée), son humeur, sa saison, et si elle s'anime.
     in property <string> mascot-place;
+    // En grand dans l'île ouverte (onglet Accueil).
+    in property <bool> mascot-enabled;
     in property <string> mascot-mood: "idle";
     in property <bool> mascot-animated;
     in property <float> mascot-level;
@@ -767,6 +1136,40 @@ export component Island inherits Window {
     // Couleurs d'état (charge, alerte) : les mêmes quel que soit le thème.
     property <color> ok-color: #30D158;
     property <color> alert-color: #FF453A;
+    // Halo de Claude (`theme.glow`) : "" aucun, work (contour irisé qui
+    // tourne), wait (accent qui pulse), done (vague verte, une fois).
+    in property <bool> glow-enabled;
+    in property <string> claude-glow;
+    // Couleurs du halo irisé : comme les couleurs d'état, fixes.
+    property <color> glow-a: #5E9BFF;
+    property <color> glow-b: #B57CFF;
+    property <color> glow-c: #FF7AB6;
+    property <color> glow-d: #FFB86B;
+    // Dégradé irisé du halo, qui tourne avec lui (pastilles des sessions).
+    property <brush> iris: @conic-gradient(from root.glow-t * 110deg, root.glow-a 0deg, root.glow-b 90deg, root.glow-c 180deg, root.glow-d 270deg, root.glow-a 360deg);
+    // Temps du halo (s) et avancée de la vague de fin (0 à 1, 1 : finie).
+    property <float> glow-t;
+    property <float> sweep: 1;
+    changed claude-glow => {
+        if self.claude-glow == "done" {
+            self.sweep = 0;
+        }
+    }
+    property <bool> glowing: root.glow-enabled && (root.claude-glow == "work" || root.claude-glow == "wait" || root.sweep < 1);
+    glow-timer := Timer {
+        interval: 40ms;
+        running: root.glowing;
+        triggered => {
+            root.glow-t += 0.04;
+            if root.sweep < 1 {
+                root.sweep = Math.min(1, root.sweep + 0.04 / 1.4);
+            }
+        }
+    }
+    // Marge de la fenêtre autour de l'île ouverte : place pour le dépassement
+    // du ressort (mêmes valeurs que `OVERSHOOT_X/Y` dans geometry.rs).
+    property <length> overshoot-x: 14px;
+    property <length> overshoot-y: 12px;
     // Notifications des applications : celle annoncée, les dernières (onglet),
     // et les couleurs des non lues (points de la pilule au repos).
     in property <bool> has-notif;
@@ -813,8 +1216,8 @@ export component Island inherits Window {
 
     // Taille fixe de la fenêtre : la pilule grandit dedans, la zone cliquable
     // est restreinte à la pilule côté Win32.
-    width: root.expanded-width;
-    height: root.expanded-height + root.top-offset;
+    width: root.expanded-width + 2 * root.overshoot-x;
+    height: root.expanded-height + root.top-offset + root.overshoot-y;
 
     pill := Rectangle {
         property <length> radius: root.expanded ? root.corner-radius : self.height / 2;
@@ -844,7 +1247,10 @@ export component Island inherits Window {
         border-bottom-left-radius: self.radius;
         border-bottom-right-radius: self.radius;
 
-        animate width, height, radius { duration: root.anim; easing: ease-out-quint; }
+        // Un ressort, comme la Dynamic Island : la pilule dépasse un peu sa
+        // taille et s'y pose (s'il est interrompu, il repart avec sa vitesse).
+        // Réglé avec `spring_settle` dans controller.rs.
+        animate width, height, radius { duration: root.anim * 1.7; easing: spring(0.3); }
 
         // Le contenu est dans la zone de survol : les boutons reçoivent leurs
         // clics sans faire perdre le survol à l'île.
@@ -1187,14 +1593,32 @@ export component Island inherits Window {
             }
 
             // Contenu ouvert : en-tête commun (heure, onglets), puis l'onglet choisi.
+            // Taille fixe (celle de l'île ouverte) : le ressort de la pilule ne
+            // le fait pas bouger. À l'ouverture, il arrive après la pilule, en
+            // grossissant un peu ; à la fermeture, il s'efface tout de suite.
             if !root.custom-view: VerticalLayout {
+                x: (parent.width - self.width) / 2;
+                y: 0;
+                width: root.expanded-width;
+                height: root.expanded-height;
                 padding: 16px;
                 padding-top: 10px + root.top-offset / 2;
                 padding-bottom: 10px;
                 spacing: 8px;
                 opacity: root.expanded ? 1 : 0;
                 visible: self.opacity > 0;
-                animate opacity { duration: root.anim; }
+                animate opacity {
+                    duration: root.expanded ? root.anim : root.anim / 2;
+                    delay: root.expanded ? root.anim / 3 : 0ms;
+                }
+                transform-origin: { x: self.width / 2, y: 0px };
+                transform-scale-x: root.expanded ? 100% : 94%;
+                transform-scale-y: root.expanded ? 100% : 94%;
+                animate transform-scale-x, transform-scale-y {
+                    duration: root.expanded ? root.anim * 1.7 : 0ms;
+                    delay: root.expanded ? root.anim / 3 : 0ms;
+                    easing: spring(0.3);
+                }
 
                 HorizontalLayout {
                     spacing: 10px;
@@ -1293,35 +1717,6 @@ export component Island inherits Window {
                         overflow: elide;
                     }
 
-                    // Visualiseur audio (désactivé par défaut) : barres d'équaliseur.
-                    if root.tab == 0 && root.viz-bars.length > 0 && root.has-media: HorizontalLayout {
-                        spacing: 2px;
-                        alignment: end;
-                        height: 14px;
-                        y: (parent.height - self.height) / 2;
-
-                        for level in root.viz-bars: Rectangle {
-                            width: 3px;
-                            y: parent.height - self.height;
-                            height: max(2px, 14px * clamp(level, 0, 1));
-                            border-radius: 1.5px;
-                            background: root.accent;
-                        }
-                    }
-
-                    // Source de la musique ; cliquable s'il y en a plusieurs.
-                    if root.tab == 0 && root.has-media: Text {
-                        text: root.media.multi-source ? root.media.source + "  ⇄" : root.media.source;
-                        color: source-ta.has-hover && root.media.multi-source ? root.fg : root.fg.with-alpha(0.55);
-                        font-size: 12px;
-                        vertical-alignment: center;
-
-                        source-ta := TouchArea {
-                            enabled: root.media.multi-source;
-                            clicked => { root.media-action("source"); }
-                        }
-                    }
-
                     if root.tab == 2 && root.notif-rows.length > 0: Text {
                         text: @tr("Clear all");
                         color: clear-ta.has-hover ? root.accent : root.fg.with-alpha(0.55);
@@ -1396,596 +1791,803 @@ export component Island inherits Window {
                 }
 
                 // Accueil : musique, Claude, minuteur, étagère, agenda…
-                if root.tab == 0: VerticalLayout {
-                    spacing: 8px;
-                    alignment: start;
+                if root.tab == 0: HorizontalLayout {
+                    spacing: 14px;
                     vertical-stretch: 1;
 
-                    // Lecteur (masqué pendant une demande de permission, prioritaire).
-                    if root.has-media && !root.has-prompt: HorizontalLayout {
-                        height: 58px;
-                        spacing: 12px;
+                    // La mascotte en grand, qui arrive avec un rebond à l'ouverture.
+                    if root.mascot-enabled: Rectangle {
+                        width: 62px;
 
-                        Rectangle {
-                            width: 58px;
+                        Mascot {
+                            width: 60px;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2 + 4px;
+                            mood: root.mascot-mood;
+                            season: root.season;
+                            // Île ouverte : on la regarde, elle vit.
+                            animated: root.expanded;
+                            level: root.mascot-level;
+                            body-color: root.fg;
+                            eye-color: root.bg.with-alpha(1);
+                            accent: root.accent;
+                            transform-origin: { x: self.width / 2, y: self.height };
+                            transform-scale-x: root.expanded ? 100% : 40%;
+                            transform-scale-y: root.expanded ? 100% : 40%;
+                            animate transform-scale-x, transform-scale-y {
+                                duration: root.expanded ? root.anim * 2 : 0ms;
+                                delay: root.expanded ? root.anim / 2 : 0ms;
+                                easing: spring(0.45);
+                            }
+                        }
+                    }
+
+                    VerticalLayout {
+                        spacing: 8px;
+                        alignment: start;
+                        vertical-stretch: 1;
+
+                        // Lecteur (masqué pendant une demande de permission, prioritaire).
+                        if root.has-media && !root.has-prompt: HorizontalLayout {
                             height: 58px;
-                            border-radius: 12px;
-                            clip: true;
-                            // Halo de la couleur de la pochette.
-                            drop-shadow-blur: 18px;
-                            drop-shadow-color: root.media.has-art ? root.accent.with-alpha(0.5) : transparent;
-                            background: root.fg.with-alpha(0.08);
-
-                            if root.media.has-art: Image {
-                                width: parent.width;
-                                height: parent.height;
-                                source: root.media.art;
-                                image-fit: cover;
-                            }
-                        }
-
-                        VerticalLayout {
-                            spacing: 2px;
-                            alignment: center;
-                            horizontal-stretch: 1;
-
-                            Text {
-                                text: root.media.title;
-                                color: root.fg;
-                                font-size: 15px;
-                                font-weight: 700;
-                                overflow: elide;
-                            }
-
-                            Text {
-                                text: root.media.artist;
-                                color: root.fg.with-alpha(0.55);
-                                font-size: 12px;
-                                overflow: elide;
-                            }
-
-                            if root.media.has-timeline: HorizontalLayout {
-                                spacing: 6px;
-                                padding-top: 4px;
-
-                                Text {
-                                    text: root.media.position;
-                                    color: root.fg.with-alpha(0.5);
-                                    font-size: 10px;
-                                    vertical-alignment: center;
-                                }
-
-                                bar := Rectangle {
-                                    height: 12px;
-                                    horizontal-stretch: 1;
-
-                                    property <bool> grab: bar-ta.has-hover && root.media.can-seek;
-
-                                    Rectangle {
-                                        y: (parent.height - self.height) / 2;
-                                        height: bar.grab ? 6px : 4px;
-                                        border-radius: self.height / 2;
-                                        background: root.fg.with-alpha(0.14);
-                                        animate height { duration: 120ms; }
-                                    }
-
-                                    Rectangle {
-                                        x: 0;
-                                        y: (parent.height - self.height) / 2;
-                                        width: parent.width * clamp(root.media.progress, 0, 1);
-                                        height: bar.grab ? 6px : 4px;
-                                        border-radius: self.height / 2;
-                                        background: @linear-gradient(90deg, root.accent.with-alpha(0.7) 0%, root.accent 100%);
-                                        animate height { duration: 120ms; }
-                                    }
-
-                                    // Curseur au survol, là où la lecture en est.
-                                    Rectangle {
-                                        width: bar.grab ? 12px : 0px;
-                                        height: self.width;
-                                        x: parent.width * clamp(root.media.progress, 0, 1) - self.width / 2;
-                                        y: (parent.height - self.height) / 2;
-                                        border-radius: self.width / 2;
-                                        background: root.fg;
-                                        drop-shadow-blur: 4px;
-                                        drop-shadow-color: root.bg.with-alpha(0.5);
-                                        animate width { duration: 120ms; }
-                                    }
-
-                                    bar-ta := TouchArea {
-                                        enabled: root.media.can-seek;
-                                        clicked => { root.media-seek(self.mouse-x / self.width); }
-                                    }
-                                }
-
-                                Text {
-                                    text: root.media.duration;
-                                    color: root.fg.with-alpha(0.5);
-                                    font-size: 10px;
-                                    vertical-alignment: center;
-                                }
-                            }
-                        }
-
-                        HorizontalLayout {
-                            spacing: 2px;
-                            alignment: center;
-                            horizontal-stretch: 0;
-
-                            IconButton {
-                                y: (parent.height - self.height) / 2;
-                                icon: "previous";
-                                ink: root.fg;
-                                enabled: root.media.can-previous;
-                                clicked => { root.media-action("prev"); }
-                            }
-
-                            IconButton {
-                                y: (parent.height - self.height) / 2;
-                                size: 38px;
-                                filled: true;
-                                hole: root.bg.with-alpha(1);
-                                icon: root.media.playing ? "pause" : "play";
-                                ink: root.fg;
-                                enabled: root.media.can-toggle;
-                                clicked => { root.media-action("toggle"); }
-                            }
-
-                            IconButton {
-                                y: (parent.height - self.height) / 2;
-                                icon: "next";
-                                ink: root.fg;
-                                enabled: root.media.can-next;
-                                clicked => { root.media-action("next"); }
-                            }
-                        }
-                    }
-
-                    // Demande de permission de Claude Code.
-                    if root.has-prompt: VerticalLayout {
-                        spacing: 6px;
-
-                        Text {
-                            text: @tr("{} wants to use {}", root.prompt.project, root.prompt.tool);
-                            color: root.accent;
-                            font-size: 14px;
-                            font-weight: 600;
-                            overflow: elide;
-                        }
-
-                        Text {
-                            text: root.prompt.detail;
-                            color: root.fg.with-alpha(0.75);
-                            font-size: 12px;
-                            font-family: "Consolas";
-                            overflow: elide;
-                        }
-
-                        HorizontalLayout {
-                            spacing: 8px;
-
-                            PillButton {
-                                text: @tr("Allow");
-                                fill: root.accent;
-                                ink: root.bg;
-                                clicked => { root.claude-decide(root.prompt.id, "allow"); }
-                            }
-
-                            PillButton {
-                                text: @tr("Deny");
-                                fill: root.fg.with-alpha(0.09);
-                                ink: root.fg;
-                                clicked => { root.claude-decide(root.prompt.id, "deny"); }
-                            }
-
-                            PillButton {
-                                text: @tr("Terminal");
-                                fill: transparent;
-                                ink: root.fg.with-alpha(0.8);
-                                line: root.fg.with-alpha(0.25);
-                                clicked => { root.claude-decide(root.prompt.id, "ask"); }
-                            }
-                        }
-                    }
-
-                    // Minuteur : durées prédéfinies, compte à rebours, pause.
-                    if !root.has-prompt && root.has-timer: HorizontalLayout {
-                        height: 30px;
-                        spacing: 6px;
-                        padding-left: 6px;
-
-                        Text {
-                            text: root.timer.phase == 0 ? @tr("Timer")
-                                : root.timer.phase == 3 ? @tr("Time's up!") : root.timer.time;
-                            color: root.timer.phase == 0 ? root.fg.with-alpha(0.7) : root.accent;
-                            font-size: root.timer.phase == 0 ? 12px : 16px;
-                            font-weight: 600;
-                            vertical-alignment: center;
-                            min-width: 64px;
-                        }
-
-                        if root.timer.phase == 0: HorizontalLayout {
-                            spacing: 6px;
-                            alignment: start;
-                            horizontal-stretch: 1;
-
-                            for minutes in root.timer.presets: PillButton {
-                                grow: false;
-                                min-width: 64px;
-                                text: @tr("{} min", minutes);
-                                fill: root.fg.with-alpha(0.09);
-                                ink: root.fg;
-                                clicked => { root.timer-action("start:" + minutes); }
-                            }
-                        }
-
-                        if root.timer.phase == 1 || root.timer.phase == 2: Rectangle {
-                            horizontal-stretch: 1;
-                            height: 12px;
+                            spacing: 12px;
 
                             Rectangle {
-                                y: (parent.height - self.height) / 2;
-                                height: 3px;
-                                border-radius: 1.5px;
-                                background: root.fg.with-alpha(0.15);
+                                width: 58px;
+                                height: 58px;
+                                border-radius: 12px;
+                                clip: true;
+                                // Halo de la couleur de la pochette.
+                                drop-shadow-blur: 18px;
+                                drop-shadow-color: root.media.has-art ? root.accent.with-alpha(0.5) : transparent;
+                                background: root.fg.with-alpha(0.08);
+
+                                if root.media.has-art: Image {
+                                    width: parent.width;
+                                    height: parent.height;
+                                    source: root.media.art;
+                                    image-fit: cover;
+                                }
                             }
 
-                            Rectangle {
-                                y: (parent.height - self.height) / 2;
-                                width: parent.width * clamp(root.timer.progress, 0, 1);
-                                height: 3px;
-                                border-radius: 1.5px;
-                                background: root.accent;
+                            VerticalLayout {
+                                spacing: 2px;
+                                alignment: center;
+                                horizontal-stretch: 1;
+
+                                // Titre, et le visualiseur à sa droite (désactivé par
+                                // défaut). Les barres restent en place pendant les
+                                // silences, estompées : rien ne bouge autour.
+                                HorizontalLayout {
+                                    spacing: 8px;
+
+                                    Text {
+                                        text: root.media.title;
+                                        color: root.fg;
+                                        font-size: 15px;
+                                        font-weight: 700;
+                                        overflow: elide;
+                                        horizontal-stretch: 1;
+                                    }
+
+                                    if root.viz-bars.length > 0: HorizontalLayout {
+                                        spacing: 2px;
+                                        alignment: end;
+                                        height: 14px;
+                                        y: (parent.height - self.height) / 2;
+                                        opacity: root.viz-quiet ? 0 : 1;
+                                        animate opacity { duration: 300ms; }
+
+                                        for level in root.viz-bars: Rectangle {
+                                            width: 3px;
+                                            y: parent.height - self.height;
+                                            height: max(2px, 14px * clamp(level, 0, 1));
+                                            border-radius: 1.5px;
+                                            background: root.accent;
+                                        }
+                                    }
+                                }
+
+                                // Artiste, puis la source (cliquable s'il y en a plusieurs).
+                                HorizontalLayout {
+                                    spacing: 6px;
+
+                                    Text {
+                                        text: root.media.artist;
+                                        color: root.fg.with-alpha(0.55);
+                                        font-size: 12px;
+                                        overflow: elide;
+                                        horizontal-stretch: 1;
+                                    }
+
+                                    Text {
+                                        text: root.media.multi-source ? root.media.source + "  ⇄" : root.media.source;
+                                        color: source-ta.has-hover && root.media.multi-source ? root.fg : root.fg.with-alpha(0.4);
+                                        font-size: 11px;
+                                        overflow: elide;
+                                        max-width: 110px;
+                                        horizontal-alignment: right;
+
+                                        source-ta := TouchArea {
+                                            enabled: root.media.multi-source;
+                                            clicked => { root.media-action("source"); }
+                                        }
+                                    }
+                                }
+
+                                if root.media.has-timeline: HorizontalLayout {
+                                    spacing: 6px;
+                                    padding-top: 4px;
+
+                                    Text {
+                                        text: root.media.position;
+                                        color: root.fg.with-alpha(0.5);
+                                        font-size: 10px;
+                                        vertical-alignment: center;
+                                    }
+
+                                    bar := Rectangle {
+                                        height: 12px;
+                                        horizontal-stretch: 1;
+
+                                        property <bool> grab: bar-ta.has-hover && root.media.can-seek;
+
+                                        Rectangle {
+                                            y: (parent.height - self.height) / 2;
+                                            height: bar.grab ? 6px : 4px;
+                                            border-radius: self.height / 2;
+                                            background: root.fg.with-alpha(0.14);
+                                            animate height { duration: 120ms; }
+                                        }
+
+                                        Rectangle {
+                                            x: 0;
+                                            y: (parent.height - self.height) / 2;
+                                            width: parent.width * clamp(root.media.progress, 0, 1);
+                                            height: bar.grab ? 6px : 4px;
+                                            border-radius: self.height / 2;
+                                            background: @linear-gradient(90deg, root.accent.with-alpha(0.7) 0%, root.accent 100%);
+                                            animate height { duration: 120ms; }
+                                        }
+
+                                        // Curseur au survol, là où la lecture en est.
+                                        Rectangle {
+                                            width: bar.grab ? 12px : 0px;
+                                            height: self.width;
+                                            x: parent.width * clamp(root.media.progress, 0, 1) - self.width / 2;
+                                            y: (parent.height - self.height) / 2;
+                                            border-radius: self.width / 2;
+                                            background: root.fg;
+                                            drop-shadow-blur: 4px;
+                                            drop-shadow-color: root.bg.with-alpha(0.5);
+                                            animate width { duration: 120ms; }
+                                        }
+
+                                        bar-ta := TouchArea {
+                                            enabled: root.media.can-seek;
+                                            clicked => { root.media-seek(self.mouse-x / self.width); }
+                                        }
+                                    }
+
+                                    Text {
+                                        text: root.media.duration;
+                                        color: root.fg.with-alpha(0.5);
+                                        font-size: 10px;
+                                        vertical-alignment: center;
+                                    }
+                                }
                             }
-                        }
-
-                        if root.timer.phase == 1: PillButton {
-                            text: @tr("Pause");
-                            fill: root.fg.with-alpha(0.09);
-                            ink: root.fg;
-                            clicked => { root.timer-action("pause"); }
-                        }
-
-                        if root.timer.phase == 2: PillButton {
-                            text: @tr("Resume");
-                            fill: root.accent;
-                            ink: root.bg;
-                            clicked => { root.timer-action("resume"); }
-                        }
-
-                        if root.timer.phase == 1 || root.timer.phase == 2: PillButton {
-                            text: @tr("Reset");
-                            fill: transparent;
-                            ink: root.fg.with-alpha(0.8);
-                            line: root.fg.with-alpha(0.25);
-                            clicked => { root.timer-action("reset"); }
-                        }
-
-                        if root.timer.phase == 3: PillButton {
-                            text: @tr("OK");
-                            fill: root.accent;
-                            ink: root.bg;
-                            clicked => { root.timer-action("reset"); }
-                        }
-                    }
-
-                    // Plugins WASM : une ligne de texte par plugin.
-                    if !root.has-prompt && root.plugin-rows.length > 0: VerticalLayout {
-                        spacing: 2px;
-
-                        for plugin in root.plugin-rows: Rectangle {
-                            height: 22px;
 
                             HorizontalLayout {
-                                padding-left: 6px;
+                                spacing: 2px;
+                                alignment: center;
+                                horizontal-stretch: 0;
+
+                                IconButton {
+                                    y: (parent.height - self.height) / 2;
+                                    icon: "previous";
+                                    ink: root.fg;
+                                    enabled: root.media.can-previous;
+                                    clicked => { root.media-action("prev"); }
+                                }
+
+                                IconButton {
+                                    y: (parent.height - self.height) / 2;
+                                    size: 38px;
+                                    filled: true;
+                                    hole: root.bg.with-alpha(1);
+                                    icon: root.media.playing ? "pause" : "play";
+                                    ink: root.fg;
+                                    enabled: root.media.can-toggle;
+                                    clicked => { root.media-action("toggle"); }
+                                }
+
+                                IconButton {
+                                    y: (parent.height - self.height) / 2;
+                                    icon: "next";
+                                    ink: root.fg;
+                                    enabled: root.media.can-next;
+                                    clicked => { root.media-action("next"); }
+                                }
+                            }
+                        }
+
+                        // Demande de permission de Claude Code.
+                        if root.has-prompt: VerticalLayout {
+                            spacing: 6px;
+
+                            Text {
+                                text: @tr("{} wants to use {}", root.prompt.project, root.prompt.tool);
+                                color: root.accent;
+                                font-size: 14px;
+                                font-weight: 600;
+                                overflow: elide;
+                            }
+
+                            Text {
+                                text: root.prompt.detail;
+                                color: root.fg.with-alpha(0.75);
+                                font-size: 12px;
+                                font-family: "Consolas";
+                                overflow: elide;
+                            }
+
+                            HorizontalLayout {
                                 spacing: 8px;
 
-                                Text {
-                                    text: plugin.name;
-                                    color: root.fg.with-alpha(0.55);
-                                    font-size: 12px;
-                                    font-weight: 600;
-                                    vertical-alignment: center;
+                                PillButton {
+                                    text: @tr("Allow");
+                                    fill: root.accent;
+                                    ink: root.bg;
+                                    clicked => { root.claude-decide(root.prompt.id, "allow"); }
+                                }
+
+                                PillButton {
+                                    text: @tr("Deny");
+                                    fill: root.fg.with-alpha(0.09);
+                                    ink: root.fg;
+                                    clicked => { root.claude-decide(root.prompt.id, "deny"); }
+                                }
+
+                                PillButton {
+                                    text: @tr("Terminal");
+                                    fill: transparent;
+                                    ink: root.fg.with-alpha(0.8);
+                                    line: root.fg.with-alpha(0.25);
+                                    clicked => { root.claude-decide(root.prompt.id, "ask"); }
+                                }
+                            }
+                        }
+
+                        // Minuteur : durées prédéfinies, compte à rebours, pause.
+                        if !root.has-prompt && root.has-timer: HorizontalLayout {
+                            height: 30px;
+                            spacing: 6px;
+                            padding-left: 6px;
+
+                            Text {
+                                text: root.timer.phase == 0 ? @tr("Timer")
+                                    : root.timer.phase == 3 ? @tr("Time's up!") : root.timer.time;
+                                color: root.timer.phase == 0 ? root.fg.with-alpha(0.7) : root.accent;
+                                font-size: root.timer.phase == 0 ? 12px : 16px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                                min-width: 64px;
+                            }
+
+                            if root.timer.phase == 0: HorizontalLayout {
+                                spacing: 6px;
+                                alignment: start;
+                                horizontal-stretch: 1;
+
+                                for minutes in root.timer.presets: PillButton {
+                                    grow: false;
                                     min-width: 64px;
-                                }
-
-                                Text {
-                                    text: plugin.text;
-                                    color: plugin.attention > 0 ? root.accent : root.fg;
-                                    font-size: 12px;
-                                    vertical-alignment: center;
-                                    overflow: elide;
-                                    horizontal-stretch: 1;
+                                    text: @tr("{} min", minutes);
+                                    fill: root.fg.with-alpha(0.09);
+                                    ink: root.fg;
+                                    clicked => { root.timer-action("start:" + minutes); }
                                 }
                             }
-                        }
-                    }
 
-                    // Étagère : fichiers déposés sur l'île, un clic les ouvre.
-                    if !root.has-prompt && root.shelf-rows.length > 0: HorizontalLayout {
-                        height: 28px;
-                        spacing: 6px;
-                        padding-left: 6px;
+                            if root.timer.phase == 1 || root.timer.phase == 2: Rectangle {
+                                horizontal-stretch: 1;
+                                height: 12px;
 
-                        Text {
-                            text: @tr("Shelf");
-                            color: root.fg.with-alpha(0.7);
-                            font-size: 12px;
-                            font-weight: 600;
-                            vertical-alignment: center;
-                            min-width: 64px;
-                        }
-
-                        for item[i] in root.shelf-rows: Rectangle {
-                            horizontal-stretch: 1;
-                            height: 24px;
-                            border-radius: 12px;
-                            background: chip-ta.has-hover ? root.fg.with-alpha(0.2) : root.fg.with-alpha(0.12);
-
-                            chip-ta := TouchArea {
-                                clicked => { root.shelf-open(i); }
-                            }
-
-                            HorizontalLayout {
-                                padding-left: 10px;
-                                padding-right: 2px;
-                                spacing: 2px;
-
-                                Text {
-                                    text: item.name;
-                                    color: root.fg;
-                                    font-size: 12px;
-                                    vertical-alignment: center;
-                                    overflow: elide;
-                                    horizontal-stretch: 1;
+                                Rectangle {
+                                    y: (parent.height - self.height) / 2;
+                                    height: 3px;
+                                    border-radius: 1.5px;
+                                    background: root.fg.with-alpha(0.15);
                                 }
 
                                 Rectangle {
-                                    width: 20px;
+                                    y: (parent.height - self.height) / 2;
+                                    width: parent.width * clamp(root.timer.progress, 0, 1);
+                                    height: 3px;
+                                    border-radius: 1.5px;
+                                    background: root.accent;
+                                }
+                            }
+
+                            if root.timer.phase == 1: PillButton {
+                                text: @tr("Pause");
+                                fill: root.fg.with-alpha(0.09);
+                                ink: root.fg;
+                                clicked => { root.timer-action("pause"); }
+                            }
+
+                            if root.timer.phase == 2: PillButton {
+                                text: @tr("Resume");
+                                fill: root.accent;
+                                ink: root.bg;
+                                clicked => { root.timer-action("resume"); }
+                            }
+
+                            if root.timer.phase == 1 || root.timer.phase == 2: PillButton {
+                                text: @tr("Reset");
+                                fill: transparent;
+                                ink: root.fg.with-alpha(0.8);
+                                line: root.fg.with-alpha(0.25);
+                                clicked => { root.timer-action("reset"); }
+                            }
+
+                            if root.timer.phase == 3: PillButton {
+                                text: @tr("OK");
+                                fill: root.accent;
+                                ink: root.bg;
+                                clicked => { root.timer-action("reset"); }
+                            }
+                        }
+
+                        // Plugins WASM : une ligne de texte par plugin.
+                        if !root.has-prompt && root.plugin-rows.length > 0: VerticalLayout {
+                            spacing: 2px;
+
+                            for plugin in root.plugin-rows: Rectangle {
+                                height: 22px;
+
+                                HorizontalLayout {
+                                    padding-left: 6px;
+                                    spacing: 8px;
+
                                     Text {
-                                        text: "×";
-                                        color: root.fg.with-alpha(0.7);
-                                        font-size: 14px;
-                                        horizontal-alignment: center;
+                                        text: plugin.name;
+                                        color: root.fg.with-alpha(0.55);
+                                        font-size: 12px;
+                                        font-weight: 600;
                                         vertical-alignment: center;
+                                        min-width: 64px;
                                     }
-                                    TouchArea {
-                                        clicked => { root.shelf-remove(i); }
+
+                                    Text {
+                                        text: plugin.text;
+                                        color: plugin.attention > 0 ? root.accent : root.fg;
+                                        font-size: 12px;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                        horizontal-stretch: 1;
                                     }
                                 }
                             }
                         }
 
-                        if root.shelf-more != "": Text {
-                            text: root.shelf-more;
-                            color: root.fg.with-alpha(0.6);
-                            font-size: 12px;
-                            vertical-alignment: center;
+                        // Étagère : fichiers déposés sur l'île, un clic les ouvre.
+                        if !root.has-prompt && root.shelf-rows.length > 0: HorizontalLayout {
+                            height: 28px;
+                            spacing: 6px;
+                            padding-left: 6px;
+
+                            Text {
+                                text: @tr("Shelf");
+                                color: root.fg.with-alpha(0.7);
+                                font-size: 12px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                                min-width: 64px;
+                            }
+
+                            for item[i] in root.shelf-rows: Rectangle {
+                                horizontal-stretch: 1;
+                                height: 24px;
+                                border-radius: 12px;
+                                background: chip-ta.has-hover ? root.fg.with-alpha(0.2) : root.fg.with-alpha(0.12);
+
+                                chip-ta := TouchArea {
+                                    clicked => { root.shelf-open(i); }
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: 10px;
+                                    padding-right: 2px;
+                                    spacing: 2px;
+
+                                    Text {
+                                        text: item.name;
+                                        color: root.fg;
+                                        font-size: 12px;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                        horizontal-stretch: 1;
+                                    }
+
+                                    Rectangle {
+                                        width: 20px;
+                                        Text {
+                                            text: "×";
+                                            color: root.fg.with-alpha(0.7);
+                                            font-size: 14px;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                        TouchArea {
+                                            clicked => { root.shelf-remove(i); }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if root.shelf-more != "": Text {
+                                text: root.shelf-more;
+                                color: root.fg.with-alpha(0.6);
+                                font-size: 12px;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        // Agenda : prochaines réunions, bouton « Rejoindre ».
+                        if !root.has-prompt && root.agenda-rows.length > 0: VerticalLayout {
+                            spacing: 2px;
+
+                            for item in root.agenda-rows: Rectangle {
+                                height: 24px;
+
+                                HorizontalLayout {
+                                    padding-left: 6px;
+                                    padding-right: 2px;
+                                    spacing: 8px;
+
+                                    Dot {
+                                        y: (parent.height - self.height) / 2;
+                                        background: item.soon ? root.accent : root.fg.with-alpha(0.35);
+                                    }
+
+                                    Text {
+                                        text: item.time;
+                                        color: item.soon ? root.accent : root.fg.with-alpha(0.7);
+                                        font-size: 12px;
+                                        font-weight: 600;
+                                        vertical-alignment: center;
+                                    }
+
+                                    if item.location != "": Text {
+                                        text: item.location;
+                                        color: root.fg.with-alpha(0.55);
+                                        font-size: 12px;
+                                        font-weight: 600;
+                                        vertical-alignment: center;
+                                    }
+
+                                    Text {
+                                        text: item.title;
+                                        color: root.fg;
+                                        font-size: 13px;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                        horizontal-stretch: 1;
+                                    }
+
+                                    if item.relative != "": Text {
+                                        text: item.relative;
+                                        color: item.soon ? root.accent : root.fg.with-alpha(0.55);
+                                        font-size: 12px;
+                                        vertical-alignment: center;
+                                    }
+
+                                    if item.has-join: Rectangle {
+                                        width: join-label.preferred-width + 16px;
+                                        height: 20px;
+                                        y: (parent.height - self.height) / 2;
+                                        border-radius: 10px;
+                                        background: join-ta.has-hover ? root.accent.brighter(0.15) : root.accent;
+
+                                        join-label := Text {
+                                            text: @tr("Join");
+                                            color: root.bg;
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+
+                                        join-ta := TouchArea {
+                                            clicked => { root.open-url(item.join-url); }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Sessions Claude Code en cours, en pastilles (clic : ramène
+                        // le terminal) ; celle qui t'attend est teintée de l'accent.
+                        if !root.has-prompt && root.claude-rows.length > 0: VerticalLayout {
+                            spacing: 2px;
+
+                            for row in root.claude-rows: Rectangle {
+                                height: 24px;
+                                border-radius: 8px;
+                                background: row.kind == "wait" ? root.accent.with-alpha(row-ta.has-hover ? 0.24 : 0.14)
+                                    : root.fg.with-alpha(row-ta.has-hover ? 0.1 : 0.05);
+                                animate background { duration: 120ms; }
+
+                                HorizontalLayout {
+                                    padding-left: 4px;
+                                    padding-right: 8px;
+                                    spacing: 8px;
+
+                                    ClaudeBadge {
+                                        y: (parent.height - self.height) / 2;
+                                        kind: row.kind;
+                                        ink: root.fg;
+                                        accent: root.accent;
+                                        ok: root.ok-color;
+                                        iris: root.iris;
+                                    }
+
+                                    Text {
+                                        text: row.project;
+                                        color: root.fg;
+                                        font-size: 12.5px;
+                                        font-weight: 650;
+                                        vertical-alignment: center;
+                                    }
+
+                                    Text {
+                                        text: row.status;
+                                        color: row.kind == "wait" ? root.accent : root.fg.with-alpha(0.6);
+                                        font-size: 12px;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                        horizontal-stretch: 1;
+                                    }
+
+                                    // Au survol : on peut y aller.
+                                    Text {
+                                        text: "›";
+                                        color: root.fg.with-alpha(0.7);
+                                        font-size: 16px;
+                                        font-weight: 600;
+                                        vertical-alignment: center;
+                                        opacity: row-ta.has-hover ? 1 : 0;
+                                        animate opacity { duration: 120ms; }
+                                    }
+                                }
+
+                                row-ta := TouchArea {
+                                    clicked => { root.claude-focus(row.id); }
+                                }
+                            }
+                        }
+
+                        if !root.has-prompt && !root.has-media && root.claude-rows.length == 0 && root.agenda-rows.length == 0: Text {
+                            text: root.has-attention ? root.attention-label : @tr("All quiet");
+                            color: root.has-attention && root.urgent ? root.accent : root.fg.with-alpha(0.75);
+                            font-size: 14px;
+                            overflow: elide;
+                        }
+                    }
+                }
+
+                // Onglet Claude : carte de consommation (jauge circulaire) et
+                // conversations récentes en cartes (clic : la reprendre).
+                if root.tab == 1: HorizontalLayout {
+                    spacing: 10px;
+                    vertical-stretch: 1;
+
+                    Rectangle {
+                        width: 128px;
+                        border-radius: 14px;
+                        border-width: 1px;
+                        border-color: root.fg.with-alpha(0.07);
+                        background: @linear-gradient(160deg, root.accent.with-alpha(0.18) 0%, root.fg.with-alpha(0.04) 75%);
+
+                        VerticalLayout {
+                            padding: 8px;
+                            spacing: 4px;
+                            alignment: center;
+
+                            // Avec une limite : la part utilisée, en jauge.
+                            if root.usage-active && root.usage-has-limit: HorizontalLayout {
+                                alignment: center;
+
+                                UsageRing {
+                                    ratio: root.usage-ratio;
+                                    ink: root.usage-ratio > 0.85 ? root.alert-color : root.accent;
+                                    track: root.fg.with-alpha(0.12);
+                                    hole: root.bg.with-alpha(1);
+                                    label: Math.round(clamp(root.usage-ratio, 0, 9.99) * 100) + "%";
+                                    label-color: root.fg;
+                                }
+                            }
+
+                            // Sans limite : les jetons en grand.
+                            if root.usage-active && !root.usage-has-limit: Text {
+                                text: root.usage-used;
+                                color: root.fg;
+                                font-size: 26px;
+                                font-weight: 800;
+                                horizontal-alignment: center;
+                            }
+
+                            if root.usage-active: Text {
+                                text: root.usage-has-limit ? root.usage-used + " / " + root.usage-limit : @tr("tokens");
+                                color: root.fg.with-alpha(0.8);
+                                font-size: 11px;
+                                font-weight: 600;
+                                horizontal-alignment: center;
+                                overflow: elide;
+                            }
+
+                            if root.usage-active: Text {
+                                text: @tr("resets in {}", root.usage-reset);
+                                color: root.fg.with-alpha(0.5);
+                                font-size: 10.5px;
+                                horizontal-alignment: center;
+                                overflow: elide;
+                            }
+
+                            if !root.usage-active: Text {
+                                text: @tr("No active usage window");
+                                color: root.fg.with-alpha(0.55);
+                                font-size: 11px;
+                                wrap: word-wrap;
+                                horizontal-alignment: center;
+                            }
                         }
                     }
 
-                    // Agenda : prochaines réunions, bouton « Rejoindre ».
-                    if !root.has-prompt && root.agenda-rows.length > 0: VerticalLayout {
-                        spacing: 2px;
+                    // Deux colonnes de cartes, qui arrivent l'une après l'autre.
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        property <length> gap: 8px;
+                        property <length> cw: (self.width - self.gap) / 2;
+                        property <length> ch: (self.height - self.gap) / 2;
 
-                        for item in root.agenda-rows: Rectangle {
-                            height: 24px;
+                        for item[i] in root.recent-rows: Rectangle {
+                            property <bool> shown;
+                            init => { self.shown = true; }
+                            x: Math.mod(i, 2) * (parent.cw + parent.gap);
+                            y: Math.floor(i / 2) * (parent.ch + parent.gap) + (self.shown ? 0px : 8px);
+                            width: parent.cw;
+                            height: parent.ch;
+                            opacity: self.shown ? 1 : 0;
+                            animate opacity, y { duration: 280ms; delay: i * 50ms; easing: ease-out-quint; }
+                            border-radius: 12px;
+                            border-width: 1px;
+                            border-color: recent-ta.has-hover ? root.accent.with-alpha(0.55) : root.fg.with-alpha(0.06);
+                            background: root.fg.with-alpha(recent-ta.has-hover ? 0.1 : 0.05);
+                            animate border-color, background { duration: 150ms; }
 
-                            HorizontalLayout {
-                                padding-left: 6px;
-                                padding-right: 2px;
-                                spacing: 8px;
+                            recent-ta := TouchArea {
+                                clicked => { root.recent-open(item.id); }
+                            }
 
-                                Dot {
-                                    y: (parent.height - self.height) / 2;
-                                    background: item.soon ? root.accent : root.fg.with-alpha(0.35);
-                                }
+                            VerticalLayout {
+                                padding: 7px;
+                                padding-left: 10px;
+                                padding-right: 10px;
+                                spacing: 2px;
 
-                                Text {
-                                    text: item.time;
-                                    color: item.soon ? root.accent : root.fg.with-alpha(0.7);
-                                    font-size: 12px;
-                                    font-weight: 600;
-                                    vertical-alignment: center;
-                                }
+                                HorizontalLayout {
+                                    spacing: 5px;
 
-                                if item.location != "": Text {
-                                    text: item.location;
-                                    color: root.fg.with-alpha(0.55);
-                                    font-size: 12px;
-                                    font-weight: 600;
-                                    vertical-alignment: center;
+                                    Rectangle {
+                                        width: 6px;
+                                        height: 6px;
+                                        y: (parent.height - self.height) / 2;
+                                        border-radius: 3px;
+                                        background: root.accent;
+                                    }
+
+                                    Text {
+                                        text: item.project;
+                                        color: root.fg.with-alpha(0.6);
+                                        font-size: 10.5px;
+                                        font-weight: 600;
+                                        overflow: elide;
+                                        horizontal-stretch: 1;
+                                    }
+
+                                    Text {
+                                        text: item.ago;
+                                        color: root.fg.with-alpha(0.4);
+                                        font-size: 10.5px;
+                                    }
                                 }
 
                                 Text {
                                     text: item.title;
                                     color: root.fg;
-                                    font-size: 13px;
-                                    vertical-alignment: center;
-                                    overflow: elide;
-                                    horizontal-stretch: 1;
-                                }
-
-                                if item.relative != "": Text {
-                                    text: item.relative;
-                                    color: item.soon ? root.accent : root.fg.with-alpha(0.55);
                                     font-size: 12px;
-                                    vertical-alignment: center;
-                                }
-
-                                if item.has-join: Rectangle {
-                                    width: join-label.preferred-width + 16px;
-                                    height: 20px;
-                                    y: (parent.height - self.height) / 2;
-                                    border-radius: 10px;
-                                    background: join-ta.has-hover ? root.accent.brighter(0.15) : root.accent;
-
-                                    join-label := Text {
-                                        text: @tr("Join");
-                                        color: root.bg;
-                                        font-size: 11px;
-                                        font-weight: 700;
-                                        horizontal-alignment: center;
-                                        vertical-alignment: center;
-                                    }
-
-                                    join-ta := TouchArea {
-                                        clicked => { root.open-url(item.join-url); }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Sessions Claude Code en cours (clic : ramène le terminal).
-                    if !root.has-prompt && root.claude-rows.length > 0: VerticalLayout {
-                        spacing: 2px;
-
-                        for row in root.claude-rows: Rectangle {
-                            height: 24px;
-                            border-radius: 6px;
-                            background: row-ta.has-hover ? root.fg.with-alpha(0.08) : transparent;
-
-                            HorizontalLayout {
-                                padding-left: 6px;
-                                padding-right: 6px;
-                                spacing: 8px;
-
-                                Dot {
-                                    y: (parent.height - self.height) / 2;
-                                    background: row.urgent ? root.accent
-                                        : row.active ? root.fg.with-alpha(0.7) : root.fg.with-alpha(0.25);
-                                }
-
-                                Text {
-                                    text: row.project;
-                                    color: root.fg;
-                                    font-size: 13px;
                                     font-weight: 600;
-                                    vertical-alignment: center;
-                                }
-
-                                Text {
-                                    text: row.status;
-                                    color: row.urgent ? root.accent : root.fg.with-alpha(0.6);
-                                    font-size: 13px;
-                                    vertical-alignment: center;
+                                    wrap: word-wrap;
                                     overflow: elide;
-                                    horizontal-stretch: 1;
+                                    vertical-stretch: 1;
                                 }
                             }
 
-                            row-ta := TouchArea {
-                                clicked => { root.claude-focus(row.id); }
+                            // Reprendre : un bouton lecture au survol.
+                            Rectangle {
+                                x: parent.width - self.width - 6px;
+                                y: parent.height - self.height - 6px;
+                                width: 20px;
+                                height: 20px;
+                                border-radius: 10px;
+                                background: root.accent;
+                                opacity: recent-ta.has-hover ? 1 : 0;
+                                animate opacity { duration: 150ms; }
+
+                                Path {
+                                    x: 7px;
+                                    y: 5.5px;
+                                    width: 8px;
+                                    height: 9px;
+                                    viewbox-width: 8;
+                                    viewbox-height: 9;
+                                    fill: white;
+                                    commands: "M0 0 L8 4.5 L0 9 Z";
+                                }
                             }
                         }
-                    }
 
-                    if !root.has-prompt && !root.has-media && root.claude-rows.length == 0 && root.agenda-rows.length == 0: Text {
-                        text: root.has-attention ? root.attention-label : @tr("All quiet");
-                        color: root.has-attention && root.urgent ? root.accent : root.fg.with-alpha(0.75);
-                        font-size: 14px;
-                        overflow: elide;
+                        if root.recent-rows.length == 0: Text {
+                            width: parent.width;
+                            height: parent.height;
+                            text: @tr("No conversation found");
+                            color: root.fg.with-alpha(0.5);
+                            font-size: 12px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
                     }
                 }
 
-                // Onglet Claude : consommation estimée et conversations récentes.
-                if root.tab == 1: VerticalLayout {
-                    spacing: 3px;
-                    alignment: start;
+                // Onglet des notifications : des cartes sur deux colonnes, à la
+                // couleur de l'application. Un clic ouvre l'application, × la retire.
+                if root.tab == 2: Rectangle {
                     vertical-stretch: 1;
+                    property <length> gap: 8px;
+                    property <length> cw: (self.width - self.gap) / 2;
+                    property <length> ch: (self.height - self.gap) / 2;
 
-                    Text {
-                        text: root.usage-text;
-                        color: root.fg.with-alpha(0.8);
-                        font-size: 12px;
-                        overflow: elide;
-                    }
-
-                    if root.usage-has-limit: Rectangle {
-                        height: 4px;
-                        border-radius: 2px;
-                        background: root.fg.with-alpha(0.15);
-
-                        Rectangle {
-                            x: 0;
-                            width: parent.width * clamp(root.usage-ratio, 0, 1);
-                            border-radius: 2px;
-                            background: root.usage-ratio > 0.85 ? root.alert-color : root.accent;
-                        }
-                    }
-
-                    for item in root.recent-rows: Rectangle {
-                        height: 20px;
-                        border-radius: 6px;
-                        background: recent-ta.has-hover ? root.fg.with-alpha(0.12) : transparent;
-
-                        recent-ta := TouchArea {
-                            clicked => { root.recent-open(item.id); }
-                        }
-
-                        HorizontalLayout {
-                            padding-left: 8px;
-                            padding-right: 8px;
-                            spacing: 10px;
-
-                            Text {
-                                text: item.title;
-                                color: root.fg;
-                                font-size: 12px;
-                                vertical-alignment: center;
-                                overflow: elide;
-                                horizontal-stretch: 1;
-                            }
-
-                            Text {
-                                text: item.meta;
-                                color: root.fg.with-alpha(0.5);
-                                font-size: 11px;
-                                vertical-alignment: center;
-                                horizontal-alignment: right;
-                            }
-                        }
-                    }
-
-                    if root.recent-rows.length == 0: Text {
-                        text: @tr("No conversation found");
-                        color: root.fg.with-alpha(0.5);
-                        font-size: 12px;
-                    }
-                }
-
-                // Onglet des notifications : les dernières, un clic ouvre l'application.
-                if root.tab == 2: VerticalLayout {
-                    spacing: 2px;
-                    alignment: start;
-                    vertical-stretch: 1;
-
-                    if root.dnd: Text {
-                        height: 22px;
-                        text: @tr("Do not disturb: notifications arrive here without popping up");
-                        color: root.accent;
-                        font-size: 12px;
-                        vertical-alignment: center;
-                        overflow: elide;
-                    }
-
-                    for item in root.notif-rows: Rectangle {
-                        height: 26px;
-                        border-radius: 8px;
-                        background: notif-ta.has-hover || close-ta.has-hover ? root.fg.with-alpha(0.08) : transparent;
+                    for item[i] in root.notif-rows: Rectangle {
+                        property <bool> shown;
+                        property <bool> hover: notif-ta.has-hover || close-ta.has-hover;
+                        init => { self.shown = true; }
+                        x: Math.mod(i, 2) * (parent.cw + parent.gap);
+                        y: Math.floor(i / 2) * (parent.ch + parent.gap) + (self.shown ? 0px : 8px);
+                        width: parent.cw;
+                        height: parent.ch;
+                        opacity: self.shown ? 1 : 0;
+                        animate opacity, y { duration: 280ms; delay: i * 50ms; easing: ease-out-quint; }
+                        border-radius: 14px;
+                        border-width: 1px;
+                        border-color: item.tint.with-alpha(self.hover ? 0.6 : 0.25);
+                        background: @linear-gradient(120deg, item.tint.with-alpha(self.hover ? 0.32 : 0.2) 0%, root.fg.with-alpha(0.04) 75%);
+                        clip: true;
 
                         notif-ta := TouchArea {
                             clicked => { root.notif-action("open:" + item.id); }
                         }
 
                         HorizontalLayout {
-                            padding-left: 6px;
-                            padding-right: 4px;
-                            spacing: 8px;
+                            padding: 8px;
+                            padding-left: 9px;
+                            padding-right: 10px;
+                            spacing: 9px;
 
                             Avatar {
-                                size: 18px;
+                                size: 30px;
                                 y: (parent.height - self.height) / 2;
                                 initial: item.initial;
                                 tint: item.tint;
@@ -1993,65 +2595,149 @@ export component Island inherits Window {
                                 icon: item.icon;
                             }
 
-                            Text {
-                                text: item.app;
-                                color: item.tint;
-                                font-size: 12px;
-                                font-weight: 700;
-                                vertical-alignment: center;
-                            }
-
-                            if item.title != "": Text {
-                                text: item.title;
-                                color: root.fg;
-                                font-size: 12px;
-                                font-weight: 600;
-                                vertical-alignment: center;
-                                overflow: elide;
-                                max-width: 140px;
-                            }
-
-                            Text {
-                                text: item.body;
-                                color: root.fg.with-alpha(0.6);
-                                font-size: 12px;
-                                vertical-alignment: center;
-                                overflow: elide;
+                            VerticalLayout {
+                                alignment: center;
+                                spacing: 1px;
                                 horizontal-stretch: 1;
-                            }
 
-                            Text {
-                                text: item.ago;
-                                color: root.fg.with-alpha(0.45);
-                                font-size: 11px;
-                                vertical-alignment: center;
-                            }
+                                HorizontalLayout {
+                                    spacing: 6px;
 
-                            Rectangle {
-                                width: 18px;
-                                opacity: notif-ta.has-hover || close-ta.has-hover ? 1 : 0;
+                                    Text {
+                                        text: item.app;
+                                        color: item.tint.brighter(0.25);
+                                        font-size: 10.5px;
+                                        font-weight: 700;
+                                        overflow: elide;
+                                        horizontal-stretch: 1;
+                                    }
+
+                                    Text {
+                                        text: item.ago;
+                                        color: root.fg.with-alpha(0.45);
+                                        font-size: 10px;
+                                    }
+                                }
 
                                 Text {
-                                    text: "×";
-                                    color: close-ta.has-hover ? root.accent : root.fg.with-alpha(0.7);
-                                    font-size: 14px;
-                                    horizontal-alignment: center;
-                                    vertical-alignment: center;
+                                    text: item.title != "" ? item.title : item.body;
+                                    color: root.fg;
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    overflow: elide;
                                 }
 
-                                close-ta := TouchArea {
-                                    clicked => { root.notif-action("remove:" + item.id); }
+                                if item.title != "" && item.body != "": Text {
+                                    text: item.body;
+                                    color: root.fg.with-alpha(0.65);
+                                    font-size: 11px;
+                                    overflow: elide;
                                 }
+                            }
+                        }
+
+                        // × : retirer la notification (au survol).
+                        Rectangle {
+                            x: parent.width - self.width - 5px;
+                            y: 5px;
+                            width: 18px;
+                            height: 18px;
+                            border-radius: 9px;
+                            background: close-ta.has-hover ? root.fg.with-alpha(0.3) : root.bg.with-alpha(0.7);
+                            opacity: parent.hover ? 1 : 0;
+                            animate opacity { duration: 120ms; }
+
+                            Text {
+                                text: "×";
+                                color: root.fg;
+                                font-size: 13px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            close-ta := TouchArea {
+                                clicked => { root.notif-action("remove:" + item.id); }
                             }
                         }
                     }
 
-                    if root.notif-rows.length == 0: Text {
+                    // Ne pas déranger : une carte de plus, à la suite des autres.
+                    if root.dnd: Rectangle {
+                        property <int> i: root.notif-rows.length;
+                        x: Math.mod(self.i, 2) * (parent.cw + parent.gap);
+                        y: Math.floor(self.i / 2) * (parent.ch + parent.gap);
+                        width: parent.cw;
+                        height: parent.ch;
+                        border-radius: 14px;
+                        border-width: 1px;
+                        border-color: root.accent.with-alpha(0.3);
+                        background: root.accent.with-alpha(0.1);
+
+                        HorizontalLayout {
+                            padding: 10px;
+                            spacing: 10px;
+
+                            Path {
+                                width: 20px;
+                                height: 20px;
+                                y: (parent.height - self.height) / 2;
+                                viewbox-width: 24;
+                                viewbox-height: 24;
+                                fill: root.accent;
+                                commands: "M 20.5 14.5 A 9 9 0 1 1 9.5 3.5 A 7 7 0 0 0 20.5 14.5 Z";
+                            }
+
+                            Text {
+                                text: @tr("Do not disturb: notifications arrive here without popping up");
+                                color: root.accent;
+                                font-size: 11.5px;
+                                wrap: word-wrap;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+                        }
+                    }
+
+                    if root.notif-rows.length == 0 && !root.dnd: Text {
+                        width: parent.width;
+                        height: parent.height;
                         text: @tr("No notifications");
                         color: root.fg.with-alpha(0.5);
                         font-size: 12px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
                     }
                 }
+            }
+        }
+        // Halo de Claude, par-dessus le contenu (un Rectangle ne capte pas la
+        // souris). Deux contours : un trait net et une lueur plus large.
+        if root.glowing: Rectangle {
+            property <bool> comet: root.claude-glow != "work" && root.claude-glow != "wait";
+            property <brush> ink: root.claude-glow == "wait" ? root.accent
+                : self.comet ? @conic-gradient(from root.sweep * 360deg, transparent 0deg, transparent 200deg, root.ok-color 345deg, transparent 360deg)
+                : root.iris;
+            opacity: root.claude-glow == "wait" ? 0.55 + 0.45 * Math.sin(root.glow-t * 1.6 * 360deg)
+                : self.comet ? Math.min(1, (1 - root.sweep) * 5) : 1;
+
+            Rectangle {
+                border-width: 5px;
+                border-color: parent.ink;
+                opacity: 0.3;
+                border-top-left-radius: pill.top-radius;
+                border-top-right-radius: pill.top-radius;
+                border-bottom-left-radius: pill.radius;
+                border-bottom-right-radius: pill.radius;
+            }
+
+            Rectangle {
+                border-width: 1.6px;
+                border-color: parent.ink;
+                border-top-left-radius: pill.top-radius;
+                border-top-right-radius: pill.top-radius;
+                border-bottom-left-radius: pill.radius;
+                border-bottom-right-radius: pill.radius;
             }
         }
     }

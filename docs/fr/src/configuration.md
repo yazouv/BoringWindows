@@ -52,6 +52,7 @@ name = "Pro"
 | `font` | `""` | nom d'une police installée | police de l'île (vide : celle du système) |
 | `corner_radius` | selon le thème | 0 à 500 | arrondi des coins de l'île ouverte |
 | `blur` | selon le thème (`true` dans `glass`) | `true` / `false` | flou de ce qui est derrière l'île (Windows 11), visible à travers un fond translucide |
+| `glow` | `true` | `true` / `false` | halo animé autour de l'île pendant que Claude travaille ou t'attend |
 | `system_accent` | `false` | `true` / `false` | couleur d'accent de Windows à la place de `accent` |
 | `animation_ms` | `240` | 0 à 2000 | durée des animations, `0` pour aucune |
 | `top_offset` | `0.0` | 0 à 500 | décalage depuis le haut de l'écran ; au-delà de 0, les coins du haut s'arrondissent aussi |
@@ -62,7 +63,7 @@ Tailles (en pixels, avant mise à l'échelle de Windows) :
 |---|---|---|
 | `[theme.compact]` | `width = 190.0`, `height = 32.0` | pilule au repos |
 | `[theme.attention]` | `width = 300.0`, `height = 36.0` | pilule quand un module a quelque chose à dire |
-| `[theme.expanded]` | `width = 520.0`, `height = 170.0` | île ouverte ; doit être au moins aussi grande que les deux autres |
+| `[theme.expanded]` | `width = 580.0`, `height = 170.0` | île ouverte ; doit être au moins aussi grande que les deux autres |
 
 Largeur entre 16 et 4000, hauteur entre 8 et 2000.
 
