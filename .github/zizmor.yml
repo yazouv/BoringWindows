@@ -1,0 +1,6 @@
+# Configuration de zizmor (job `zizmor` de workflows.yml).
+rules:
+  # Suggère la syntaxe `$/…` pour appeler build.yml ; `./…` reste la syntaxe
+  # documentée et comprise par actionlint.
+  self-repository:
+    disable: true

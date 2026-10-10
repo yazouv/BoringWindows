@@ -391,10 +391,10 @@ Note : sur Mac, boring.notch existe déjà ; l'intérêt est surtout d'avoir la 
 
 ### Phase 6 — Distribution
 - [x] release-please : PR de release (version + CHANGELOG) ; la fusionner publie la release
-- [x] Binaires Windows / macOS / Linux + `.sha256` attachés à chaque release (`release.yml`)
-- [x] CI des PR sur un seul runner Linux (clippy des 3 OS, tests)
+- [x] Binaires Windows / macOS / Linux + `.sha256` + attestations de provenance attachés à chaque release (`build.yml`, essai à blanc sur les PR concernées et la PR de release)
+- [x] CI des PR : clippy des 3 OS, tests sur Linux, Windows et macOS, `cargo deny`, Conventional Commits ; `main` protégée (PR + checks obligatoires), actions épinglées par SHA, Dependabot, actionlint + zizmor
 - [x] Mise à jour automatique (GitHub Releases, empreinte vérifiée, jeton facultatif pour un dépôt privé)
-- [x] Installeur Inno Setup (job `installer` de la release, par utilisateur) + manifestes **winget** (première soumission à la main, puis `wingetcreate` avec `WINGET_TOKEN`) : voir `packaging/README.md`
+- [x] Installeur Inno Setup (job Windows de `build.yml`, par utilisateur) + manifestes **winget** (première soumission à la main, puis `wingetcreate` avec `WINGET_TOKEN`) : voir `packaging/README.md`
 - [ ] Signature de code (ex. SignPath, gratuit pour l'open source) pour éviter SmartScreen
 - [x] macOS : binaire Intel (`boringwindows-macos-x64.tar.gz`, compilé depuis le runner Apple Silicon), mise à jour automatique comprise
 - [ ] macOS : bundle `.app` signé + notarisé

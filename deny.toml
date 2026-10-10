@@ -1,0 +1,16 @@
+# cargo-deny : vérifié par le job `deny` de .github/workflows/ci.yml.
+#   cargo deny --all-features check advisories sources
+# Ni les licences (Slint est sous triple licence, à revoir à la main) ni les
+# doublons de versions (inévitables avec windows-rs et Slint).
+
+[advisories]
+# Failles (RustSec) : toujours bloquantes. Crates non maintenus : seulement
+# nos dépendances directes ; les autres viennent de Slint et compagnie, sans
+# alternative de notre côté.
+unmaintained = "workspace"
+ignore = []
+
+[sources]
+# Seulement crates.io : pas de dépendance git ni de registre tiers.
+unknown-registry = "deny"
+unknown-git = "deny"

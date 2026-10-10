@@ -33,15 +33,20 @@ On Linux, building needs `libfontconfig1-dev libxkbcommon-dev`.
 
 ## CI/CD and versioning
 
-- **`ci.yml`**: runs on PRs to `main` and on pushes to `main`, as a single `check` job: fmt, clippy, tests.
-  - **Runner**: the user's `self-hosted` runner for pushes and same-repo PRs. Its build dir (`CARGO_TARGET_DIR`, next to the workspace) persists between runs.
-  - **PRs from forks** run on `ubuntu-latest`, with `rust-cache`. The repo is public: never route fork code to the self-hosted runner.
-  - **Steps depend on the OS**: on Linux, clippy also checks the Windows and macOS targets; on other OSes, only the host.
-  - It skips release-please PRs (`release-please--*` branches): they only touch the version, changelog and lockfile.
-- **`release.yml`**: release-please runs on every push to `main`. It keeps a "chore: release x.y.z" PR open. Merging that PR tags `vX.Y.Z`, builds the Windows, macOS and Linux binaries, and attaches them with `.sha256` files. The updater depends on the asset names in that workflow and in `bw_update::asset_name()`; keep them in sync. One job per OS: macOS builds both architectures in a single job, and the Windows job also builds `installer/boringwindows.iss` (Inno Setup) and updates the `Yazouv.BoringWindows` winget package (skipped when the `WINGET_TOKEN` secret is absent). Keep it that way: macOS minutes cost 10× and Windows 2× Linux ones, billed per started minute and per job.
+GitHub-hosted runners only (free for a public repo). Never add a self-hosted runner: a fork PR can edit a workflow to run anything on it.
+
+- **`main` is protected** by the "Protect Main" ruleset: changes go through a PR, and the `ci.yml` jobs (`check`, `test (windows)`, `test (macos)`, `deny`, `commits`) are required checks. Renaming one of these jobs means updating the ruleset.
+- **`ci.yml`**: on PRs, pushes to `main`, every Monday (new advisories, new clippy lints) and on dispatch.
+  - `check` (Linux): fmt, clippy for Linux, Windows and macOS targets, tests.
+  - `test (windows)`, `test (macos)`: `cargo test` on the real systems.
+  - `deny`: `cargo deny check advisories sources` (config in `deny.toml`).
+  - `commits`: every non-merge commit of a PR must follow Conventional Commits.
+- **Actions are pinned by commit SHA** with a `# vX.Y.Z` comment; Dependabot (`.github/dependabot.yml`) updates them and the Cargo dependencies weekly, with a 7-day cooldown. `workflows.yml` runs actionlint and zizmor when `.github/` changes. Each job requests only the permissions it uses, and checkouts set `persist-credentials: false`.
+- **`release.yml`**: release-please runs on every push to `main`. It keeps a "chore: release x.y.z" PR open; the `lockfile` job aligns `Cargo.lock` on it, then dispatches `ci.yml` and `release-check.yml` on that branch (a PR pushed with the `GITHUB_TOKEN` triggers no workflow, so its required checks would never run). Merging that PR tags `vX.Y.Z` and calls `build.yml`.
+- **`build.yml`** (reusable): builds the Windows, macOS and Linux binaries with `.sha256` files and the Inno Setup installer (`installer/boringwindows.iss`). With a `tag`, it adds build provenance attestations, attaches everything to the release and updates the `Yazouv.BoringWindows` winget package (skipped when the `WINGET_TOKEN` secret is absent). Without one (`release-check.yml`: PRs touching the release build or dependencies, the release PR, manual runs), it is a dry run and the files become run artifacts. The updater depends on the asset names in that workflow and in `bw_update::asset_name()`; keep them in sync. macOS builds both architectures in a single job.
 - **Commit messages must follow Conventional Commits** (`feat:`, `fix:`, `docs:`, `chore:`…). release-please derives the version and changelog from them.
 - Never bump versions by hand. release-please owns `[workspace.package] version` in `Cargo.toml`, plus `version.txt`, `CHANGELOG.md` and the manifest.
-- **`docs.yml`**: publishes the mdBook to GitHub Pages when `docs/` changes on `main`.
+- **`docs.yml`**: builds the mdBook on PRs touching `docs/`, and publishes it to GitHub Pages when `docs/` changes on `main`.
 
 ## Architecture
 

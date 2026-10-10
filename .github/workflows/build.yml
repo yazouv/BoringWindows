@@ -1,0 +1,164 @@
+name: Build
+
+# Binaires de release pour Windows, macOS et Linux, plus l'installeur Windows.
+# Workflow réutilisable, appelé par :
+# - release.yml, avec `tag` : attestation de provenance, ajout à la release,
+#   winget ;
+# - release-check.yml, sans tag : essai à blanc, binaires en artefacts du run.
+# Les deux construisent exactement la même chose : une release ne casse pas
+# sur une étape jamais exécutée avant.
+#
+# Permissions héritées de l'appelant : écriture pour release.yml, lecture
+# seule pour l'essai à blanc.
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit, branche ou tag à compiler
+        type: string
+        required: true
+      tag:
+        description: Release où publier les binaires (vide = essai à blanc)
+        type: string
+        default: ""
+    secrets:
+      WINGET_TOKEN:
+        required: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Coût : nul pour un dépôt public. Pour un dépôt privé, les minutes macOS
+  # compteraient 10 fois et Windows 2 fois celles de Linux, d'où un seul job
+  # macOS pour les deux architectures (scripts de build et macros
+  # procédurales compilés une fois) et l'installeur dans le job Windows.
+  build:
+    name: build (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows-x64
+            targets: x86_64-pc-windows-msvc
+            toolchain-targets: x86_64-pc-windows-msvc
+          # Mac Intel compilé depuis le runner Apple Silicon (le SDK de Xcode
+          # contient les deux architectures).
+          - os: macos-latest
+            name: macos
+            targets: aarch64-apple-darwin x86_64-apple-darwin
+            toolchain-targets: aarch64-apple-darwin,x86_64-apple-darwin
+          # 22.04 : glibc plus ancienne, le binaire tourne sur plus de distributions.
+          - os: ubuntu-22.04
+            name: linux-x64
+            targets: x86_64-unknown-linux-gnu
+            toolchain-targets: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    env:
+      TAG: ${{ inputs.tag }}
+      TARGETS: ${{ matrix.targets }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - name: Dépendances système (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libfontconfig1-dev libxkbcommon-dev
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: stable
+          targets: ${{ matrix.toolchain-targets }}
+      # Dépendances seulement (pas le code du dépôt). Cargo.lock change à chaque
+      # release (version du workspace) : la clé exacte ne correspond jamais, le
+      # cache de la release précédente est repris s'il a moins de 7 jours.
+      # Seules les vraies releases l'écrivent.
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: release-${{ matrix.name }}
+          save-if: ${{ inputs.tag != '' }}
+      - name: Compilation, paquet et empreinte
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir dist
+          for target in $TARGETS; do
+            cargo build --release --locked --target "$target"
+            case "$target" in
+              x86_64-pc-windows-msvc) asset=boringwindows-windows-x64.exe
+                cp "target/$target/release/boringwindows.exe" "dist/$asset" ;;
+              aarch64-apple-darwin) asset=boringwindows-macos-arm64.tar.gz ;;
+              x86_64-apple-darwin) asset=boringwindows-macos-x64.tar.gz ;;
+              x86_64-unknown-linux-gnu) asset=boringwindows-linux-x64.tar.gz ;;
+            esac
+            [ -f "dist/$asset" ] || tar -czf "dist/$asset" -C "target/$target/release" boringwindows
+            if command -v sha256sum >/dev/null; then
+              (cd dist && sha256sum "$asset" > "$asset.sha256")
+            else
+              (cd dist && shasum -a 256 "$asset" > "$asset.sha256")
+            fi
+            cat "dist/$asset.sha256"
+          done
+
+      # Installeur Windows (Inno Setup). Pour une vraie release, un échec ici ne
+      # la bloque pas (le .exe seul reste disponible) ; pour l'essai à blanc, si.
+      - name: Installeur (Inno Setup)
+        id: installer
+        if: runner.os == 'Windows'
+        continue-on-error: ${{ inputs.tag != '' }}
+        shell: pwsh
+        run: |
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+            $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          }
+          $version = if ($env:TAG) { $env:TAG.TrimStart('v') } else { (Get-Content version.txt -Raw).Trim() }
+          & $iscc "/DAppVersion=$version" "/DSourceExe=$PWD\dist\boringwindows-windows-x64.exe" installer\boringwindows.iss
+          if ($LASTEXITCODE -ne 0) { throw "iscc a échoué" }
+          $setup = "installer\Output\boringwindows-windows-x64-setup.exe"
+          $hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
+          "$hash  boringwindows-windows-x64-setup.exe" | Set-Content -Encoding ascii "$setup.sha256"
+          Copy-Item $setup, "$setup.sha256" dist\
+
+      # Essai à blanc : binaires téléchargeables depuis la page du run.
+      - name: Artefacts (essai à blanc)
+        if: inputs.tag == ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: boringwindows-${{ matrix.name }}
+          path: dist/
+          retention-days: 7
+
+      # Provenance signée (Sigstore) : `gh attestation verify <fichier>
+      # --repo yazouv/BoringWindows` prouve que le binaire sort de ce workflow.
+      - name: Attestation de provenance
+        if: inputs.tag != ''
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.exe
+            dist/*.tar.gz
+      - name: Ajout à la release
+        if: inputs.tag != ''
+        shell: bash
+        run: gh release upload "$TAG" dist/* --clobber
+
+      # winget : met à jour le paquet Yazouv.BoringWindows (le premier dépôt du
+      # paquet se fait à la main, voir packaging/README.md). Sans jeton, rien ne se passe.
+      - name: winget
+        if: inputs.tag != '' && runner.os == 'Windows' && steps.installer.outcome == 'success'
+        continue-on-error: true
+        shell: pwsh
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          if (-not $env:WINGET_TOKEN) { Write-Host "WINGET_TOKEN absent : publication winget ignorée."; exit 0 }
+          $version = $env:TAG.TrimStart('v')
+          $url = "https://github.com/$env:GH_REPO/releases/download/$($env:TAG)/boringwindows-windows-x64-setup.exe"
+          Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+          .\wingetcreate.exe update Yazouv.BoringWindows --version $version --urls $url --submit --token $env:WINGET_TOKEN

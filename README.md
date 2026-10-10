@@ -182,13 +182,19 @@ fenêtre flottante, pour le développement.
 
 ## Versions et CI/CD
 
-- **PR vers `main`** : `ci.yml` vérifie format, clippy (Linux, Windows et macOS)
-  et tests sur un seul runner Linux, le moins cher en minutes.
+- **PR vers `main`** (obligatoire : `main` est protégée) : `ci.yml` vérifie
+  format, clippy (Linux, Windows et macOS), tests sur Linux, Windows et macOS,
+  failles connues des dépendances (`cargo deny`) et messages de commit. Les PR
+  qui touchent la compilation de la release la font à blanc
+  (`release-check.yml`, binaires en artefacts du run).
+- **Dépendances** : Dependabot propose chaque semaine les mises à jour des
+  crates et des actions (épinglées par SHA).
 - **Push sur `main`** : [release-please](https://github.com/googleapis/release-please)
   tient à jour une PR « chore: release x.y.z » (version dans `Cargo.toml`,
   `CHANGELOG.md`). **La fusionner publie la release** : tag `vx.y.z`, puis
-  binaires Windows, macOS et Linux (+ empreintes `.sha256`) attachés à la
-  release, et liens de téléchargement en tête des notes.
+  binaires Windows, macOS et Linux (+ empreintes `.sha256` et attestations de
+  provenance, `gh attestation verify <fichier> --repo yazouv/BoringWindows`)
+  attachés à la release, et liens de téléchargement en tête des notes.
 - **Mise à jour automatique** : l'app lit la dernière release et remplace son
   exécutable (voir la doc, *Installation › Mises à jour*).
 - **Doc** : publiée sur GitHub Pages quand `docs/` change sur `main`.
