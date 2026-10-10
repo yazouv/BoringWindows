@@ -1,6 +1,5 @@
-//! Hors Windows : la fenêtre s'affiche sans intégration système avancée
-//! (placement, zone cliquable, plein écran). macOS a en plus l'icône de barre
-//! de menus et pas d'icône dans le Dock.
+//! Linux et autres : la fenêtre s'affiche sans intégration système avancée
+//! (placement, zone cliquable, plein écran, icône de notification).
 
 use std::path::Path;
 
@@ -8,10 +7,7 @@ use bw_config::MonitorChoice;
 use slint::BackendSelector;
 use slint::winit_030::winit::window::Window;
 
-use super::PlatformEvent;
-use super::SystemLook;
-#[cfg(not(target_os = "macos"))]
-use super::TrayCommand;
+use super::{PlatformEvent, SystemLook, TrayCommand};
 use crate::geometry::{PhysRect, RoundRect};
 
 pub struct SingleInstance;
@@ -20,21 +16,8 @@ pub fn single_instance() -> Option<SingleInstance> {
     Some(SingleInstance)
 }
 
-#[cfg(not(target_os = "macos"))]
 pub fn configure_backend(selector: BackendSelector) -> BackendSelector {
     selector
-}
-
-/// Application « accessoire » : pas d'icône dans le Dock ni dans Cmd+Tab.
-#[cfg(target_os = "macos")]
-pub fn configure_backend(selector: BackendSelector) -> BackendSelector {
-    use slint::winit_030::SlintEvent;
-    use slint::winit_030::winit::event_loop::EventLoop;
-    use slint::winit_030::winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
-
-    let mut builder = EventLoop::<SlintEvent>::with_user_event();
-    builder.with_activation_policy(ActivationPolicy::Accessory);
-    selector.with_winit_event_loop_builder(builder)
 }
 
 pub fn initial_position(_: MonitorChoice, _: (f32, f32)) -> Option<slint::PhysicalPosition> {
@@ -83,10 +66,8 @@ impl Platform {
 }
 
 /// Linux : pas d'icône de notification (elle exigerait GTK).
-#[cfg(not(target_os = "macos"))]
 pub struct Tray;
 
-#[cfg(not(target_os = "macos"))]
 impl Tray {
     pub fn new(
         _autostart: bool,
@@ -123,6 +104,8 @@ pub fn confirm(title: &str, text: &str) -> bool {
     true
 }
 
+pub fn activate_app() {}
+
 /// Ramener le terminal d'une session au premier plan : Windows uniquement.
 pub fn focus_terminal(_ancestors: &[u32], _console_window: Option<i64>) -> bool {
     false
@@ -153,19 +136,14 @@ pub fn alert_sound() {}
 
 /// Ouvre un fichier avec l'application associée.
 pub fn open_path(path: &Path) {
-    let opener = if cfg!(target_os = "macos") {
-        "open"
-    } else {
-        "xdg-open"
-    };
-    if let Err(e) = std::process::Command::new(opener).arg(path).spawn() {
+    if let Err(e) = std::process::Command::new("xdg-open").arg(path).spawn() {
         log::warn!("impossible d'ouvrir {} : {e}", path.display());
     }
 }
 
-/// Reprise d'une conversation Claude Code : pas encore gérée hors Windows.
+/// Reprise d'une conversation Claude Code : Windows et macOS seulement.
 pub fn resume_claude_session(_cwd: &Path, _session_id: &str) -> bool {
-    log::warn!("rouvrir une conversation n'est géré que sous Windows");
+    log::warn!("rouvrir une conversation n'est géré que sous Windows et macOS");
     false
 }
 

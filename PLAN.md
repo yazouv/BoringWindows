@@ -370,18 +370,21 @@ de texte aux écrans de l'assistant), puis la fenêtre de réglages.
 - [x] Gestes sur l'île (molette : volume ; glisser : morceau suivant/précédent ; appui long : ne pas déranger ; doc FR + EN)
 - [x] Mode présentation (`bw-presence` : appel ou partage d'écran détecté → annonces tues et point rouge ; île exclue des captures ; doc FR + EN)
 - [x] Plus de barre de titre au premier clic sur l'île (sous-classement de la fenêtre)
+- [x] Processeur et mémoire (`bw-system` : à côté de l'heure, mesurés seulement île ouverte ; alertes facultatives qui nomment l'application en cause ; doc FR + EN)
+- [x] Raccourcis clavier globaux (`[hotkeys]` : ouvrir l'île, lecture/pause, morceaux, ne pas déranger ; `global-hotkey`, réglables dans Réglages › Système ; doc FR + EN)
 
 ### Port macOS (en parallèle, sans bloquer Windows)
 
 Le cœur (`bw-core`, `bw-config`, l'UI Slint) est déjà multiplateforme ; seul
-`platform/` est spécifique. Aujourd'hui sur macOS : compilation + binaire en CI,
-icône de barre de menus, pas d'icône dans le Dock. L'île s'ouvre comme une
-fenêtre flottante, sans placement ni zone cliquable.
+`platform/` est spécifique. Tout ce qui suit est vérifié par clippy pour macOS
+depuis Linux, mais reste **à valider sur un vrai Mac**.
 
-- [ ] `platform/macos.rs` : `NSPanel` non activant, niveau au-dessus de la barre de menus, centré sous l'encoche
-- [ ] Zone cliquable (`ignoresMouseEvents` selon la position) et masquage en plein écran
-- [ ] Bundle `.app` signé + notarisé (sinon Gatekeeper bloque), démarrage à la connexion (`SMAppService`)
-- [ ] Modules : musique via MediaRemote / AppleScript, hook Claude via socket Unix au lieu du named pipe
+- [x] `platform/macos.rs` : `NSPanel` non activant (classe de la fenêtre de winit remplacée), niveau au-dessus de la barre de menus, centré en haut (autour de l'encoche), pilule fermée à la hauteur de la barre de menus
+- [x] Zone cliquable (`ignoresMouseEvents` selon la position, moniteurs d'événements) et masquage en plein écran (natif : les apps plein écran ont leur propre bureau)
+- [x] Démarrage à la connexion (LaunchAgent ; `SMAppService` demandera le bundle), dialogue de confirmation, sélecteur de fichier, son, apparence et accent du système, inactivité (mascotte), terminal de la session Claude ramené devant, reprise de conversation dans Terminal
+- [ ] Bundle `.app` signé + notarisé (sinon Gatekeeper bloque)
+- [x] Modules : musique via AppleScript (Spotify et Musique, réveillés par leurs notifications distribuées ; MediaRemote est fermé aux apps tierces depuis macOS 15.4), hook Claude via socket Unix
+- [ ] Flou, notifications des applications, batterie, Bluetooth, volume, mode présentation
 
 Note : sur Mac, boring.notch existe déjà ; l'intérêt est surtout d'avoir la même
 île et la même config sur les deux machines.

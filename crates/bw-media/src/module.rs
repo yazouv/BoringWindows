@@ -13,7 +13,7 @@ pub const MODULE_ID: &str = "media";
 
 /// Commandes envoyées au thread qui parle au système.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(not(windows), allow(dead_code))]
+#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
 pub(crate) enum Command {
     Refresh,
     TogglePlayPause,
@@ -55,7 +55,7 @@ impl MediaModule {
 
     /// Une source de contrôles média existe sur ce système.
     pub fn is_supported() -> bool {
-        cfg!(windows)
+        cfg!(any(windows, target_os = "macos"))
     }
 }
 
@@ -73,7 +73,13 @@ impl Module for MediaModule {
                 let _ = tx.send(s);
             })?);
         }
-        #[cfg(not(windows))]
+        #[cfg(target_os = "macos")]
+        {
+            self.commands = Some(crate::macos::spawn(self.config.clone(), move |s| {
+                let _ = tx.send(s);
+            })?);
+        }
+        #[cfg(not(any(windows, target_os = "macos")))]
         {
             let _ = (&self.config, tx);
             log::info!("musique : pas de contrôles média sur ce système");

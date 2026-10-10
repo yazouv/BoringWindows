@@ -6,6 +6,7 @@ mod controller;
 mod demo;
 mod geometry;
 mod gestures;
+mod hotkeys;
 mod mascot;
 mod platform;
 mod shelf;

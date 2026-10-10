@@ -27,6 +27,15 @@ xattr -d com.apple.quarantine boringwindows
 ./boringwindows
 ```
 
+On a Mac, the island sits above the menu bar, centered at the top of the
+screen (around the notch if there is one), and takes the height of the menu
+bar while closed. Clicking the island doesn't take the focus away from the
+current app, and clicks next to the pill go through. The icon lives in the
+menu bar, not in the Dock. **Start with the system** adds a LaunchAgent
+(`~/Library/LaunchAgents/io.github.yazouv.boringwindows.plist`). Not on Mac
+yet: the blur (`theme.blur`), app notifications, battery, Bluetooth, volume
+and presentation mode; and the island always hides in full-screen apps.
+
 **Linux**: `tar -xzf boringwindows-linux-x64.tar.gz && ./boringwindows` (the
 island opens as a floating window, without a tray icon).
 

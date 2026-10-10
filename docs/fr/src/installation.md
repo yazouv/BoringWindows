@@ -28,6 +28,17 @@ xattr -d com.apple.quarantine boringwindows
 ./boringwindows
 ```
 
+Sur Mac, l'île se pose au-dessus de la barre de menus, centrée en haut de
+l'écran (autour de l'encoche s'il y en a une), et prend la hauteur de la
+barre de menus quand elle est fermée. Un clic sur l'île ne retire pas le
+focus à l'application en cours, et les clics à côté de la pilule passent à
+travers. L'icône est dans la barre de menus, pas dans le Dock.
+**Démarrer avec le système** ajoute un LaunchAgent
+(`~/Library/LaunchAgents/io.github.yazouv.boringwindows.plist`). Pas encore
+sur Mac : le flou (`theme.blur`), les notifications des applications, la
+batterie, le Bluetooth, le volume et le mode présentation ; et l'île se cache
+toujours dans les applications en plein écran.
+
 **Linux** : `tar -xzf boringwindows-linux-x64.tar.gz && ./boringwindows`
 (l'île s'ouvre comme une fenêtre flottante, sans icône de notification).
 

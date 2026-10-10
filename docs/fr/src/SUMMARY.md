@@ -17,6 +17,7 @@
 - [Volume et luminosité](volume.md)
 - [Batterie et Bluetooth](energie.md)
 - [Météo](meteo.md)
+- [Processeur, mémoire et raccourcis](systeme.md)
 - [Mascotte](mascotte.md)
 - [Gestes](gestes.md)
 - [Mode présentation](presentation.md)

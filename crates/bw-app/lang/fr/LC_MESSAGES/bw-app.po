@@ -515,3 +515,48 @@ msgstr "Largeur × hauteur"
 
 msgid "Wins when several modules want the island"
 msgstr "L'emporte quand plusieurs modules veulent l'île"
+
+msgid "CPU and memory"
+msgstr "Processeur et mémoire"
+
+msgid "Show the CPU and memory use"
+msgstr "Afficher le processeur et la mémoire"
+
+msgid "Next to the time in the open island. Measured only while the island is open."
+msgstr "À côté de l'heure dans l'île ouverte. Mesurés seulement pendant que l'île est ouverte."
+
+msgid "Refresh (seconds)"
+msgstr "Rafraîchissement (secondes)"
+
+msgid "Alert when the CPU stays above"
+msgstr "Alerte quand le processeur reste au-dessus de"
+
+msgid "Alert when the memory stays above"
+msgstr "Alerte quand la mémoire reste au-dessus de"
+
+msgid "never"
+msgstr "jamais"
+
+msgid "With an alert, a measure is also taken every 5 seconds, and the pill names the app responsible after 30 seconds above the threshold."
+msgstr "Avec une alerte, une mesure est aussi prise toutes les 5 secondes, et la pilule nomme l'application en cause après 30 secondes au-dessus du seuil."
+
+msgid "Keyboard shortcuts"
+msgstr "Raccourcis clavier"
+
+msgid "Open or close the island"
+msgstr "Ouvrir ou refermer l'île"
+
+msgid "Play / pause"
+msgstr "Lecture / pause"
+
+msgid "Next track"
+msgstr "Morceau suivant"
+
+msgid "Previous track"
+msgstr "Morceau précédent"
+
+msgid "Do not disturb"
+msgstr "Ne pas déranger"
+
+msgid "They work in every app. Combine Ctrl, Alt, Shift or Super (Windows key, Cmd on a Mac) with a key: A to Z, 0 to 9, F1 to F24, Space, Up, Down, Left, Right… Leave empty for no shortcut."
+msgstr "Ils marchent dans toutes les applications. Combine Ctrl, Alt, Shift ou Super (touche Windows, Cmd sur Mac) avec une touche : A à Z, 0 à 9, F1 à F24, Space, Up, Down, Left, Right… Laisse vide pour aucun raccourci."

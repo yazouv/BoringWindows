@@ -57,6 +57,7 @@ component Icon inherits Path {
         : root.name == "timer" ? "M10 2h4 M12 14l3-3 M20 14a8 8 0 1 1-16 0a8 8 0 1 1 16 0"
         : root.name == "shelf" ? "M2 12h6l2 3h4l2-3h6 M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"
         : root.name == "mascot" ? "M22 12a10 10 0 1 1-20 0a10 10 0 1 1 20 0 M8 14s1.5 2 4 2 4-2 4-2 M9 9h.01 M15 9h.01"
+        : root.name == "system" ? "M12 20v2 M12 2v2 M17 20v2 M17 2v2 M2 12h2 M2 17h2 M2 7h2 M20 12h2 M20 17h2 M20 7h2 M7 20v2 M7 2v2 M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z M9 8h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"
         : root.name == "docs" ? "M12 7v14 M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"
         : root.name == "file" ? "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z M14 2v4a2 2 0 0 0 2 2h4 M16 13H8 M16 17H8 M10 9H8"
         : root.name == "check" ? "M20 6L9 17l-5-5"
@@ -409,6 +410,16 @@ export component SettingsWindow inherits Window {
     in-out property <bool> timer-enabled;
     in-out property <bool> timer-sound;
     in-out property <string> timer-presets;
+    // --- Système ---
+    in-out property <bool> system-enabled;
+    in-out property <int> system-refresh;
+    in-out property <int> cpu-alert-index;
+    in-out property <int> ram-alert-index;
+    in-out property <string> hotkey-toggle;
+    in-out property <string> hotkey-play-pause;
+    in-out property <string> hotkey-next;
+    in-out property <string> hotkey-previous;
+    in-out property <string> hotkey-dnd;
     // --- État de l'enregistrement ---
     in property <string> status;
     in property <bool> status-error;
@@ -497,6 +508,7 @@ export component SettingsWindow inherits Window {
                 { icon: "timer", label: @tr("Timer") },
                 { icon: "shelf", label: @tr("Shelf") },
                 { icon: "mascot", label: @tr("Mascot") },
+                { icon: "system", label: @tr("System") },
             ]: NavItem {
                 icon: item.icon;
                 label: item.label;
@@ -1541,6 +1553,133 @@ export component SettingsWindow inherits Window {
                             toggled => { root.changed("modules.mascot.seasonal"); }
                         }
                     }
+                }
+            }
+        }
+
+        if root.page == 10: Page {
+            title: @tr("System");
+
+            Section {
+                title: @tr("CPU and memory");
+
+                Card {
+                    Setting {
+                        title: @tr("Show the CPU and memory use");
+                        description: @tr("Next to the time in the open island. Measured only while the island is open.");
+                        Toggle {
+                            checked <=> root.system-enabled;
+                            toggled => { root.changed("modules.system.enabled"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.system-enabled;
+                        title: @tr("Refresh (seconds)");
+                        SpinBox {
+                            width: 110px;
+                            enabled: root.system-enabled;
+                            minimum: 1;
+                            maximum: 10;
+                            value <=> root.system-refresh;
+                            edited => { root.changed("modules.system.refresh_secs"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.system-enabled;
+                        title: @tr("Alert when the CPU stays above");
+                        ComboBox {
+                            width: 120px;
+                            enabled: root.system-enabled;
+                            model: [@tr("never"), "70 %", "80 %", "90 %", "95 %"];
+                            current-index <=> root.cpu-alert-index;
+                            selected => { root.changed("modules.system.cpu_alert_percent"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.system-enabled;
+                        title: @tr("Alert when the memory stays above");
+                        ComboBox {
+                            width: 120px;
+                            enabled: root.system-enabled;
+                            model: [@tr("never"), "70 %", "80 %", "90 %", "95 %"];
+                            current-index <=> root.ram-alert-index;
+                            selected => { root.changed("modules.system.ram_alert_percent"); }
+                        }
+                    }
+                }
+
+                Hint {
+                    text: @tr("With an alert, a measure is also taken every 5 seconds, and the pill names the app responsible after 30 seconds above the threshold.");
+                }
+            }
+
+            Section {
+                title: @tr("Keyboard shortcuts");
+
+                Card {
+                    Setting {
+                        title: @tr("Open or close the island");
+                        LineEdit {
+                            width: 200px;
+                            text <=> root.hotkey-toggle;
+                            placeholder-text: "Ctrl+Alt+B";
+                            edited => { root.changed("hotkeys.toggle"); }
+                        }
+                    }
+
+                    Setting {
+                        divided: true;
+                        title: @tr("Play / pause");
+                        LineEdit {
+                            width: 200px;
+                            text <=> root.hotkey-play-pause;
+                            placeholder-text: "Ctrl+Alt+P";
+                            edited => { root.changed("hotkeys.play_pause"); }
+                        }
+                    }
+
+                    Setting {
+                        divided: true;
+                        title: @tr("Next track");
+                        LineEdit {
+                            width: 200px;
+                            text <=> root.hotkey-next;
+                            placeholder-text: "Ctrl+Alt+Right";
+                            edited => { root.changed("hotkeys.next_track"); }
+                        }
+                    }
+
+                    Setting {
+                        divided: true;
+                        title: @tr("Previous track");
+                        LineEdit {
+                            width: 200px;
+                            text <=> root.hotkey-previous;
+                            placeholder-text: "Ctrl+Alt+Left";
+                            edited => { root.changed("hotkeys.previous_track"); }
+                        }
+                    }
+
+                    Setting {
+                        divided: true;
+                        title: @tr("Do not disturb");
+                        LineEdit {
+                            width: 200px;
+                            text <=> root.hotkey-dnd;
+                            placeholder-text: "Ctrl+Alt+D";
+                            edited => { root.changed("hotkeys.do_not_disturb"); }
+                        }
+                    }
+                }
+
+                Hint {
+                    text: @tr("They work in every app. Combine Ctrl, Alt, Shift or Super (Windows key, Cmd on a Mac) with a key: A to Z, 0 to 9, F1 to F24, Space, Up, Down, Left, Right… Leave empty for no shortcut.");
                 }
             }
         }
