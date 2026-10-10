@@ -22,6 +22,11 @@ where
     F: FnMut(Result<Config, ConfigError>) + Send + 'static,
 {
     let dir = path.parent().unwrap_or(Path::new(".")).to_owned();
+    // FSEvents (macOS) donne les chemins résolus (`/var` → `/private/var`) :
+    // sans ça, `starts_with` ne reconnaîtrait jamais le dossier des thèmes.
+    // Pas sous Windows, où `canonicalize` renvoie un chemin `\\?\…`.
+    #[cfg(target_os = "macos")]
+    let dir = dir.canonicalize().unwrap_or(dir);
     let themes = themes_dir(&dir);
     let layouts = layouts_dir(&dir);
     let target: PathBuf = path.to_owned();
@@ -107,39 +112,46 @@ mod tests {
         .unwrap();
         // Une même écriture peut produire plusieurs notifications (création,
         // modification) : on attend le résultat voulu au lieu d'en compter.
-        let wait_for = |pred: &dyn Fn(&Result<Config, ConfigError>) -> bool| {
+        // L'écriture est refaite chaque seconde : FSEvents (macOS) démarre en
+        // différé et perd les modifications faites juste après `watch`. Refaire
+        // la même écriture ne notifie rien de plus (résultat inchangé).
+        let wait_for = |write: &dyn Fn(), pred: &dyn Fn(&Result<Config, ConfigError>) -> bool| {
             let deadline = std::time::Instant::now() + Duration::from_secs(10);
             loop {
+                write();
                 let left = deadline.saturating_duration_since(std::time::Instant::now());
-                let res = rx.recv_timeout(left).expect("rechargement attendu");
-                if pred(&res) {
+                assert!(!left.is_zero(), "rechargement attendu");
+                if let Ok(res) = rx.recv_timeout(left.min(Duration::from_secs(1)))
+                    && pred(&res)
+                {
                     return;
                 }
             }
         };
+        let write =
+            |file: PathBuf, text: &'static str| move || std::fs::write(&file, text).unwrap();
+        let theme = themes_dir(dir.path()).join("perso.toml");
 
         // Un autre fichier du dossier ne déclenche rien de faux.
         std::fs::write(dir.path().join("other.txt"), "x").unwrap();
-        std::fs::write(&path, "[general]\nopen_on = \"click\"").unwrap();
-        wait_for(&|r| r.as_ref().is_ok_and(|c| c.general.open_on == OpenOn::Click));
+        wait_for(
+            &write(path.clone(), "[general]\nopen_on = \"click\""),
+            &|r| r.as_ref().is_ok_and(|c| c.general.open_on == OpenOn::Click),
+        );
 
-        std::fs::write(&path, "[general]\nopen_on = \"never\"").unwrap();
-        wait_for(&|r| r.is_err());
+        wait_for(
+            &write(path.clone(), "[general]\nopen_on = \"never\""),
+            &|r| r.is_err(),
+        );
 
         // Un thème personnel modifié recharge aussi la config.
         std::fs::create_dir(themes_dir(dir.path())).unwrap();
-        std::fs::write(
-            themes_dir(dir.path()).join("perso.toml"),
-            "corner_radius = 5.0",
-        )
-        .unwrap();
-        std::fs::write(&path, "[theme]\nname = \"perso\"").unwrap();
-        wait_for(&|r| r.as_ref().is_ok_and(|c| c.theme.corner_radius == 5.0));
-        std::fs::write(
-            themes_dir(dir.path()).join("perso.toml"),
-            "corner_radius = 9.0",
-        )
-        .unwrap();
-        wait_for(&|r| r.as_ref().is_ok_and(|c| c.theme.corner_radius == 9.0));
+        std::fs::write(&theme, "corner_radius = 5.0").unwrap();
+        wait_for(&write(path.clone(), "[theme]\nname = \"perso\""), &|r| {
+            r.as_ref().is_ok_and(|c| c.theme.corner_radius == 5.0)
+        });
+        wait_for(&write(theme.clone(), "corner_radius = 9.0"), &|r| {
+            r.as_ref().is_ok_and(|c| c.theme.corner_radius == 9.0)
+        });
     }
 }
