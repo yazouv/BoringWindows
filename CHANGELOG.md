@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.4.0](https://github.com/yazouv/BoringWindows/compare/v0.3.0...v0.4.0) (2026-10-10)
+
+
+### Nouveautés
+
+* amélioration des composants d'interface avec des animations et des ajustements de style ([f04d856](https://github.com/yazouv/BoringWindows/commit/f04d856576a10f820c50987fef6dd018ec2771dc))
+* design modernisé, batterie, Bluetooth, météo, thème auto et flou ([b1b1611](https://github.com/yazouv/BoringWindows/commit/b1b1611898549b27c9985b9620c02c414bf11b0a))
+* design modernisé, batterie, Bluetooth, météo, thème auto et flou ([1fa3b45](https://github.com/yazouv/BoringWindows/commit/1fa3b457a0c45cf35cf068f5a36b96d0d89b63c4))
+* icône des applications et clic qui ouvre le bon endroit ([30edb30](https://github.com/yazouv/BoringWindows/commit/30edb305eddd6cfae7357e07bdface8af593e17d))
+* luminosité de l'écran intégré dans l'île ([8d8967e](https://github.com/yazouv/BoringWindows/commit/8d8967e1b551bee24ab90f5b7165100c598de20e))
+* mascotte, décorations de saison, gestes et mode présentation ([ff7f3e8](https://github.com/yazouv/BoringWindows/commit/ff7f3e83099898bd8a97f0c3c6f8a494b7574886))
+* mascotte, décorations de saison, gestes et mode présentation ([5ffa461](https://github.com/yazouv/BoringWindows/commit/5ffa461cc8b93afd5f7322916be1918b10d0c7cb))
+* ne pas déranger, et pilule à la hauteur d'une barre des tâches réduite ([c1d9d8d](https://github.com/yazouv/BoringWindows/commit/c1d9d8d5af900ba178f94bc14cfa2a85eafb622a))
+* notifications des applications et onglets dans l'île ([f44802c](https://github.com/yazouv/BoringWindows/commit/f44802ca4899b81f800d5785731a6788ed56246a))
+
+
+### Corrections
+
+* l'île reste au-dessus de la barre des tâches et pendant les captures ([8e28607](https://github.com/yazouv/BoringWindows/commit/8e286071f08f159ba6aaeb4329a187ffe7d27888))
+* plus de barre de titre au premier clic sur l'île ([35fd534](https://github.com/yazouv/BoringWindows/commit/35fd534d7e19884a7e5da854f169cb18c3a5167e))
+* plus de barre de titre au premier clic sur l'île ([4c706fd](https://github.com/yazouv/BoringWindows/commit/4c706fd8eced02e64ab8d3a10e4cd5509b923695))
+
 ## [0.3.0](https://github.com/yazouv/BoringWindows/compare/v0.2.1...v0.3.0) (2026-10-02)
 
 
