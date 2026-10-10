@@ -42,6 +42,11 @@ terminal (Windows Terminal, VS Code…) to the front.
 
 A **system sound** plays every time Claude starts waiting for you.
 
+A **glow** also surrounds the island: an iridescent outline that turns while
+Claude works, orange and pulsing when it is waiting for you, and a green wave
+that goes around once when it is done. To turn it off: Settings ›
+**Appearance** › **Claude glow**, or `glow = false` under `[theme]`.
+
 ## Answering a permission request
 
 When Claude wants to run a command that needs your approval, hover the island:

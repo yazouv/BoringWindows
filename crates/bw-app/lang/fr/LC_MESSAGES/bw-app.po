@@ -327,6 +327,12 @@ msgstr "Afficher la connexion des appareils Bluetooth, avec leur niveau de batte
 msgid "Blur what is behind the island (Windows 11, translucent themes)"
 msgstr "Flouter ce qui est derrière l'île (Windows 11, thèmes translucides)"
 
+msgid "Claude glow"
+msgstr "Halo de Claude"
+
+msgid "Animated outline around the island while Claude works or waits for you"
+msgstr "Contour animé autour de l'île pendant que Claude travaille ou t'attend"
+
 msgid "Use the Windows accent color"
 msgstr "Utiliser la couleur d'accent de Windows"
 

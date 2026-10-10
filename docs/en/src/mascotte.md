@@ -16,6 +16,13 @@ A little blob with eyes lives in the pill. Its mood follows what is going on:
 When Claude has the pill, the mascot takes the place of the status dot; when
 music has it, the mascot moves to the right.
 
+In the **open island**, it shows up big on the left of the Home tab, and
+arrives with a bounce. Big, it has more details: a sprout on its head that
+sways, cheeks, shiny eyes, arms (raised for joy, up in the air when Claude is
+waiting for you, typing while it works), feet, a mouth that follows its mood,
+music notes when it dances and "z"s floating up while it sleeps. It stays
+animated as long as the island is open.
+
 ## Seasons
 
 It dresses up, and the open island gets decorated:

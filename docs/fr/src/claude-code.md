@@ -43,6 +43,11 @@ ramener son terminal (Windows Terminal, VS Code…) au premier plan.
 
 Un **son système** retentit chaque fois que Claude se met à t'attendre.
 
+Un **halo** entoure aussi l'île : un contour irisé qui tourne pendant que
+Claude travaille, orange et qui pulse quand il t'attend, et une vague verte
+qui en fait le tour une fois quand il a fini. Pour l'enlever : Réglages ›
+**Apparence** › **Halo de Claude**, ou `glow = false` dans `[theme]`.
+
 ## Répondre à une demande de permission
 
 Quand Claude veut lancer une commande qui demande ton accord, survole l'île :

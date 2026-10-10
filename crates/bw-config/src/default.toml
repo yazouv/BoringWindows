@@ -29,6 +29,8 @@ name = "default"
 # font = "Segoe UI"           # police (par défaut : celle du système)
 # corner_radius = 22.0        # coins de l'île ouverte (la pilule reste ronde)
 # blur = false               # flou derrière l'île (Windows ; fond translucide)
+# Halo animé autour de l'île pendant que Claude travaille ou t'attend.
+glow = true
 # Durée des animations (ms). 0 = pas d'animation.
 animation_ms = 240
 # Décalage depuis le haut de l'écran (px).
@@ -46,7 +48,7 @@ width = 300.0
 height = 36.0
 
 [theme.expanded]
-width = 520.0
+width = 580.0
 height = 170.0
 
 [layout]

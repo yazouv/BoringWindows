@@ -29,6 +29,8 @@ name = "default"
 # font = "Segoe UI"           # font (default: the system font)
 # corner_radius = 22.0        # corners of the open island (the pill stays round)
 # blur = false               # blur behind the island (Windows; translucent background)
+# Animated glow around the island while Claude works or waits for you.
+glow = true
 # Animation duration (ms). 0 = no animation.
 animation_ms = 240
 # Offset from the top of the screen (px).
@@ -46,7 +48,7 @@ width = 300.0
 height = 36.0
 
 [theme.expanded]
-width = 520.0
+width = 580.0
 height = 170.0
 
 [layout]

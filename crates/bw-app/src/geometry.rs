@@ -64,12 +64,37 @@ pub fn notification_size(theme: &Theme) -> Size {
 /// Marge autour de la pilule pour ne pas rogner l'anticrénelage des bords.
 const AA_PAD: i32 = 2;
 
+/// Marge de la fenêtre autour de l'île ouverte (logique) : l'ouverture est un
+/// ressort qui dépasse un peu la taille finale avant de s'y poser. Mêmes
+/// valeurs que `overshoot-x` et `overshoot-y` dans `island.slint`.
+pub const OVERSHOOT_X: f32 = 14.0;
+pub const OVERSHOOT_Y: f32 = 12.0;
+
 /// Taille logique de la fenêtre (identique au calcul de `island.slint`).
 pub fn window_size(theme: &Theme) -> (f32, f32) {
     (
-        theme.expanded.width,
-        theme.expanded.height + theme.top_offset,
+        theme.expanded.width + 2.0 * OVERSHOOT_X,
+        theme.expanded.height + theme.top_offset + OVERSHOOT_Y,
     )
+}
+
+/// Zone cliquable pendant le passage de `old` à `new` : les deux formes et le
+/// dépassement du ressort.
+pub fn transition_rect(theme: &Theme, old: Shape, new: Shape, scale: f32) -> PhysRect {
+    let both = pill_rect(theme, old, scale).union(pill_rect(theme, new, scale));
+    let (dx, dy) = (
+        (OVERSHOOT_X * scale).ceil() as i32,
+        (OVERSHOOT_Y * scale).ceil() as i32,
+    );
+    let (win_w, win_h) = window_size(theme);
+    let (max_w, max_h) = ((win_w * scale).ceil() as i32, (win_h * scale).ceil() as i32);
+    let x = (both.x - dx).max(0);
+    PhysRect {
+        x,
+        y: both.y,
+        width: (both.x + both.width + dx).min(max_w) - x,
+        height: (both.height + dy).min(max_h - both.y),
+    }
 }
 
 /// Zone occupée par la pilule pour `shape`, à l'échelle `scale`.
@@ -159,25 +184,52 @@ mod tests {
     fn pill_is_centered_and_clamped_to_window() {
         let theme = Theme::default();
         let r = pill_rect(&theme, Shape::Compact, 1.0);
-        // (520 - 190) / 2 = 165, moins la marge.
+        // (608 - 190) / 2 = 209, moins la marge.
         assert_eq!(
             r,
             PhysRect {
-                x: 163,
+                x: 207,
                 y: 0,
                 width: 194,
                 height: 34
             }
         );
 
+        // Fenêtre : île ouverte + 14 px de chaque côté et 12 px en bas.
         let full = pill_rect(&theme, Shape::Expanded, 1.0);
         assert_eq!(
             full,
             PhysRect {
+                x: 12,
+                y: 0,
+                width: 584,
+                height: 172
+            }
+        );
+    }
+
+    #[test]
+    fn transition_covers_the_spring_overshoot() {
+        let theme = Theme::default();
+        let r = transition_rect(&theme, Shape::Compact, Shape::Expanded, 1.0);
+        // Toute la fenêtre (608 × 182), bornée à ses bords.
+        assert_eq!(
+            r,
+            PhysRect {
                 x: 0,
                 y: 0,
-                width: 520,
-                height: 170
+                width: 608,
+                height: 182
+            }
+        );
+        let small = transition_rect(&theme, Shape::Compact, Shape::Attention, 1.0);
+        assert_eq!(
+            small,
+            PhysRect {
+                x: 138,
+                y: 0,
+                width: 332,
+                height: 50
             }
         );
     }
@@ -189,7 +241,7 @@ mod tests {
         assert_eq!(
             r,
             PhysRect {
-                x: 245,
+                x: 311,
                 y: 0,
                 width: 290,
                 height: 50

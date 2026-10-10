@@ -830,6 +830,7 @@ impl Controller {
                 Value::Bool(ui.get_mascot_seasonal()),
             )),
             "theme.blur" => Some((vec!["theme", "blur"], Value::Bool(ui.get_blur()))),
+            "theme.glow" => Some((vec!["theme", "glow"], Value::Bool(ui.get_glow()))),
             "theme.system_accent" => Some((
                 vec!["theme", "system_accent"],
                 Value::Bool(ui.get_system_accent()),
@@ -1076,6 +1077,7 @@ fn theme_label(id: &str) -> String {
 
 fn fill_appearance(ui: &SettingsWindow, t: &bw_config::Theme) {
     ui.set_blur(t.blur);
+    ui.set_glow(t.glow);
     ui.set_system_accent(t.system_accent);
     ui.set_accent(hex(t.accent).into());
     ui.set_accent_preview(super::color(t.accent));
