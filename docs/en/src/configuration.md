@@ -72,6 +72,19 @@ Width between 16 and 4000, height between 8 and 2000.
 | `compact` | `["claude", "media", "calendar"]` | priority order of modules **at equal importance** (something urgent always wins) |
 | `view` | `""` | name of a file in `layouts/` (without `.slint`): [custom view](layouts.md) of the open island |
 
+## `[hotkeys]`
+
+[Keyboard shortcuts](systeme.md#keyboard-shortcuts) that work everywhere,
+for example `"Ctrl+Alt+B"`; `""`: none.
+
+| Option | Default | Purpose |
+|---|---|---|
+| `toggle` | `"Ctrl+Alt+B"` | open or close the island |
+| `play_pause` | `""` | music: play / pause |
+| `next_track` | `""` | music: next track |
+| `previous_track` | `""` | music: previous track |
+| `do_not_disturb` | `""` | turn "do not disturb" on or off |
+
 ## `[modules.claude]`
 
 See [Claude Code](claude-code.md).
@@ -181,6 +194,16 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 | `latitude`, `longitude` | none | -90 to 90, -180 to 180 | exact coordinates, instead of `city` (both together) |
 | `units` | `"celsius"` | `"celsius"`, `"fahrenheit"` | temperature unit |
 | `refresh_minutes` | `30` | 10 to 180 | refresh interval (min) |
+
+## `[modules.system]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `true` | | show the [CPU and memory](systeme.md) in the open island |
+| `refresh_secs` | `2` | 1 to 10 | refresh interval while the island is open (s) |
+| `cpu_alert_percent` | `0` | 0, or 50 to 100 | alert when the CPU stays above it (%); 0: never |
+| `ram_alert_percent` | `0` | 0, or 50 to 100 | alert when the memory stays above it (%); 0: never |
+| `alert_after_secs` | `30` | 5 to 600 | time above the threshold before the alert (s) |
 
 ## `[modules.mascot]`
 

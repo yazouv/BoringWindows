@@ -1,15 +1,19 @@
-//! Intégration système. L'implémentation complète est Win32 ; macOS a l'icône
-//! de barre de menus, et ailleurs des substituts permettent de travailler l'UI.
+//! Intégration système : Win32 (complète), macOS (panneau au-dessus de la
+//! barre de menus), et ailleurs des substituts pour travailler l'UI.
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 mod fallback;
+#[cfg(target_os = "macos")]
+mod macos;
 #[cfg(any(windows, target_os = "macos"))]
 mod tray;
 #[cfg(windows)]
 mod win32;
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 pub use fallback::*;
+#[cfg(target_os = "macos")]
+pub use macos::*;
 #[cfg(any(windows, target_os = "macos"))]
 pub use tray::Tray;
 #[cfg(windows)]
@@ -23,7 +27,7 @@ pub struct SystemLook {
 }
 
 /// Événements système remontés à l'application (sur le thread UI).
-// Construits uniquement par l'implémentation Win32.
+// Construits par les implémentations Win32 et macOS (en partie).
 #[cfg_attr(not(windows), allow(dead_code))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlatformEvent {
@@ -38,11 +42,15 @@ pub enum PlatformEvent {
     /// Clavier ou souris utilisés après `watch_user_return` (l'utilisateur
     /// est revenu).
     UserReturned,
+    /// La souris a quitté la pilule sans que la fenêtre le voie (macOS : la
+    /// fenêtre ignore la souris hors de la pilule).
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    PointerLeft,
 }
 
 /// Commandes du menu de la zone de notification.
-// Construits uniquement par l'implémentation Win32.
-#[cfg_attr(not(windows), allow(dead_code))]
+// Construits seulement par l'icône de notification (Windows, macOS).
+#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrayCommand {
     /// Ouvrir la fenêtre de réglages.

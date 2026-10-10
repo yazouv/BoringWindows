@@ -55,6 +55,7 @@ pub struct Config {
     pub general: General,
     pub theme: Theme,
     pub layout: Layout,
+    pub hotkeys: Hotkeys,
     /// Sections `[modules.<nom>]`, interprétées par chaque module.
     pub modules: BTreeMap<String, toml::Table>,
 }
@@ -191,6 +192,44 @@ impl Default for Layout {
             view: String::new(),
             view_stamp: 0,
         }
+    }
+}
+
+/// Raccourcis clavier globaux (« Ctrl+Alt+B »…) ; vide : aucun. La syntaxe
+/// est vérifiée par l'app au moment de les enregistrer auprès du système.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct Hotkeys {
+    /// Ouvrir ou refermer l'île.
+    pub toggle: String,
+    pub play_pause: String,
+    pub next_track: String,
+    pub previous_track: String,
+    pub do_not_disturb: String,
+}
+
+impl Default for Hotkeys {
+    fn default() -> Self {
+        Self {
+            toggle: "Ctrl+Alt+B".into(),
+            play_pause: String::new(),
+            next_track: String::new(),
+            previous_track: String::new(),
+            do_not_disturb: String::new(),
+        }
+    }
+}
+
+impl Hotkeys {
+    /// Clé de config et raccourci de chaque action.
+    pub fn entries(&self) -> [(&'static str, &str); 5] {
+        [
+            ("toggle", &self.toggle),
+            ("play_pause", &self.play_pause),
+            ("next_track", &self.next_track),
+            ("previous_track", &self.previous_track),
+            ("do_not_disturb", &self.do_not_disturb),
+        ]
     }
 }
 

@@ -401,3 +401,48 @@ msgstr "Décorations de saison (Halloween, Noël, Nouvel An)"
 
 msgid "The mascot reacts to Claude Code (working, waiting for you, done), dances to the music, falls asleep when you are away and gets sleepy in the evening. By default it only moves when something happens, so the island uses no CPU at rest."
 msgstr "La mascotte réagit à Claude Code (travaille, t'attend, a fini), danse sur la musique, s'endort quand tu t'absentes et a sommeil le soir. Par défaut, elle ne bouge que quand il se passe quelque chose : l'île ne consomme rien au repos."
+
+msgid "System"
+msgstr "Système"
+
+msgid "CPU and memory"
+msgstr "Processeur et mémoire"
+
+msgid "Show the CPU and memory use next to the time in the open island"
+msgstr "Afficher l'usage du processeur et de la mémoire à côté de l'heure dans l'île ouverte"
+
+msgid "Refresh (seconds)"
+msgstr "Rafraîchissement (secondes)"
+
+msgid "Alert when the CPU stays above"
+msgstr "Alerte quand le processeur reste au-dessus de"
+
+msgid "Alert when the memory stays above"
+msgstr "Alerte quand la mémoire reste au-dessus de"
+
+msgid "never"
+msgstr "jamais"
+
+msgid "Measured only while the island is open. With an alert, a measure is also taken every 5 seconds, and the pill names the app responsible after 30 seconds above the threshold."
+msgstr "Mesuré seulement pendant que l'île est ouverte. Avec une alerte, une mesure est aussi prise toutes les 5 secondes, et la pilule nomme l'application en cause après 30 secondes au-dessus du seuil."
+
+msgid "Keyboard shortcuts"
+msgstr "Raccourcis clavier"
+
+msgid "Open or close the island"
+msgstr "Ouvrir ou refermer l'île"
+
+msgid "Play / pause"
+msgstr "Lecture / pause"
+
+msgid "Next track"
+msgstr "Morceau suivant"
+
+msgid "Previous track"
+msgstr "Morceau précédent"
+
+msgid "Do not disturb"
+msgstr "Ne pas déranger"
+
+msgid "They work in every app. Combine Ctrl, Alt, Shift or Super (Windows key, Cmd on a Mac) with a key: A to Z, 0 to 9, F1 to F24, Space, Up, Down, Left, Right… Leave empty for no shortcut."
+msgstr "Ils marchent dans toutes les applications. Combine Ctrl, Alt, Shift ou Super (touche Windows, Cmd sur Mac) avec une touche : A à Z, 0 à 9, F1 à F24, Space, Up, Down, Left, Right… Laisse vide pour aucun raccourci."

@@ -101,6 +101,16 @@ export struct WeatherInfo {
     detail: string,
 }
 
+// Processeur et mémoire dans l'en-tête ; au survol, le détail remplace la date.
+export struct SystemInfo {
+    cpu: string,
+    ram: string,
+    detail: string,
+    // Au-dessus de 90 % : en couleur d'alerte.
+    cpu-hot: bool,
+    ram-hot: bool,
+}
+
 // Pictogrammes au trait, viewbox 24x24 (tracés d'après Lucide, licence ISC).
 component Glyph inherits Path {
     in property <string> name;
@@ -122,6 +132,8 @@ component Glyph inherits Path {
         : root.name == "headphones" ? "M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"
         : root.name == "bluetooth" ? "M7 7l10 10-5 5V2l5 5L7 17"
         : root.name == "bolt" ? "M13 2L4.5 13.5H11L10 22l8.5-11.5H12Z"
+        : root.name == "cpu" ? "M12 20v2 M12 2v2 M17 20v2 M17 2v2 M2 12h2 M2 17h2 M2 7h2 M20 12h2 M20 17h2 M20 7h2 M7 20v2 M7 2v2 M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z M9 8h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"
+        : root.name == "memory" ? "M6 19v-3 M10 19v-3 M14 19v-3 M18 19v-3 M8 11V9 M16 11V9 M12 11V9 M2 15h20 M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v1.1a2 2 0 0 0 0 3.837V17a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5.1a2 2 0 0 0 0-3.837Z"
         : root.name == "battery" ? "M16 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z M22 11v2"
         : "M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z";
 }
@@ -715,6 +727,10 @@ export component Island inherits Window {
     // Météo à côté de la date ; au survol, le détail remplace la date.
     in property <bool> has-weather;
     in property <WeatherInfo> weather;
+    // Processeur et mémoire à côté de la météo (module system).
+    in property <bool> has-system;
+    in property <SystemInfo> system;
+    property <bool> system-hover;
     // Pilule telle qu'elle est dessinée (animations comprises) : avec le
     // flou, la région de la fenêtre la suit image par image.
     out property <length> pill-x: pill.x;
@@ -1194,34 +1210,82 @@ export component Island inherits Window {
                     }
 
                     // Météo : pictogramme et température ; le survol montre le détail.
-                    if root.has-weather: HorizontalLayout {
-                        spacing: 4px;
-
-                        Glyph {
-                            width: 15px;
-                            height: 15px;
-                            y: (parent.height - self.height) / 2;
-                            name: root.weather.icon;
-                            ink: root.fg.with-alpha(0.85);
+                    // (La zone de survol enveloppe le layout : placée dedans,
+                    // elle y prendrait sa propre case.)
+                    if root.has-weather: TouchArea {
+                        changed has-hover => {
+                            root.weather-hover = self.has-hover;
                         }
 
-                        Text {
-                            text: root.weather.temperature;
-                            color: root.fg.with-alpha(0.85);
-                            font-size: 13px;
-                            font-weight: 600;
-                            vertical-alignment: center;
+                        HorizontalLayout {
+                            spacing: 4px;
+
+                            Glyph {
+                                width: 15px;
+                                height: 15px;
+                                y: (parent.height - self.height) / 2;
+                                name: root.weather.icon;
+                                ink: root.fg.with-alpha(0.85);
+                            }
+
+                            Text {
+                                text: root.weather.temperature;
+                                color: root.fg.with-alpha(0.85);
+                                font-size: 13px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    // Processeur et mémoire ; le survol montre le détail.
+                    if root.has-system: TouchArea {
+                        changed has-hover => {
+                            root.system-hover = self.has-hover;
                         }
 
-                        weather-ta := TouchArea {
-                            changed has-hover => {
-                                root.weather-hover = self.has-hover;
+                        HorizontalLayout {
+                            spacing: 3px;
+
+                            Glyph {
+                                width: 13px;
+                                height: 13px;
+                                y: (parent.height - self.height) / 2;
+                                name: "cpu";
+                                ink: root.system.cpu-hot ? root.alert-color : root.fg.with-alpha(0.7);
+                            }
+
+                            Text {
+                                text: root.system.cpu;
+                                min-width: 27px;
+                                color: root.system.cpu-hot ? root.alert-color : root.fg.with-alpha(0.85);
+                                font-size: 12px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+                            }
+
+                            Glyph {
+                                width: 13px;
+                                height: 13px;
+                                y: (parent.height - self.height) / 2;
+                                name: "memory";
+                                ink: root.system.ram-hot ? root.alert-color : root.fg.with-alpha(0.7);
+                            }
+
+                            Text {
+                                text: root.system.ram;
+                                min-width: 27px;
+                                color: root.system.ram-hot ? root.alert-color : root.fg.with-alpha(0.85);
+                                font-size: 12px;
+                                font-weight: 600;
+                                vertical-alignment: center;
                             }
                         }
                     }
 
                     Text {
-                        text: root.toast != "" ? root.toast : root.weather-hover ? root.weather.detail : root.date-text;
+                        text: root.toast != "" ? root.toast : root.weather-hover ? root.weather.detail
+                            : root.system-hover ? root.system.detail : root.date-text;
                         color: root.toast != "" ? root.fg : root.fg.with-alpha(0.5);
                         font-size: 12px;
                         vertical-alignment: center;

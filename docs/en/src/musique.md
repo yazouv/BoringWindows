@@ -35,6 +35,16 @@ Part of the name is enough: `"chrome"`, `"msedge"`, `"firefox"`, `"spotify"`…
 The exact names are printed in the console (`musique : sources [...]`) when
 you start BoringWindows from a terminal.
 
+## On a Mac
+
+macOS has no public equivalent of the Windows media controls: there,
+BoringWindows follows **Spotify** and **Music** (Apple Music). They announce
+every track change, play or pause; the island then reads the track with
+AppleScript. On first use, macOS asks whether BoringWindows (or your
+terminal) may control the app: accept, otherwise nothing shows (System
+Settings › Privacy & Security › Automation to change it later). Browsers and
+other players aren't supported yet.
+
 ## Settings
 
 ```toml

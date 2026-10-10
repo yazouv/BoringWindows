@@ -139,6 +139,16 @@ export component SettingsWindow inherits Window {
     in-out property <bool> timer-enabled;
     in-out property <bool> timer-sound;
     in-out property <string> timer-presets;
+    // --- Système ---
+    in-out property <bool> system-enabled;
+    in-out property <int> system-refresh;
+    in-out property <int> cpu-alert-index;
+    in-out property <int> ram-alert-index;
+    in-out property <string> hotkey-toggle;
+    in-out property <string> hotkey-play-pause;
+    in-out property <string> hotkey-next;
+    in-out property <string> hotkey-previous;
+    in-out property <string> hotkey-dnd;
     // --- Pied de page ---
     in property <string> status;
     in property <bool> status-error;
@@ -908,6 +918,113 @@ export component SettingsWindow inherits Window {
 
                     Hint {
                         text: @tr("Data from open-meteo.com, free and without an account; only the city name and its coordinates are sent. Hover the temperature to see the forecast of the day.");
+                    }
+                }
+            }
+
+            Tab {
+                title: @tr("System");
+                VerticalBox {
+                    alignment: start;
+
+                    GroupBox {
+                        title: @tr("CPU and memory");
+                        VerticalBox {
+                            CheckBox {
+                                text: @tr("Show the CPU and memory use next to the time in the open island");
+                                checked <=> root.system-enabled;
+                                toggled => { root.changed("modules.system.enabled"); }
+                            }
+
+                            Row {
+                                label: @tr("Refresh (seconds)");
+                                SpinBox {
+                                    enabled: root.system-enabled;
+                                    minimum: 1;
+                                    maximum: 10;
+                                    value <=> root.system-refresh;
+                                    edited => { root.changed("modules.system.refresh_secs"); }
+                                }
+                            }
+
+                            Row {
+                                label: @tr("Alert when the CPU stays above");
+                                ComboBox {
+                                    enabled: root.system-enabled;
+                                    model: [@tr("never"), "70 %", "80 %", "90 %", "95 %"];
+                                    current-index <=> root.cpu-alert-index;
+                                    selected => { root.changed("modules.system.cpu_alert_percent"); }
+                                }
+                            }
+
+                            Row {
+                                label: @tr("Alert when the memory stays above");
+                                ComboBox {
+                                    enabled: root.system-enabled;
+                                    model: [@tr("never"), "70 %", "80 %", "90 %", "95 %"];
+                                    current-index <=> root.ram-alert-index;
+                                    selected => { root.changed("modules.system.ram_alert_percent"); }
+                                }
+                            }
+
+                            Hint {
+                                text: @tr("Measured only while the island is open. With an alert, a measure is also taken every 5 seconds, and the pill names the app responsible after 30 seconds above the threshold.");
+                            }
+                        }
+                    }
+
+                    GroupBox {
+                        title: @tr("Keyboard shortcuts");
+                        VerticalBox {
+                            Row {
+                                label: @tr("Open or close the island");
+                                LineEdit {
+                                    text <=> root.hotkey-toggle;
+                                    placeholder-text: "Ctrl+Alt+B";
+                                    edited => { root.changed("hotkeys.toggle"); }
+                                }
+                            }
+
+                            Row {
+                                label: @tr("Play / pause");
+                                LineEdit {
+                                    text <=> root.hotkey-play-pause;
+                                    placeholder-text: "Ctrl+Alt+P";
+                                    edited => { root.changed("hotkeys.play_pause"); }
+                                }
+                            }
+
+                            Row {
+                                label: @tr("Next track");
+                                LineEdit {
+                                    text <=> root.hotkey-next;
+                                    placeholder-text: "Ctrl+Alt+Right";
+                                    edited => { root.changed("hotkeys.next_track"); }
+                                }
+                            }
+
+                            Row {
+                                label: @tr("Previous track");
+                                LineEdit {
+                                    text <=> root.hotkey-previous;
+                                    placeholder-text: "Ctrl+Alt+Left";
+                                    edited => { root.changed("hotkeys.previous_track"); }
+                                }
+                            }
+
+                            Row {
+                                label: @tr("Do not disturb");
+                                LineEdit {
+                                    text <=> root.hotkey-dnd;
+                                    placeholder-text: "Ctrl+Alt+D";
+                                    edited => { root.changed("hotkeys.do_not_disturb"); }
+                                }
+                            }
+
+                            Hint {
+                                text: @tr("They work in every app. Combine Ctrl, Alt, Shift or Super (Windows key, Cmd on a Mac) with a key: A to Z, 0 to 9, F1 to F24, Space, Up, Down, Left, Right… Leave empty for no shortcut.");
+                            }
+                        }
                     }
                 }
             }

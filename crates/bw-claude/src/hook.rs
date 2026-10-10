@@ -365,10 +365,10 @@ mod process {
 mod process {
     pub fn ancestors() -> Vec<u32> {
         let mut chain = vec![std::os::unix::process::parent_id()];
-        // Linux : on remonte via /proc ; ailleurs, le parent direct suffit.
+        // Linux : on remonte via /proc ; macOS : via proc_pidinfo.
         while chain.len() < 12 {
             let pid = *chain.last().unwrap_or(&0);
-            let Some(parent) = linux_parent(pid) else {
+            let Some(parent) = parent_of(pid) else {
                 break;
             };
             if parent <= 1 || chain.contains(&parent) {
@@ -379,6 +379,34 @@ mod process {
         chain
     }
 
+    #[cfg(target_os = "macos")]
+    fn parent_of(pid: u32) -> Option<u32> {
+        let mut info = std::mem::MaybeUninit::<libc::proc_bsdinfo>::zeroed();
+        let size = size_of::<libc::proc_bsdinfo>() as libc::c_int;
+        // SAFETY: `info` est un tampon de la taille annoncée ; le noyau le
+        // remplit et renvoie le nombre d'octets écrits.
+        let written = unsafe {
+            libc::proc_pidinfo(
+                i32::try_from(pid).ok()?,
+                libc::PROC_PIDTBSDINFO,
+                0,
+                info.as_mut_ptr().cast(),
+                size,
+            )
+        };
+        if written != size {
+            return None;
+        }
+        // SAFETY: entièrement rempli par proc_pidinfo (vérifié ci-dessus).
+        Some(unsafe { info.assume_init() }.pbi_ppid)
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    fn parent_of(pid: u32) -> Option<u32> {
+        linux_parent(pid)
+    }
+
+    #[cfg(not(target_os = "macos"))]
     fn linux_parent(pid: u32) -> Option<u32> {
         let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
         // Le nom du processus est entre parenthèses et peut contenir des espaces.

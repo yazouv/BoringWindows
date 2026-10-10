@@ -138,6 +138,7 @@ pub(super) struct SettingsState {
 
 impl Controller {
     pub(super) fn open_settings(self: &Rc<Self>) {
+        platform::activate_app();
         if let Some(s) = self.settings.borrow().as_ref() {
             let _ = s.ui.show();
             return;
@@ -199,6 +200,18 @@ impl Controller {
         ui.set_weather_enabled(config.module_enabled(bw_weather::MODULE_ID, false));
         ui.set_weather_city(weather.city.as_str().into());
         ui.set_weather_units_index(i32::from(weather.units == bw_weather::Units::Fahrenheit));
+        let system = bw_system::SystemConfig::from_table(config.modules.get(bw_system::MODULE_ID))
+            .unwrap_or_default();
+        ui.set_system_enabled(config.module_enabled(bw_system::MODULE_ID, true));
+        ui.set_system_refresh(system.refresh_secs as i32);
+        ui.set_cpu_alert_index(alert_index(system.cpu_alert_percent));
+        ui.set_ram_alert_index(alert_index(system.ram_alert_percent));
+        let hotkeys = &config.hotkeys;
+        ui.set_hotkey_toggle(hotkeys.toggle.as_str().into());
+        ui.set_hotkey_play_pause(hotkeys.play_pause.as_str().into());
+        ui.set_hotkey_next(hotkeys.next_track.as_str().into());
+        ui.set_hotkey_previous(hotkeys.previous_track.as_str().into());
+        ui.set_hotkey_dnd(hotkeys.do_not_disturb.as_str().into());
         ui.set_notifications_enabled(config.module_enabled(bw_notify::MODULE_ID, true));
         let notify = bw_notify::NotifyConfig::from_table(config.modules.get(bw_notify::MODULE_ID))
             .unwrap_or_default();
@@ -840,6 +853,42 @@ impl Controller {
                     .into(),
                 ),
             )),
+            "modules.system.enabled" => Some((
+                vec!["modules", "system", "enabled"],
+                Value::Bool(ui.get_system_enabled()),
+            )),
+            "modules.system.refresh_secs" => Some((
+                vec!["modules", "system", "refresh_secs"],
+                Value::Int(ui.get_system_refresh().into()),
+            )),
+            "modules.system.cpu_alert_percent" => Some((
+                vec!["modules", "system", "cpu_alert_percent"],
+                Value::Int(alert_percent(ui.get_cpu_alert_index())),
+            )),
+            "modules.system.ram_alert_percent" => Some((
+                vec!["modules", "system", "ram_alert_percent"],
+                Value::Int(alert_percent(ui.get_ram_alert_index())),
+            )),
+            "hotkeys.toggle" => Some((
+                vec!["hotkeys", "toggle"],
+                Value::Str(ui.get_hotkey_toggle().trim().to_owned()),
+            )),
+            "hotkeys.play_pause" => Some((
+                vec!["hotkeys", "play_pause"],
+                Value::Str(ui.get_hotkey_play_pause().trim().to_owned()),
+            )),
+            "hotkeys.next_track" => Some((
+                vec!["hotkeys", "next_track"],
+                Value::Str(ui.get_hotkey_next().trim().to_owned()),
+            )),
+            "hotkeys.previous_track" => Some((
+                vec!["hotkeys", "previous_track"],
+                Value::Str(ui.get_hotkey_previous().trim().to_owned()),
+            )),
+            "hotkeys.do_not_disturb" => Some((
+                vec!["hotkeys", "do_not_disturb"],
+                Value::Str(ui.get_hotkey_dnd().trim().to_owned()),
+            )),
             "modules.notifications.enabled" => Some((
                 vec!["modules", "notifications", "enabled"],
                 Value::Bool(ui.get_notifications_enabled()),
@@ -980,13 +1029,34 @@ impl Controller {
         let mut editor = ConfigEditor::open(&self.path).map_err(|e| e.to_string())?;
         f(&mut editor);
         let config = editor.config().map_err(|e| e.to_string())?;
-        let (_, errors) = build_modules(&config);
+        let (_, mut errors) = build_modules(&config);
+        errors.extend(crate::hotkeys::bindings(&config.hotkeys).1);
         if let Some(e) = errors.into_iter().next() {
             return Err(e);
         }
         editor.save().map_err(|e| e.to_string())?;
         Ok(config)
     }
+}
+
+/// Seuils d'alerte proposés (processeur, mémoire) ; 0 : jamais.
+const ALERT_STEPS: [u8; 5] = [0, 70, 80, 90, 95];
+
+/// Entrée de la liste pour un seuil : la plus proche (config écrite à la main).
+fn alert_index(percent: u8) -> i32 {
+    if percent == 0 {
+        return 0;
+    }
+    (1..ALERT_STEPS.len())
+        .min_by_key(|&i| ALERT_STEPS[i].abs_diff(percent))
+        .unwrap_or(0) as i32
+}
+
+fn alert_percent(index: i32) -> i64 {
+    ALERT_STEPS
+        .get(usize::try_from(index).unwrap_or(0))
+        .copied()
+        .map_or(0, i64::from)
 }
 
 /// Nom affiché d'un thème : traduit pour ceux fournis, nom du fichier sinon.

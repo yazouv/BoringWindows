@@ -73,6 +73,19 @@ Largeur entre 16 et 4000, hauteur entre 8 et 2000.
 | `compact` | `["claude", "media", "calendar"]` | ordre de priorité des modules **à importance égale** (une urgence passe toujours devant) |
 | `view` | `""` | nom d'un fichier de `layouts/` (sans `.slint`) : [vue personnelle](layouts.md) de l'île ouverte |
 
+## `[hotkeys]`
+
+[Raccourcis clavier](systeme.md#raccourcis-clavier) valables partout, par
+exemple `"Ctrl+Alt+B"` ; `""` : aucun.
+
+| Option | Défaut | Rôle |
+|---|---|---|
+| `toggle` | `"Ctrl+Alt+B"` | ouvrir ou refermer l'île |
+| `play_pause` | `""` | musique : lecture / pause |
+| `next_track` | `""` | musique : morceau suivant |
+| `previous_track` | `""` | musique : morceau précédent |
+| `do_not_disturb` | `""` | activer ou couper « ne pas déranger » |
+
 ## `[modules.claude]`
 
 Voir [Claude Code](claude-code.md).
@@ -182,6 +195,16 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 | `latitude`, `longitude` | aucune | -90 à 90, -180 à 180 | coordonnées exactes, à la place de `city` (les deux ensemble) |
 | `units` | `"celsius"` | `"celsius"`, `"fahrenheit"` | unité des températures |
 | `refresh_minutes` | `30` | 10 à 180 | rafraîchissement (min) |
+
+## `[modules.system]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `true` | | afficher le [processeur et la mémoire](systeme.md) dans l'île ouverte |
+| `refresh_secs` | `2` | 1 à 10 | rafraîchissement pendant que l'île est ouverte (s) |
+| `cpu_alert_percent` | `0` | 0, ou 50 à 100 | alerte quand le processeur reste au-dessus (%) ; 0 : jamais |
+| `ram_alert_percent` | `0` | 0, ou 50 à 100 | alerte quand la mémoire reste au-dessus (%) ; 0 : jamais |
+| `alert_after_secs` | `30` | 5 à 600 | durée au-dessus du seuil avant l'alerte (s) |
 
 ## `[modules.mascot]`
 

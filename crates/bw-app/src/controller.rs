@@ -32,7 +32,7 @@ use crate::platform::{self, Platform, PlatformEvent, Tray, TrayCommand};
 use crate::shelf::{Shelf, ShelfConfig};
 use crate::{
     AgendaRow, ClaudePrompt, ClaudeRow, GaugeInfo, Island, MediaInfo, NotifInfo, PluginRow,
-    RecentRow, ShelfRow, TimerInfo, WeatherInfo, clock, demo,
+    RecentRow, ShelfRow, SystemInfo, TimerInfo, WeatherInfo, clock, demo,
 };
 
 /// Pseudo-module utilisé pour signaler une config invalide dans l'île.
@@ -51,6 +51,11 @@ const TAB_NOTIFICATIONS: i32 = 2;
 /// marge après sa fin.
 const BLUR_FRAME: Duration = Duration::from_millis(16);
 const BLUR_TAIL: Duration = Duration::from_millis(80);
+/// Île ouverte par raccourci : elle se referme après ce délai si la souris
+/// ne vient pas dessus.
+const HOTKEY_OPEN: Duration = Duration::from_secs(6);
+/// Processeur ou mémoire au-delà : affichés en couleur d'alerte.
+const HOT_PERCENT: f32 = 90.0;
 
 thread_local! {
     static CONTROLLER: OnceCell<Rc<Controller>> = const { OnceCell::new() };
@@ -143,6 +148,7 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         wheel: RefCell::new(gestures::Wheel::default()),
         live: Cell::new(false),
         toast_timer: Timer::default(),
+        hotkeys: RefCell::new(None),
     });
     CONTROLLER.with(|c| {
         let _ = c.set(controller.clone());
@@ -226,6 +232,8 @@ pub struct Controller {
     /// En appel ou en partage d'écran (`bw-presence`).
     live: Cell<bool>,
     toast_timer: Timer,
+    /// Raccourcis clavier globaux (absents si le système les refuse).
+    hotkeys: RefCell<Option<crate::hotkeys::Hotkeys>>,
 }
 
 impl Controller {
@@ -395,6 +403,12 @@ impl Controller {
         }
         self.start_updates();
 
+        match crate::hotkeys::Hotkeys::new(|id| post(move |c| c.on_hotkey(id))) {
+            Ok(hotkeys) => *self.hotkeys.borrow_mut() = Some(hotkeys),
+            Err(e) => log::warn!("raccourcis clavier indisponibles : {e}"),
+        }
+        self.apply_hotkeys();
+
         if !hooks_installed && self.module_ids.borrow().contains(&bw_claude::MODULE_ID) {
             self.flash(&tr!(
                 "Claude Code: hooks not installed · right-click the icon",
@@ -451,6 +465,10 @@ impl Controller {
             if expanded {
                 self.refresh_activity();
             }
+            self.send_action(
+                bw_system::MODULE_ID,
+                if expanded { "open" } else { "close" },
+            );
             self.update_progress();
             self.update_viz_activity();
             self.update_timer_ui();
@@ -466,17 +484,19 @@ impl Controller {
                 self.set_expanded(true);
             }
         } else if self.expanded.get() {
-            let weak = Rc::downgrade(self);
-            self.collapse_timer.start(
-                TimerMode::SingleShot,
-                Duration::from_millis(general.collapse_delay_ms.into()),
-                move || {
-                    if let Some(c) = weak.upgrade() {
-                        c.set_expanded(false);
-                    }
-                },
-            );
+            self.schedule_collapse(Duration::from_millis(general.collapse_delay_ms.into()));
         }
+    }
+
+    /// Referme l'île dans `delay`, sauf si la souris revient dessus.
+    fn schedule_collapse(self: &Rc<Self>, delay: Duration) {
+        let weak = Rc::downgrade(self);
+        self.collapse_timer
+            .start(TimerMode::SingleShot, delay, move || {
+                if let Some(c) = weak.upgrade() {
+                    c.set_expanded(false);
+                }
+            });
     }
 
     /// Recalcule l'état affiché après un changement (ouverture, attention…).
@@ -774,6 +794,7 @@ impl Controller {
             // Les textes des modules (agenda, Claude…) sont refaits au redémarrage.
             self.restart_modules();
         }
+        self.apply_hotkeys();
     }
 
     /// Remet dans la langue courante les textes produits côté Rust.
@@ -826,6 +847,7 @@ impl Controller {
         self.timer_tick.stop();
         self.ui.set_has_timer(false);
         self.ui.set_has_weather(false);
+        self.ui.set_has_system(false);
         self.live.set(false);
         self.ui.set_live(false);
         self.gauges.borrow_mut().clear();
@@ -850,6 +872,9 @@ impl Controller {
         }
         if self.dnd.get() {
             self.send_notify("dnd:on");
+        }
+        if self.expanded.get() {
+            self.send_action(bw_system::MODULE_ID, "open");
         }
         self.refresh_shape();
     }
@@ -894,6 +919,15 @@ impl Controller {
                         icon: weather.sky.icon(weather.day).into(),
                         temperature: weather.temperature_text().into(),
                         detail: weather.detail().into(),
+                    });
+                } else if let Some(system) = state.downcast_ref::<bw_system::SystemSnapshot>() {
+                    self.ui.set_has_system(true);
+                    self.ui.set_system(SystemInfo {
+                        cpu: system.cpu_text().into(),
+                        ram: system.ram_text().into(),
+                        detail: system.detail().into(),
+                        cpu_hot: system.cpu >= HOT_PERCENT,
+                        ram_hot: system.ram_percent() >= HOT_PERCENT,
                     });
                 } else if let Ok(snapshot) = state.clone().downcast::<CalendarSnapshot>() {
                     *self.calendar.borrow_mut() = Some(snapshot);
@@ -987,10 +1021,18 @@ impl Controller {
     }
 
     fn refresh_activity(&self) {
+        self.send_action(bw_claude::ACTIVITY_ID, "refresh");
+    }
+
+    /// Action adressée à un module, s'il est actif.
+    fn send_action(&self, module: &str, name: &str) {
+        if !self.module_ids.borrow().contains(&module) {
+            return;
+        }
         if let Some(host) = self.host.borrow().as_ref() {
             host.send_action(Action {
-                module: bw_claude::ACTIVITY_ID.into(),
-                name: "refresh".into(),
+                module: module.into(),
+                name: name.into(),
             });
         }
     }
@@ -1891,9 +1933,12 @@ impl Controller {
     }
 
     fn on_long_press(self: &Rc<Self>) {
-        if !self.gestures_config().enabled {
-            return;
+        if self.gestures_config().enabled {
+            self.toggle_dnd_with_feedback();
         }
+    }
+
+    fn toggle_dnd_with_feedback(self: &Rc<Self>) {
         let on = !self.dnd.get();
         self.set_dnd(on);
         let text = if on {
@@ -1961,6 +2006,65 @@ impl Controller {
             });
     }
 
+    // --- Raccourcis clavier ---------------------------------------------------
+
+    /// Enregistre les raccourcis de la config ; les erreurs s'affichent dans
+    /// l'île comme une config invalide.
+    fn apply_hotkeys(&self) {
+        let errors = {
+            let mut hotkeys = self.hotkeys.borrow_mut();
+            let Some(hotkeys) = hotkeys.as_mut() else {
+                return;
+            };
+            hotkeys.apply(&self.config.borrow().hotkeys)
+        };
+        if let Some(first) = errors.first() {
+            for e in &errors {
+                log::error!("{e}");
+            }
+            self.arbiter.borrow_mut().claim(
+                CONFIG_ERROR,
+                Attention::High,
+                Some(format!("⚠ {first}")),
+            );
+            self.refresh_shape();
+        }
+    }
+
+    fn on_hotkey(self: &Rc<Self>, id: u32) {
+        use crate::hotkeys::HotkeyAction;
+        let Some(action) = self.hotkeys.borrow().as_ref().and_then(|h| h.action(id)) else {
+            return;
+        };
+        log::debug!("raccourci : {action:?}");
+        match action {
+            HotkeyAction::Toggle => {
+                let open = !self.expanded.get();
+                self.set_expanded(open);
+                if open {
+                    // Ouverte au clavier : elle se referme seule si la souris
+                    // ne vient pas dessus.
+                    self.schedule_collapse(HOTKEY_OPEN);
+                }
+            }
+            HotkeyAction::PlayPause => {
+                if self.media.borrow().is_some() {
+                    self.media_action("toggle".to_owned());
+                }
+            }
+            HotkeyAction::Next | HotkeyAction::Previous => {
+                let next = action == HotkeyAction::Next;
+                let gesture = if next {
+                    Gesture::Next
+                } else {
+                    Gesture::Previous
+                };
+                self.run_gesture(gesture, &self.gestures_config());
+            }
+            HotkeyAction::DoNotDisturb => self.toggle_dnd_with_feedback(),
+        }
+    }
+
     // --- Système -----------------------------------------------------------
 
     fn on_platform_event(&self, event: PlatformEvent) {
@@ -1987,6 +2091,12 @@ impl Controller {
                 }
             }
             PlatformEvent::TaskbarChanged => self.update_taskbar(),
+            PlatformEvent::PointerLeft => {
+                // Les zones survolées de l'île apprennent que la souris est partie.
+                self.ui
+                    .window()
+                    .dispatch_event(slint::platform::WindowEvent::PointerExited);
+            }
             PlatformEvent::UserReturned => {
                 self.set_away(false);
                 self.schedule_away();
@@ -2127,6 +2237,13 @@ fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
         match bw_weather::WeatherConfig::from_table(config.modules.get(bw_weather::MODULE_ID)) {
             Ok(c) => modules.push(Box::new(bw_weather::WeatherModule::new(c))),
             Err(e) => errors.push(format!("modules.weather : {e:#}")),
+        }
+    }
+    if bw_system::SystemModule::is_supported() && config.module_enabled(bw_system::MODULE_ID, true)
+    {
+        match bw_system::SystemConfig::from_table(config.modules.get(bw_system::MODULE_ID)) {
+            Ok(c) => modules.push(Box::new(bw_system::SystemModule::new(c))),
+            Err(e) => errors.push(format!("modules.system : {e:#}")),
         }
     }
     if config.module_enabled("demo", false) {

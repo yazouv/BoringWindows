@@ -53,6 +53,19 @@ height = 170.0
 # Priority order of modules when several ask for attention at the same time.
 compact = ["claude", "media", "calendar"]
 
+[hotkeys]
+# Keyboard shortcuts that work everywhere, e.g. "Ctrl+Alt+B" or "Ctrl+Shift+F9" ("": none).
+# Modifiers: Ctrl, Alt, Shift, Super (Windows key, Cmd on a Mac).
+# Keys: A to Z, 0 to 9, F1 to F24, Space, Up, Down, Left, Right, Home, End…
+# Open or close the island.
+toggle = "Ctrl+Alt+B"
+# Music: play / pause, next track, previous track.
+play_pause = ""
+next_track = ""
+previous_track = ""
+# Turn "do not disturb" on or off.
+do_not_disturb = ""
+
 # Each module is configured in its [modules.<name>] section.
 # A module with enabled = false is not even started.
 
@@ -132,6 +145,19 @@ city = ""
 units = "celsius"
 # Refresh interval (minutes).
 refresh_minutes = 30
+
+[modules.system]
+# CPU and memory next to the time in the open island (details on hover).
+enabled = true
+# Refresh while the island is open (s, 1 to 10). While it is closed, nothing
+# is measured, unless an alert is set.
+refresh_secs = 2
+# Alert in the pill when the CPU or the memory stays above this threshold
+# (%, 50 to 100), naming the app responsible; 0 = no alert.
+cpu_alert_percent = 0
+ram_alert_percent = 0
+# Time above the threshold before the alert (s).
+alert_after_secs = 30
 
 [modules.mascot]
 # The mascot: a little blob in the pill that reacts to Claude Code, dances to

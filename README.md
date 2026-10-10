@@ -7,6 +7,7 @@ Une « Dynamic Island » pour Windows, écrite en Rust : légère, discrète et 
 - 📅 **Calendrier** (ICS, Google, Outlook, CalDAV) avec rappel et bouton « Rejoindre »
 - 🔋 **Batterie et Bluetooth** (chargeur, batterie faible, casque connecté avec son niveau) et 🌤️ **météo**
 - 👻 Une **mascotte** qui réagit à Claude et danse sur la musique, des **gestes** (volume, morceaux) et un **mode présentation** (île discrète et invisible pendant un partage d'écran)
+- 📊 **CPU et mémoire** dans l'île, avec alerte en cas de surcharge, et **raccourcis clavier** globaux
 - 🎨 Thèmes (dont un automatique qui suit Windows, avec flou), layouts et modules configurables par fichiers, rechargés à chaud
 
 Inspiré de [boring.notch](https://github.com/TheBoredTeam/boring.notch) et [coucou](https://github.com/Louis-CFM/coucou).
@@ -17,6 +18,14 @@ Claude Code, dépannage) · 🇬🇧 [English](https://yazouv.github.io/BoringWi
 Sources dans [`docs/`](docs/).
 
 👉 Voir le [plan du projet](PLAN.md).
+
+> **Comment ce projet est fait.** BoringWindows est écrit en très grande partie
+> par une IA ([Claude Code](https://claude.com/claude-code)) : je décris ce que
+> je veux, je teste, je relis et je corrige le tir, mais l'essentiel du code
+> n'a pas été tapé à la main. Les tests, clippy et la CI tournent sur chaque
+> changement, et les parties sensibles (relais des hooks, secrets, mises à
+> jour) sont relues de près. Il peut quand même rester des bizarreries : les
+> issues et les PR sont les bienvenues.
 
 ## État
 
@@ -161,12 +170,15 @@ démarrage, masquer l'île, quitter.
 | `bw-power` | batterie du PC et appareils Bluetooth (événements de Windows, sans polling) |
 | `bw-weather` | météo du moment (open-meteo, sans clé) |
 | `bw-presence` | mode présentation : appels et partages d'écran en cours (registre de confidentialité de Windows) |
+| `bw-system` | processeur et mémoire (mesurés île ouverte), alertes de surcharge |
 | `bw-update` | mises à jour depuis les releases GitHub (empreinte vérifiée) |
 | `bw-app` | binaire : île Slint (`ui/island.slint`), intégration Win32, icône de notification |
 
-Le code Win32 est isolé dans `crates/bw-app/src/platform/win32.rs`. Sur macOS et
-Linux, l'île s'ouvre comme une fenêtre flottante (macOS : icône de barre de menus,
-pas d'icône dans le Dock) ; le port macOS complet est décrit dans le plan.
+Le code Win32 est isolé dans `crates/bw-app/src/platform/win32.rs`, celui de
+macOS dans `platform/macos.rs` : l'île y est un panneau au-dessus de la barre
+de menus, centré en haut de l'écran, avec la musique de Spotify et de Musique
+(à valider sur un vrai Mac, voir le plan). Sous Linux, l'île s'ouvre comme une
+fenêtre flottante, pour le développement.
 
 ## Versions et CI/CD
 

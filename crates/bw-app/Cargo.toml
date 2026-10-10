@@ -22,6 +22,7 @@ bw-media.workspace = true
 bw-notify.workspace = true
 bw-power.workspace = true
 bw-presence.workspace = true
+bw-system.workspace = true
 bw-weather.workspace = true
 bw-timer.workspace = true
 bw-volume.workspace = true
@@ -48,9 +49,52 @@ slint-interpreter = { version = "~1.18", default-features = false, features = [
 serde.workspace = true
 tokio.workspace = true
 toml.workspace = true
+global-hotkey = { version = "0.8", default-features = false }
 
 [target.'cfg(any(windows, target_os = "macos"))'.dependencies]
 tray-icon = { version = "0.24", default-features = false }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6"
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = [
+    "std",
+    "block2",
+    "libc",
+    "objc2-core-foundation",
+    "NSAlert",
+    "NSApplication",
+    "NSButton",
+    "NSColor",
+    "NSColorSpace",
+    "NSControl",
+    "NSEvent",
+    "NSGraphics",
+    "NSOpenPanel",
+    "NSPanel",
+    "NSResponder",
+    "NSRunningApplication",
+    "NSSavePanel",
+    "NSScreen",
+    "NSSound",
+    "NSTrackingArea",
+    "NSView",
+    "NSWindow",
+] }
+objc2-foundation = { version = "0.3", default-features = false, features = [
+    "std",
+    "block2",
+    "NSArray",
+    "NSDistributedNotificationCenter",
+    "NSGeometry",
+    "NSNotification",
+    "NSObject",
+    "NSOperation",
+    "NSString",
+    "NSURL",
+    "NSUserDefaults",
+] }
+raw-window-handle = "0.6"
 
 [target.'cfg(windows)'.dependencies]
 raw-window-handle = "0.6"

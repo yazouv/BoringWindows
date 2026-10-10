@@ -53,6 +53,19 @@ height = 170.0
 # Ordre de priorité des modules quand plusieurs réclament l'attention en même temps.
 compact = ["claude", "media", "calendar"]
 
+[hotkeys]
+# Raccourcis clavier valables partout, ex. "Ctrl+Alt+B" ou "Ctrl+Shift+F9" ("" : aucun).
+# Modificateurs : Ctrl, Alt, Shift, Super (touche Windows, Cmd sur Mac).
+# Touches : A à Z, 0 à 9, F1 à F24, Space, Up, Down, Left, Right, Home, End…
+# Ouvrir ou refermer l'île.
+toggle = "Ctrl+Alt+B"
+# Musique : lecture / pause, morceau suivant, morceau précédent.
+play_pause = ""
+next_track = ""
+previous_track = ""
+# Activer ou couper « ne pas déranger ».
+do_not_disturb = ""
+
 # Chaque module se configure dans sa section [modules.<nom>].
 # Un module avec enabled = false n'est même pas démarré.
 
@@ -132,6 +145,19 @@ city = ""
 units = "celsius"
 # Rafraîchissement (minutes).
 refresh_minutes = 30
+
+[modules.system]
+# Processeur et mémoire à côté de l'heure dans l'île ouverte (détail au survol).
+enabled = true
+# Rafraîchissement pendant que l'île est ouverte (s, de 1 à 10). Île fermée,
+# rien n'est mesuré, sauf si une alerte est réglée.
+refresh_secs = 2
+# Alerte dans la pilule quand le processeur ou la mémoire reste au-dessus de ce
+# seuil (%, de 50 à 100), avec l'application en cause ; 0 = pas d'alerte.
+cpu_alert_percent = 0
+ram_alert_percent = 0
+# Durée au-dessus du seuil avant l'alerte (s).
+alert_after_secs = 30
 
 [modules.mascot]
 # La mascotte : un petit blob dans la pilule qui réagit à Claude Code, danse sur
