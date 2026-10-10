@@ -13,6 +13,18 @@ mod wmi;
 pub use config::VolumeConfig;
 pub use module::{BRIGHTNESS_ID, MODULE_ID, VolumeModule};
 
+/// Monte ou baisse le volume principal de `step` (-1 à 1) : nouveau niveau et
+/// état muet. Windows seulement ; à appeler sur le thread UI (COM initialisé).
+pub fn nudge(step: f32) -> anyhow::Result<(f32, bool)> {
+    #[cfg(windows)]
+    return wasapi::nudge(step);
+    #[cfg(not(windows))]
+    {
+        let _ = step;
+        anyhow::bail!("volume : Windows seulement")
+    }
+}
+
 /// Texte affiché : « Volume 45 % » ou « Muet ».
 pub fn label(level: f32, muted: bool) -> String {
     if muted || level <= 0.0 {

@@ -361,6 +361,11 @@ de texte aux écrans de l'assistant), puis la fenêtre de réglages.
 - [x] Batterie du PC (`bw-power`, module `battery` : branchement, charge terminée, batterie faible ; événements `PowerManager`, doc FR + EN ; à valider sur un portable)
 - [x] Appareils Bluetooth (module `bluetooth` : connexion avec niveau de batterie, déconnexion, batterie faible ; `DeviceWatcher`, doc FR + EN ; à valider avec un casque)
 - [x] Météo (`bw-weather`, open-meteo sans clé, à côté de la date, détail au survol, onglet de réglages, doc FR + EN)
+- [x] Mascotte (blob à yeux dans la pilule : humeur selon Claude, musique, heure et absence ; danse sur les basses ; animée seulement quand utile, option « toujours animée » ; doc FR + EN)
+- [x] Décorations de saison (Halloween : chapeau de sorcière et citrouilles ; Noël ; Nouvel An)
+- [x] Gestes sur l'île (molette : volume ; glisser : morceau suivant/précédent ; appui long : ne pas déranger ; doc FR + EN)
+- [x] Mode présentation (`bw-presence` : appel ou partage d'écran détecté → annonces tues et point rouge ; île exclue des captures ; doc FR + EN)
+- [x] Plus de barre de titre au premier clic sur l'île (sous-classement de la fenêtre)
 
 ### Port macOS (en parallèle, sans bloquer Windows)
 

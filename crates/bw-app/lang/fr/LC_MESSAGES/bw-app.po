@@ -374,3 +374,30 @@ msgstr "Unité"
 
 msgid "Data from open-meteo.com, free and without an account; only the city name and its coordinates are sent. Hover the temperature to see the forecast of the day."
 msgstr "Données d'open-meteo.com, gratuit et sans compte ; seuls le nom de la ville et ses coordonnées sont envoyés. Survole la température pour voir les prévisions du jour."
+
+msgid "Gestures on the island: wheel for volume, swipe to change track, long press for do not disturb"
+msgstr "Gestes sur l'île : molette pour le volume, glisser pour changer de morceau, appui long pour ne pas déranger"
+
+msgid "Presentation mode: stay quiet during calls and screen sharing"
+msgstr "Mode présentation : rester discrète pendant les appels et les partages d'écran"
+
+msgid "Hide the island from screen sharing, recordings and screenshots"
+msgstr "Cacher l'île des partages d'écran, enregistrements et captures"
+
+msgid "Mascot"
+msgstr "Mascotte"
+
+msgid "Show the mascot in the island"
+msgstr "Afficher la mascotte dans l'île"
+
+msgid "Always animated (breathes and blinks, uses a little CPU)"
+msgstr "Toujours animée (respire et cligne des yeux, consomme un peu de CPU)"
+
+msgid "Dance to the music"
+msgstr "Danser sur la musique"
+
+msgid "Seasonal decorations (Halloween, Christmas, New Year)"
+msgstr "Décorations de saison (Halloween, Noël, Nouvel An)"
+
+msgid "The mascot reacts to Claude Code (working, waiting for you, done), dances to the music, falls asleep when you are away and gets sleepy in the evening. By default it only moves when something happens, so the island uses no CPU at rest."
+msgstr "La mascotte réagit à Claude Code (travaille, t'attend, a fini), danse sur la musique, s'endort quand tu t'absentes et a sommeil le soir. Par défaut, elle ne bouge que quand il se passe quelque chose : l'île ne consomme rien au repos."

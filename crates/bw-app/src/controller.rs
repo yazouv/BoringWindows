@@ -26,6 +26,8 @@ use slint::{
 };
 
 use crate::geometry::{self, Shape};
+use crate::gestures::{self, Gesture, GesturesConfig};
+use crate::mascot::{self, ClaudeState, MascotConfig};
 use crate::platform::{self, Platform, PlatformEvent, Tray, TrayCommand};
 use crate::shelf::{Shelf, ShelfConfig};
 use crate::{
@@ -136,6 +138,11 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         blur_timer: Timer::default(),
         blur_until: Cell::new(None),
         gauges: RefCell::new(std::collections::HashMap::new()),
+        away: Cell::new(false),
+        away_timer: Timer::default(),
+        wheel: RefCell::new(gestures::Wheel::default()),
+        live: Cell::new(false),
+        toast_timer: Timer::default(),
     });
     CONTROLLER.with(|c| {
         let _ = c.set(controller.clone());
@@ -211,6 +218,14 @@ pub struct Controller {
     blur_until: Cell<Option<std::time::Instant>>,
     /// Dernière jauge publiée par chaque module (batterie, Bluetooth).
     gauges: RefCell<std::collections::HashMap<&'static str, bw_power::Gauge>>,
+    /// Personne au clavier depuis `sleep_after_minutes` : la mascotte dort.
+    away: Cell<bool>,
+    away_timer: Timer,
+    /// Cumul des défilements (gestes).
+    wheel: RefCell<gestures::Wheel>,
+    /// En appel ou en partage d'écran (`bw-presence`).
+    live: Cell<bool>,
+    toast_timer: Timer,
 }
 
 impl Controller {
@@ -308,6 +323,23 @@ impl Controller {
             }
             slint::winit_030::EventResult::Propagate
         });
+        self.ui.on_wheel({
+            let weak = weak.clone();
+            move |dx, dy, shift| {
+                if let Some(c) = weak.upgrade() {
+                    c.on_wheel(dx, dy, shift);
+                }
+            }
+        });
+        self.ui.on_drag(with(&weak, |c, dx: f32| c.on_drag(dx)));
+        self.ui.on_long_press({
+            let weak = weak.clone();
+            move || {
+                if let Some(c) = weak.upgrade() {
+                    c.on_long_press();
+                }
+            }
+        });
         self.ui
             .on_timer_action(with(&weak, |c, action: slint::SharedString| {
                 c.timer_action(action.to_string());
@@ -345,6 +377,8 @@ impl Controller {
         self.update_taskbar();
         self.update_visibility();
         self.apply_blur();
+        self.apply_capture_exclusion();
+        self.schedule_away();
 
         // Créée boucle d'événements lancée : exigé par macOS.
         let hooks_installed = self.installer.is_installed();
@@ -452,6 +486,8 @@ impl Controller {
         // tout, sauf une action requise (permission de Claude…).
         let notif_wins = self.announcing().is_some()
             && !self.dnd.get()
+            // En appel ou en partage d'écran : rien ne s'annonce.
+            && !self.live.get()
             && winner.as_ref().is_some_and(|w| w.level < Attention::Urgent);
         let new = if self.expanded.get() {
             Shape::Expanded
@@ -506,6 +542,7 @@ impl Controller {
         }
         self.ui
             .set_attention_label(winner.and_then(|w| w.summary).unwrap_or_default().into());
+        self.update_mascot();
 
         let old = self.shape.replace(new);
         if old == new {
@@ -638,6 +675,7 @@ impl Controller {
         let (text, next) = clock::now();
         self.ui.set_time_text(text.time.into());
         self.ui.set_date_text(text.date.into());
+        self.update_mascot();
         self.sync_custom_view();
         self.clock_timer
             .start(TimerMode::SingleShot, next, || post(|c| c.update_clock()));
@@ -709,6 +747,8 @@ impl Controller {
 
         self.apply_theme();
         self.apply_blur();
+        self.apply_capture_exclusion();
+        self.schedule_away();
         let view_changed = {
             let config = self.config.borrow();
             old.layout.view != config.layout.view
@@ -786,6 +826,8 @@ impl Controller {
         self.timer_tick.stop();
         self.ui.set_has_timer(false);
         self.ui.set_has_weather(false);
+        self.live.set(false);
+        self.ui.set_live(false);
         self.gauges.borrow_mut().clear();
         self.apply_claude(None);
         *self.media.borrow_mut() = None;
@@ -841,6 +883,8 @@ impl Controller {
                     self.apply_notify(snapshot);
                 } else if let Some(snapshot) = state.downcast_ref::<TimerSnapshot>() {
                     self.apply_timer(snapshot.clone());
+                } else if let Some(live) = state.downcast_ref::<bw_presence::LiveSnapshot>() {
+                    self.apply_live(live);
                 } else if let Some(gauge) = state.downcast_ref::<bw_power::Gauge>() {
                     // Publiée juste avant l'attention qu'elle accompagne.
                     self.gauges.borrow_mut().insert(event.module, gauge.clone());
@@ -1122,13 +1166,17 @@ impl Controller {
 
     /// La capture audio ne tourne que si l'île est ouverte et qu'une musique joue.
     fn update_viz_activity(&self) {
-        let enabled = self.module_ids.borrow().contains(&bw_viz::MODULE_ID);
-        let playing = self
-            .media
+        let present = self.module_ids.borrow().contains(&bw_viz::MODULE_ID);
+        let bars = self
+            .config
             .borrow()
-            .as_ref()
-            .is_some_and(|(_, s)| s.now_playing.as_ref().is_some_and(|n| n.playing));
-        let active = enabled && self.expanded.get() && playing;
+            .module_enabled(bw_viz::MODULE_ID, false);
+        let mascot = self.mascot_config();
+        let dance = mascot.enabled && mascot.music;
+        let expanded = self.expanded.get();
+        // Barres dans l'île ouverte, ou danse de la pilule fermée.
+        let active =
+            present && self.music_playing() && ((bars && expanded) || (dance && !expanded));
         if active == self.viz_active.replace(active) {
             return;
         }
@@ -1140,20 +1188,40 @@ impl Controller {
         }
         if !active {
             self.ui.set_viz_bars(ModelRc::default());
+            self.ui.set_mascot_level(0.0);
+            self.ui.set_pill_bounce(1.0);
             self.sync_custom_view();
         }
     }
 
     fn apply_viz(&self, snapshot: &bw_viz::VizSnapshot) {
-        // Barres à zéro : elles disparaissent au lieu de rester à plat.
-        let flat = snapshot.bands.iter().all(|b| *b <= 0.001);
-        let bars = if flat || !self.viz_active.get() {
-            ModelRc::default()
+        if !self.viz_active.get() {
+            return;
+        }
+        if self.expanded.get() {
+            // Barres à zéro : elles disparaissent au lieu de rester à plat.
+            let flat = snapshot.bands.iter().all(|b| *b <= 0.001);
+            let bars = if flat {
+                ModelRc::default()
+            } else {
+                ModelRc::new(VecModel::from(snapshot.bands.clone()))
+            };
+            self.ui.set_viz_bars(bars);
+            self.sync_custom_view();
+            return;
+        }
+        // Pilule fermée : les basses (premières bandes) font danser la
+        // mascotte, et la pilule quand elle montre la musique (sans flou :
+        // le fond flouté ne suit pas ces petites variations).
+        let low = &snapshot.bands[..snapshot.bands.len().min(3)];
+        let bass = if low.is_empty() {
+            0.0
         } else {
-            ModelRc::new(VecModel::from(snapshot.bands.clone()))
+            (low.iter().sum::<f32>() / low.len() as f32).clamp(0.0, 1.0)
         };
-        self.ui.set_viz_bars(bars);
-        self.sync_custom_view();
+        self.ui.set_mascot_level(bass);
+        let music_pill = self.ui.get_mascot_place() == "right" && !self.blur.get();
+        self.ui.set_pill_bounce(if music_pill { bass } else { 1.0 });
     }
 
     // --- Étagère ------------------------------------------------------------
@@ -1549,6 +1617,7 @@ impl Controller {
         }
         *self.claude.borrow_mut() = snapshot;
         self.layout_rows();
+        self.update_mascot();
     }
 
     fn remind_claude(&self) {
@@ -1660,6 +1729,222 @@ impl Controller {
         }
     }
 
+    // --- Mascotte ---------------------------------------------------------
+
+    fn mascot_config(&self) -> MascotConfig {
+        MascotConfig::from_table(self.config.borrow().modules.get("mascot")).unwrap_or_default()
+    }
+
+    fn music_playing(&self) -> bool {
+        self.media
+            .borrow()
+            .as_ref()
+            .is_some_and(|(_, s)| s.now_playing.as_ref().is_some_and(|n| n.playing))
+    }
+
+    /// Humeur, place et saison de la mascotte d'après l'état du moment.
+    fn update_mascot(&self) {
+        use chrono::{Datelike, Timelike};
+
+        let config = self.mascot_config();
+        let now = chrono::Local::now();
+        let season = if config.seasonal {
+            mascot::season(now.month(), now.day())
+        } else {
+            mascot::Season::None
+        };
+        self.ui.set_season(season.name().into());
+        if !config.enabled {
+            self.ui.set_mascot_place("".into());
+            self.ui.set_mascot_animated(false);
+            return;
+        }
+
+        let claude = self.claude.borrow().as_ref().and_then(|s| {
+            let any = |f: fn(SessionKind) -> bool| s.sessions.iter().any(|v| f(v.kind));
+            if any(|k| matches!(k, SessionKind::Permission | SessionKind::NeedsYou)) {
+                Some(ClaudeState::Waiting)
+            } else if any(|k| k == SessionKind::Working) {
+                Some(ClaudeState::Working)
+            } else if any(|k| k == SessionKind::Done) {
+                Some(ClaudeState::Done)
+            } else {
+                None
+            }
+        });
+        let mood = mascot::mood(claude, self.music_playing(), self.away.get(), now.hour());
+
+        // Au repos, au centre ; à la place du point quand Claude a la pilule ;
+        // à droite quand c'est la musique (pochette à gauche) ; cachée sinon.
+        let winner = self.arbiter.borrow().winner();
+        let media_owner = self.media.borrow().as_ref().map(|(owner, _)| *owner);
+        let place = match &winner {
+            None => "center",
+            Some(w) if w.module == bw_claude::MODULE_ID => "left",
+            Some(w) if Some(w.module.as_str()) == media_owner => "right",
+            Some(_) => "",
+        };
+        let animated = config.always_animated
+            || (mood.is_lively() && (mood != mascot::Mood::Music || config.music));
+        self.ui.set_mascot_place(place.into());
+        self.ui.set_mascot_mood(mood.name().into());
+        self.ui.set_mascot_animated(animated);
+    }
+
+    /// Endort la mascotte après `sleep_after_minutes` sans saisie. Le minuteur
+    /// vise l'instant où ce délai sera atteint, et se recale s'il y a eu une
+    /// saisie entre-temps.
+    fn schedule_away(&self) {
+        let config = self.mascot_config();
+        if !config.enabled {
+            self.away_timer.stop();
+            return;
+        }
+        let limit = Duration::from_secs(u64::from(config.sleep_after_minutes) * 60);
+        let idle = platform::idle_for();
+        if idle >= limit {
+            self.set_away(true);
+            return;
+        }
+        self.away_timer.start(
+            TimerMode::SingleShot,
+            limit - idle + Duration::from_secs(1),
+            || post(|c| c.schedule_away()),
+        );
+    }
+
+    fn set_away(&self, away: bool) {
+        if self.away.replace(away) == away {
+            return;
+        }
+        log::info!("mascotte : {}", if away { "endormie" } else { "réveillée" });
+        if away {
+            self.with_platform(Platform::watch_user_return);
+        }
+        self.update_mascot();
+    }
+
+    // --- Gestes ------------------------------------------------------------
+
+    fn gestures_config(&self) -> GesturesConfig {
+        GesturesConfig::from_table(self.config.borrow().modules.get("gestures")).unwrap_or_default()
+    }
+
+    /// Molette ou pavé tactile sur l'île (pixels logiques ; `dy` > 0 : vers le
+    /// haut). Maj + molette vaut un défilement horizontal.
+    fn on_wheel(self: &Rc<Self>, dx: f32, dy: f32, shift: bool) {
+        let config = self.gestures_config();
+        if !config.enabled {
+            return;
+        }
+        let (dx, dy) = if shift && dx == 0.0 {
+            (dy, 0.0)
+        } else {
+            (dx, dy)
+        };
+        let found = self
+            .wheel
+            .borrow_mut()
+            .feed(dx, dy, std::time::Instant::now());
+        for gesture in found {
+            self.run_gesture(gesture, &config);
+        }
+    }
+
+    fn on_drag(self: &Rc<Self>, dx: f32) {
+        let config = self.gestures_config();
+        if let Some(gesture) = gestures::drag(dx).filter(|_| config.enabled) {
+            self.run_gesture(gesture, &config);
+        }
+    }
+
+    fn run_gesture(self: &Rc<Self>, gesture: Gesture, config: &GesturesConfig) {
+        match gesture {
+            Gesture::VolumeUp | Gesture::VolumeDown => {
+                let sign = if gesture == Gesture::VolumeUp {
+                    1.0
+                } else {
+                    -1.0
+                };
+                match bw_volume::nudge(sign * config.volume_step as f32 / 100.0) {
+                    Ok((level, muted)) => {
+                        // Le module volume affiche déjà ses changements.
+                        let shown = self.module_ids.borrow().contains(&bw_volume::MODULE_ID);
+                        self.gesture_feedback(&bw_volume::label(level, muted), !shown);
+                    }
+                    Err(e) => log::warn!("geste : volume : {e:#}"),
+                }
+            }
+            Gesture::Next | Gesture::Previous => {
+                if self.media.borrow().is_some() {
+                    let next = gesture == Gesture::Next;
+                    self.media_action(if next { "next" } else { "prev" }.to_owned());
+                    let text = if next {
+                        tr!("Next track", "Morceau suivant")
+                    } else {
+                        tr!("Previous track", "Morceau précédent")
+                    };
+                    self.gesture_feedback(&text, true);
+                }
+            }
+        }
+    }
+
+    fn on_long_press(self: &Rc<Self>) {
+        if !self.gestures_config().enabled {
+            return;
+        }
+        let on = !self.dnd.get();
+        self.set_dnd(on);
+        let text = if on {
+            tr!("Do not disturb on", "Ne pas déranger activé")
+        } else {
+            tr!("Do not disturb off", "Ne pas déranger désactivé")
+        };
+        self.gesture_feedback(&text, true);
+    }
+
+    /// Retour d'un geste : dans l'en-tête si l'île est ouverte, sinon dans la
+    /// pilule (`compact`).
+    fn gesture_feedback(self: &Rc<Self>, text: &str, compact: bool) {
+        if self.expanded.get() {
+            self.ui.set_toast(text.into());
+            let weak = Rc::downgrade(self);
+            self.toast_timer.start(
+                TimerMode::SingleShot,
+                Duration::from_millis(1500),
+                move || {
+                    if let Some(c) = weak.upgrade() {
+                        c.ui.set_toast("".into());
+                    }
+                },
+            );
+        } else if compact {
+            self.flash(text);
+        }
+    }
+
+    // --- Mode présentation --------------------------------------------------
+
+    fn presentation_config(&self) -> bw_presence::PresentationConfig {
+        bw_presence::PresentationConfig::from_table(
+            self.config.borrow().modules.get(bw_presence::MODULE_ID),
+        )
+        .unwrap_or_default()
+    }
+
+    /// L'île hors des captures et partages d'écran, si demandé.
+    fn apply_capture_exclusion(&self) {
+        let hide = self.presentation_config().hide_from_capture;
+        self.with_platform(|p| p.set_capture_excluded(hide));
+    }
+
+    fn apply_live(&self, snapshot: &bw_presence::LiveSnapshot) {
+        self.live.set(snapshot.live());
+        self.ui.set_live(snapshot.live());
+        self.refresh_shape();
+    }
+
     /// Message bref dans la pilule.
     fn flash(self: &Rc<Self>, text: &str) {
         self.arbiter
@@ -1702,6 +1987,10 @@ impl Controller {
                 }
             }
             PlatformEvent::TaskbarChanged => self.update_taskbar(),
+            PlatformEvent::UserReturned => {
+                self.set_away(false);
+                self.schedule_away();
+            }
             PlatformEvent::DisplayChanged => {
                 self.place();
                 self.update_taskbar();
@@ -1787,7 +2076,12 @@ fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
             Err(e) => errors.push(format!("modules.brightness : {e:#}")),
         }
     }
-    if bw_viz::VizModule::is_supported() && config.module_enabled(bw_viz::MODULE_ID, false) {
+    // Le visualiseur sert aussi à faire danser la mascotte sur la musique.
+    let mascot = MascotConfig::from_table(config.modules.get("mascot")).unwrap_or_default();
+    let dance = mascot.enabled && mascot.music;
+    if bw_viz::VizModule::is_supported()
+        && (config.module_enabled(bw_viz::MODULE_ID, false) || dance)
+    {
         match bw_viz::VizConfig::from_table(config.modules.get(bw_viz::MODULE_ID)) {
             Ok(c) => modules.push(Box::new(bw_viz::VizModule::new(c))),
             Err(e) => errors.push(format!("modules.visualizer : {e:#}")),
@@ -1817,6 +2111,16 @@ fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
                 Ok(c) => modules.push(Box::new(bw_power::PowerModule::bluetooth(c))),
                 Err(e) => errors.push(format!("modules.{id} : {e:#}")),
             }
+        }
+    }
+    if bw_presence::PresenceModule::is_supported()
+        && config.module_enabled(bw_presence::MODULE_ID, true)
+    {
+        match bw_presence::PresentationConfig::from_table(
+            config.modules.get(bw_presence::MODULE_ID),
+        ) {
+            Ok(c) => modules.push(Box::new(bw_presence::PresenceModule::new(c))),
+            Err(e) => errors.push(format!("modules.presentation : {e:#}")),
         }
     }
     if config.module_enabled(bw_weather::MODULE_ID, false) {

@@ -19,6 +19,11 @@ Ce qu'elle affiche :
 - 🔋 **[Batterie et Bluetooth](energie.md)** : chargeur branché, batterie
   faible, casque connecté avec son niveau de batterie.
 - 🌤️ **[Météo](meteo.md)** : le temps qu'il fait, à côté de la date.
+- 👻 **[Mascotte](mascotte.md)** : un petit blob qui réagit à Claude, danse sur
+  la musique, s'endort quand tu t'absentes et se déguise pour Halloween ou Noël.
+- 🖱️ **[Gestes](gestes.md)** et 🔴 **[mode présentation](presentation.md)** :
+  volume à la molette, morceau suivant d'un glissement, et une île discrète
+  (et invisible) quand tu partages ton écran.
 
 Elle est légère (écrite en Rust, aucun navigateur embarqué), ne vole jamais le
 focus et se cache toute seule quand tu passes une vidéo ou un jeu en plein

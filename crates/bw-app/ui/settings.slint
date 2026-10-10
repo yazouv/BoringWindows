@@ -68,6 +68,14 @@ export component SettingsWindow inherits Window {
     in-out property <bool> brightness-enabled;
     in-out property <bool> battery-enabled;
     in-out property <bool> bluetooth-enabled;
+    in-out property <bool> gestures-enabled;
+    in-out property <bool> presentation-enabled;
+    in-out property <bool> hide-from-capture;
+    // --- Mascotte ---
+    in-out property <bool> mascot-enabled;
+    in-out property <bool> mascot-always-animated;
+    in-out property <bool> mascot-music;
+    in-out property <bool> mascot-seasonal;
     in-out property <bool> notifications-enabled;
     in-out property <bool> notifications-content;
     in-out property <bool> notifications-original;
@@ -226,6 +234,24 @@ export component SettingsWindow inherits Window {
                         text: @tr("Show Bluetooth devices connecting, with their battery level");
                         checked <=> root.bluetooth-enabled;
                         toggled => { root.changed("modules.bluetooth.enabled"); }
+                    }
+
+                    CheckBox {
+                        text: @tr("Gestures on the island: wheel for volume, swipe to change track, long press for do not disturb");
+                        checked <=> root.gestures-enabled;
+                        toggled => { root.changed("modules.gestures.enabled"); }
+                    }
+
+                    CheckBox {
+                        text: @tr("Presentation mode: stay quiet during calls and screen sharing");
+                        checked <=> root.presentation-enabled;
+                        toggled => { root.changed("modules.presentation.enabled"); }
+                    }
+
+                    CheckBox {
+                        text: @tr("Hide the island from screen sharing, recordings and screenshots");
+                        checked <=> root.hide-from-capture;
+                        toggled => { root.changed("modules.presentation.hide_from_capture"); }
                     }
 
                     CheckBox {
@@ -810,6 +836,43 @@ export component SettingsWindow inherits Window {
 
                     Hint {
                         text: @tr("Up to 5 durations, separated by commas (1 to 600). Open the island and pick one to start; 25 is the classic Pomodoro.");
+                    }
+                }
+            }
+
+            Tab {
+                title: @tr("Mascot");
+                VerticalBox {
+                    alignment: start;
+
+                    CheckBox {
+                        text: @tr("Show the mascot in the island");
+                        checked <=> root.mascot-enabled;
+                        toggled => { root.changed("modules.mascot.enabled"); }
+                    }
+
+                    CheckBox {
+                        text: @tr("Always animated (breathes and blinks, uses a little CPU)");
+                        enabled: root.mascot-enabled;
+                        checked <=> root.mascot-always-animated;
+                        toggled => { root.changed("modules.mascot.always_animated"); }
+                    }
+
+                    CheckBox {
+                        text: @tr("Dance to the music");
+                        enabled: root.mascot-enabled;
+                        checked <=> root.mascot-music;
+                        toggled => { root.changed("modules.mascot.music"); }
+                    }
+
+                    CheckBox {
+                        text: @tr("Seasonal decorations (Halloween, Christmas, New Year)");
+                        checked <=> root.mascot-seasonal;
+                        toggled => { root.changed("modules.mascot.seasonal"); }
+                    }
+
+                    Hint {
+                        text: @tr("The mascot reacts to Claude Code (working, waiting for you, done), dances to the music, falls asleep when you are away and gets sleepy in the evening. By default it only moves when something happens, so the island uses no CPU at rest.");
                     }
                 }
             }

@@ -59,6 +59,10 @@ impl Platform {
 
     pub fn set_blur(&self, _on: bool) {}
 
+    pub fn set_capture_excluded(&self, _excluded: bool) {}
+
+    pub fn watch_user_return(&self) {}
+
     pub fn set_visible(&self, _visible: bool) {}
 
     pub fn fullscreen_now(&self) -> bool {
@@ -174,4 +178,9 @@ pub struct LookWatcher;
 
 pub fn watch_system_look(_on_change: impl Fn() + Send + 'static) -> Option<LookWatcher> {
     None
+}
+
+/// Hors Windows : jamais inactif (la mascotte ne s'endort pas).
+pub fn idle_for() -> std::time::Duration {
+    std::time::Duration::ZERO
 }

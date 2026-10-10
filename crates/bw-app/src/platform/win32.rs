@@ -39,7 +39,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetWindowThreadProcessId, HWND_TOPMOST, IsWindowVisible, RegisterClassW,
     RegisterWindowMessageW, SW_HIDE, SW_SHOWNOACTIVATE, SW_SHOWNORMAL, SWP_FRAMECHANGED,
     SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowLongPtrW, SetWindowPos,
-    ShowWindow, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_APP, WM_DISPLAYCHANGE,
+    ShowWindow, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_APP, WM_DISPLAYCHANGE, WM_INPUT,
     WNDCLASSW, WS_CAPTION, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_MAXIMIZEBOX, WS_MINIMIZEBOX,
     WS_POPUP, WS_SYSMENU,
 };
@@ -199,6 +199,8 @@ pub struct Platform {
     foreground_hook: HWINEVENTHOOK,
     /// Flou (créé à la première activation).
     backdrop: RefCell<Option<Backdrop>>,
+    /// Exclusion des captures demandée (appliquée aussi au fond créé ensuite).
+    capture_excluded: Cell<bool>,
 }
 
 impl Platform {
@@ -255,6 +257,7 @@ impl Platform {
             helper,
             foreground_hook,
             backdrop: RefCell::new(None),
+            capture_excluded: Cell::new(false),
         })
     }
 
@@ -294,7 +297,16 @@ impl Platform {
         let mut backdrop = self.backdrop.borrow_mut();
         if on && backdrop.is_none() {
             match Backdrop::new(self.hwnd) {
-                Ok(b) => *backdrop = Some(b),
+                Ok(b) => {
+                    if self.capture_excluded.get() {
+                        use windows::Win32::UI::WindowsAndMessaging::{
+                            SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE,
+                        };
+                        // SAFETY: fenêtre du fond, créée juste avant sur ce thread.
+                        let _ = unsafe { SetWindowDisplayAffinity(b.hwnd, WDA_EXCLUDEFROMCAPTURE) };
+                    }
+                    *backdrop = Some(b);
+                }
                 Err(e) => log::warn!("flou indisponible : {e}"),
             }
         }
@@ -303,6 +315,34 @@ impl Platform {
             // SAFETY: fenêtre vivante, appel sur son thread.
             b.show(unsafe { IsWindowVisible(self.hwnd) }.as_bool());
         }
+    }
+
+    /// L'île (et son fond flouté) n'apparaît pas dans les captures, partages
+    /// d'écran et enregistrements.
+    pub fn set_capture_excluded(&self, excluded: bool) {
+        use windows::Win32::UI::WindowsAndMessaging::{
+            SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE, WDA_NONE,
+        };
+        let affinity = if excluded {
+            WDA_EXCLUDEFROMCAPTURE
+        } else {
+            WDA_NONE
+        };
+        let mut windows = vec![self.hwnd];
+        windows.extend(self.backdrop.borrow().as_ref().map(|b| b.hwnd));
+        for hwnd in windows {
+            // SAFETY: fenêtres vivantes de ce thread.
+            if let Err(e) = unsafe { SetWindowDisplayAffinity(hwnd, affinity) } {
+                log::warn!("exclusion des captures refusée : {e}");
+            }
+        }
+        self.capture_excluded.set(excluded);
+    }
+
+    /// Prévient (`PlatformEvent::UserReturned`) à la prochaine saisie au
+    /// clavier ou à la souris, une seule fois.
+    pub fn watch_user_return(&self) {
+        set_raw_input(self.helper, true);
     }
 
     pub fn set_visible(&self, visible: bool) {
@@ -588,6 +628,12 @@ unsafe extern "system" fn helper_proc(
         }
         APPBAR_CALLBACK if wparam.0 as u32 == ABN_POSCHANGED => Some(PlatformEvent::TaskbarChanged),
         WM_DISPLAYCHANGE => Some(PlatformEvent::DisplayChanged),
+        // Première saisie après une absence : on se désinscrit aussitôt pour
+        // ne pas recevoir chaque mouvement de souris.
+        WM_INPUT => {
+            set_raw_input(hwnd, false);
+            Some(PlatformEvent::UserReturned)
+        }
         // Explorateur redémarré : l'appbar est à réenregistrer.
         m if m != 0 && m == taskbar_created() => {
             let mut data = appbar_data(hwnd);
@@ -1181,4 +1227,45 @@ pub fn watch_system_look(on_change: impl Fn() + Send + 'static) -> Option<LookWa
     subscribe()
         .inspect_err(|e| log::warn!("apparence de Windows non suivie : {e}"))
         .ok()
+}
+
+// ---------------------------------------------------------------------------
+// Présence de l'utilisateur
+
+/// Temps écoulé depuis la dernière saisie au clavier ou à la souris.
+pub fn idle_for() -> std::time::Duration {
+    use windows::Win32::System::SystemInformation::GetTickCount;
+    use windows::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
+    let mut info = LASTINPUTINFO {
+        cbSize: size_of::<LASTINPUTINFO>() as u32,
+        dwTime: 0,
+    };
+    // SAFETY: structure locale initialisée avec sa taille.
+    if !unsafe { GetLastInputInfo(&mut info) }.as_bool() {
+        return std::time::Duration::ZERO;
+    }
+    // SAFETY: appel sans argument.
+    let now = unsafe { GetTickCount() };
+    std::time::Duration::from_millis(now.wrapping_sub(info.dwTime).into())
+}
+
+/// Inscrit (ou désinscrit) `hwnd` aux saisies brutes de la souris et du
+/// clavier, même en arrière-plan : WM_INPUT arrive à la première saisie.
+fn set_raw_input(hwnd: HWND, on: bool) {
+    use windows::Win32::UI::Input::{
+        RAWINPUTDEVICE, RIDEV_INPUTSINK, RIDEV_REMOVE, RegisterRawInputDevices,
+    };
+    // Page « bureau générique » : souris (2) et clavier (6).
+    let device = |usage| RAWINPUTDEVICE {
+        usUsagePage: 1,
+        usUsage: usage,
+        dwFlags: if on { RIDEV_INPUTSINK } else { RIDEV_REMOVE },
+        hwndTarget: if on { hwnd } else { HWND::default() },
+    };
+    let devices = [device(2), device(6)];
+    // SAFETY: tableau local, taille d'un élément exacte.
+    if let Err(e) = unsafe { RegisterRawInputDevices(&devices, size_of::<RAWINPUTDEVICE>() as u32) }
+    {
+        log::warn!("détection du retour au clavier impossible : {e}");
+    }
 }

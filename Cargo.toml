@@ -26,6 +26,7 @@ bw-plugins = { path = "crates/bw-plugins" }
 bw-notify = { path = "crates/bw-notify" }
 bw-weather = { path = "crates/bw-weather" }
 bw-power = { path = "crates/bw-power" }
+bw-presence = { path = "crates/bw-presence" }
 anyhow = "1"
 log = "0.4"
 serde = { version = "1", features = ["derive"] }

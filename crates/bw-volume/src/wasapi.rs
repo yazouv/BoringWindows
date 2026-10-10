@@ -71,3 +71,22 @@ fn register(
         Ok((endpoint, callback))
     }
 }
+
+/// Monte ou baisse le volume principal de `step` (-1 à 1) ; nouveau niveau et
+/// état muet. À appeler sur un thread où COM est initialisé (le thread UI).
+pub fn nudge(step: f32) -> anyhow::Result<(f32, bool)> {
+    // SAFETY: appels COM sur un thread initialisé (garanti par l'appelant).
+    unsafe {
+        let enumerator: IMMDeviceEnumerator =
+            CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
+        let device = enumerator.GetDefaultAudioEndpoint(eRender, eConsole)?;
+        let endpoint: IAudioEndpointVolume = device.Activate(CLSCTX_ALL, None)?;
+        let level = (endpoint.GetMasterVolumeLevelScalar()? + step).clamp(0.0, 1.0);
+        endpoint.SetMasterVolumeLevelScalar(level, std::ptr::null())?;
+        // Monter le son le rétablit s'il était coupé, comme les touches du clavier.
+        if step > 0.0 && endpoint.GetMute()?.as_bool() {
+            endpoint.SetMute(false, std::ptr::null())?;
+        }
+        Ok((level, endpoint.GetMute()?.as_bool()))
+    }
+}

@@ -133,6 +133,37 @@ units = "celsius"
 # Refresh interval (minutes).
 refresh_minutes = 30
 
+[modules.mascot]
+# The mascot: a little blob in the pill that reacts to Claude Code, dances to
+# the music, falls asleep when you are away and dresses up for the season.
+enabled = true
+# Always animated (breathes, blinks); otherwise only when something happens,
+# so that the island uses nothing at rest.
+always_animated = false
+# Dance to the bass while music plays.
+music = true
+# Costumes and decorations (Halloween, Christmas, New Year).
+seasonal = true
+# Minutes without keyboard or mouse before it falls asleep.
+sleep_after_minutes = 10
+
+[modules.gestures]
+# Gestures on the island: wheel for volume, swipe (touchpad, Shift + wheel or
+# mouse) to change track, long press for "do not disturb".
+enabled = true
+# Volume step per wheel notch (%).
+volume_step = 2
+
+[modules.presentation]
+# During a call or screen sharing: nothing pops up and a red dot shows in the
+# pill.
+enabled = true
+# The island doesn't appear in screen sharing, recordings and screenshots
+# (including yours).
+hide_from_capture = true
+# Apps whose use of the microphone means "in a call" (part of a name).
+call_apps = ["teams", "discord", "zoom", "slack", "webex", "skype", "chrome", "msedge", "firefox", "brave", "opera", "obs"]
+
 [modules.demo]
 # Demo module: changes attention every few seconds to try out the
 # animations. Turn it off once the real modules are set up.

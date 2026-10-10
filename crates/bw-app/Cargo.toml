@@ -21,6 +21,7 @@ bw-core.workspace = true
 bw-media.workspace = true
 bw-notify.workspace = true
 bw-power.workspace = true
+bw-presence.workspace = true
 bw-weather.workspace = true
 bw-timer.workspace = true
 bw-volume.workspace = true
@@ -70,11 +71,14 @@ windows = { version = "0.62", features = [
     "Win32_System_Console",
     "Win32_System_Diagnostics_Debug",
     "Win32_System_Registry",
+    "Win32_System_SystemInformation",
     "Win32_System_Threading",
     "Win32_System_WinRT",
     "Win32_System_WinRT_Composition",
     "Win32_UI_Accessibility",
     "Win32_UI_HiDpi",
+    "Win32_UI_Input",
+    "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }

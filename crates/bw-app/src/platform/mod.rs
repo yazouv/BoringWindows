@@ -35,6 +35,9 @@ pub enum PlatformEvent {
     Foreground,
     /// La barre des tâches a bougé, changé de taille, ou l'Explorateur a redémarré.
     TaskbarChanged,
+    /// Clavier ou souris utilisés après `watch_user_return` (l'utilisateur
+    /// est revenu).
+    UserReturned,
 }
 
 /// Commandes du menu de la zone de notification.

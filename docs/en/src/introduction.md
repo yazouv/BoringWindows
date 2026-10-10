@@ -19,6 +19,12 @@ What it shows:
 - 🔋 **[Battery and Bluetooth](energie.md)**: charger plugged in, low battery,
   headphones connected with their battery level.
 - 🌤️ **[Weather](meteo.md)**: the current weather, next to the date.
+- 👻 **[Mascot](mascotte.md)**: a little blob that reacts to Claude, dances to
+  the music, falls asleep when you are away and dresses up for Halloween or
+  Christmas.
+- 🖱️ **[Gestures](gestes.md)** and 🔴 **[presentation mode](presentation.md)**:
+  volume with the wheel, next track with a swipe, and a quiet (and invisible)
+  island when you share your screen.
 
 It is lightweight (written in Rust, no embedded browser), never steals focus
 and hides itself when a video or a game goes full screen.

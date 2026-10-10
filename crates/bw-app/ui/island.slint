@@ -162,6 +162,328 @@ component BatteryGauge inherits Rectangle {
     }
 }
 
+// Œil de la mascotte, selon l'humeur.
+component MascotEye inherits Rectangle {
+    // open | closed | happy | half | big
+    in property <string> kind;
+    in property <color> ink;
+    width: 4px;
+    height: 5px;
+
+    if root.kind == "happy": Path {
+        width: 3.6px;
+        height: 2.6px;
+        y: 1.5px;
+        viewbox-width: 4;
+        viewbox-height: 3;
+        fill: transparent;
+        stroke: root.ink;
+        stroke-width: 1.3px;
+        commands: "M0 3 L2 0.6 L4 3";
+    }
+
+    if root.kind != "happy": Rectangle {
+        property <length> h: root.kind == "closed" ? 1.3px : root.kind == "half" ? 2px
+            : root.kind == "big" ? 4.6px : 3.6px;
+        width: root.kind == "big" ? 3.4px : 2.8px;
+        height: self.h;
+        x: (parent.width - self.width) / 2;
+        y: parent.height - self.h - (root.kind == "closed" ? 1px : 0px);
+        border-radius: Math.min(self.width, self.h) / 2;
+        background: root.ink;
+    }
+}
+
+// La mascotte : un petit blob à yeux. Elle ne s'anime que si `animated`
+// (le minuteur interne ne tourne pas sinon : rien n'est redessiné au repos).
+component Mascot inherits Rectangle {
+    // idle | morning | evening | sleep | work | wait | happy | music
+    in property <string> mood: "idle";
+    // "" | halloween | christmas | newyear
+    in property <string> season;
+    in property <bool> animated;
+    // Basses de la musique (0 à 1).
+    in property <float> level;
+    in property <color> body-color: white;
+    in property <color> eye-color: black;
+    in property <color> accent: #ff8a3d;
+    width: 26px;
+    height: 24px;
+
+    // Temps écoulé (s), avancé seulement pendant l'animation.
+    property <float> t;
+    Timer {
+        interval: 40ms;
+        running: root.animated;
+        triggered => { root.t += 0.04; }
+    }
+
+    property <bool> calm: root.mood == "idle" || root.mood == "morning" || root.mood == "evening";
+    property <bool> blink: root.animated && root.calm && Math.mod(root.t, 3.7) < 0.14;
+    property <length> hop: !root.animated ? 0px
+        : root.mood == "wait" ? -Math.abs(Math.sin(root.t * 2 * 360deg)) * 3px
+        : root.mood == "happy" ? -Math.abs(Math.sin(root.t * 1.2 * 360deg)) * 2.5px
+        : root.mood == "work" ? Math.sin(root.t * 1.6 * 360deg) * 1px
+        : root.mood == "music" ? -root.level * 4px
+        : 0px;
+    // Respiration lente.
+    property <length> breath: root.animated && root.calm ? Math.sin(root.t * 0.25 * 360deg) * 0.7px : 0px;
+    property <length> look: root.animated && root.mood == "work" ? Math.sin(root.t * 0.8 * 360deg) * 1.3px : 0px;
+    property <string> eyes: root.blink || root.mood == "sleep" ? "closed"
+        : root.mood == "happy" || root.mood == "music" || root.mood == "morning" ? "happy"
+        : root.mood == "evening" ? "half"
+        : root.mood == "wait" ? "big" : "open";
+
+    body := Rectangle {
+        x: 4px;
+        y: 9px + root.hop - root.breath;
+        width: 18px;
+        height: 14px + root.breath;
+        border-radius: 7px;
+        background: root.mood == "wait" ? root.accent : root.body-color;
+        animate background { duration: 200ms; }
+
+        // Reflet.
+        Rectangle {
+            x: 4px;
+            y: 2.5px;
+            width: 4px;
+            height: 2px;
+            border-radius: 1px;
+            background: white.with-alpha(0.35);
+        }
+
+        MascotEye {
+            x: 3.5px + root.look;
+            y: 3px;
+            kind: root.eyes;
+            ink: root.eye-color;
+        }
+
+        MascotEye {
+            x: 10.5px + root.look;
+            y: 3px;
+            kind: root.eyes;
+            ink: root.eye-color;
+        }
+
+        // Sourire quand Claude a fini ou que la musique joue.
+        if root.mood == "happy" || root.mood == "music": Path {
+            x: 7px;
+            y: 9.5px;
+            width: 4px;
+            height: 2px;
+            viewbox-width: 4;
+            viewbox-height: 2;
+            fill: transparent;
+            stroke: root.eye-color;
+            stroke-width: 1.1px;
+            commands: "M0 0 Q2 2.4 4 0";
+        }
+    }
+
+    // Chapeaux de saison.
+    if root.season == "halloween": Rectangle {
+        x: body.x + 2px;
+        y: body.y - 8px;
+        width: 14px;
+        height: 9px;
+
+        Path {
+            width: 9px;
+            height: 8px;
+            x: 2.5px;
+            viewbox-width: 9;
+            viewbox-height: 8;
+            fill: #4B2470;
+            commands: "M0 8 L9 8 L5.5 0 Z";
+        }
+
+        Rectangle {
+            x: 3.5px;
+            y: 6px;
+            width: 7px;
+            height: 1.2px;
+            background: #FF8C1A;
+        }
+
+        Rectangle {
+            y: 7.5px;
+            height: 1.5px;
+            border-radius: 0.75px;
+            background: #2E1446;
+        }
+    }
+
+    if root.season == "christmas": Rectangle {
+        x: body.x + 3px;
+        y: body.y - 7px;
+        width: 14px;
+        height: 8px;
+
+        Path {
+            width: 11px;
+            height: 7px;
+            viewbox-width: 11;
+            viewbox-height: 7;
+            fill: #E53935;
+            commands: "M0 7 L10 7 L9 0 Z";
+        }
+
+        Rectangle {
+            x: 7.5px;
+            y: -1.5px;
+            width: 3.4px;
+            height: 3.4px;
+            border-radius: 1.7px;
+            background: white;
+        }
+
+        Rectangle {
+            x: -0.5px;
+            y: 5.6px;
+            width: 12px;
+            height: 2px;
+            border-radius: 1px;
+            background: white;
+        }
+    }
+
+    if root.season == "newyear": Rectangle {
+        x: body.x + 5px;
+        y: body.y - 8px;
+        width: 8px;
+        height: 9px;
+
+        Path {
+            width: 8px;
+            height: 8px;
+            y: 1px;
+            viewbox-width: 8;
+            viewbox-height: 8;
+            fill: #FFD60A;
+            commands: "M0 8 L8 8 L4 0 Z";
+        }
+
+        Rectangle {
+            x: 2.5px;
+            y: 0px;
+            width: 3px;
+            height: 3px;
+            border-radius: 1.5px;
+            background: #FF375F;
+        }
+    }
+
+    // Sommeil : un petit « z ».
+    if root.mood == "sleep": Text {
+        x: body.x + body.width - 2px;
+        y: body.y - 9px;
+        text: "z";
+        color: root.body-color.with-alpha(0.7);
+        font-size: 8px;
+        font-weight: 700;
+    }
+
+    // Claude t'attend : un « ! ».
+    if root.mood == "wait": Text {
+        x: body.x + body.width + 1px;
+        y: body.y - 6px + root.hop / 2;
+        text: "!";
+        color: root.accent;
+        font-size: 11px;
+        font-weight: 900;
+    }
+}
+
+// Petite citrouille (Halloween).
+component Pumpkin inherits Rectangle {
+    in property <length> size: 12px;
+    width: root.size;
+    height: root.size;
+
+    Rectangle {
+        y: root.size * 0.22;
+        height: root.size * 0.78;
+        border-radius: self.height / 2;
+        background: #FF8C1A;
+    }
+
+    // Côtes.
+    Rectangle {
+        x: root.size * 0.3;
+        y: root.size * 0.22;
+        width: root.size * 0.4;
+        height: root.size * 0.78;
+        border-radius: self.width / 2;
+        background: #E86F00;
+    }
+
+    Rectangle {
+        x: root.size * 0.42;
+        y: 0;
+        width: root.size * 0.16;
+        height: root.size * 0.3;
+        border-radius: root.size * 0.05;
+        background: #3C8D2F;
+    }
+}
+
+// Décorations de saison de l'île ouverte : citrouilles, neige, confettis.
+// Statiques : rien ne tourne au repos.
+component SeasonDecor inherits Rectangle {
+    in property <string> season;
+
+    if root.season == "halloween": Rectangle {
+        Pumpkin {
+            x: parent.width - 34px;
+            y: parent.height - 18px;
+            size: 13px;
+        }
+
+        Pumpkin {
+            x: parent.width - 20px;
+            y: parent.height - 14px;
+            size: 9px;
+        }
+    }
+
+    if root.season == "christmas": Rectangle {
+        for flake in [
+            { x: 0.06, y: 0.82, s: 3px },
+            { x: 0.14, y: 0.9, s: 2px },
+            { x: 0.83, y: 0.86, s: 3px },
+            { x: 0.9, y: 0.78, s: 2px },
+            { x: 0.95, y: 0.9, s: 2.5px },
+            { x: 0.03, y: 0.68, s: 2px },
+        ]: Rectangle {
+            x: parent.width * flake.x;
+            y: parent.height * flake.y;
+            width: flake.s;
+            height: flake.s;
+            border-radius: flake.s / 2;
+            background: white.with-alpha(0.75);
+        }
+    }
+
+    if root.season == "newyear": Rectangle {
+        for bit[i] in [
+            { x: 0.88, y: 0.75, c: #FFD60A },
+            { x: 0.92, y: 0.86, c: #FF375F },
+            { x: 0.95, y: 0.7, c: #64D2FF },
+            { x: 0.85, y: 0.9, c: #30D158 },
+            { x: 0.05, y: 0.85, c: #BF5AF2 },
+        ]: Rectangle {
+            x: parent.width * bit.x;
+            y: parent.height * bit.y;
+            width: 3px;
+            height: 1.6px;
+            border-radius: 0.8px;
+            background: bit.c;
+        }
+    }
+}
+
 // Icônes dessinées (pas de police d'icônes à embarquer), viewbox 24x24.
 component IconButton inherits Rectangle {
     in property <string> icon;
@@ -402,6 +724,30 @@ export component Island inherits Window {
     out property <length> pill-radius: pill.radius;
     out property <bool> pill-flat-top: root.top-offset <= 0;
     property <bool> weather-hover;
+    // Mascotte : où elle se tient dans la pilule fermée (center | left |
+    // right, vide : cachée), son humeur, sa saison, et si elle s'anime.
+    in property <string> mascot-place;
+    in property <string> mascot-mood: "idle";
+    in property <bool> mascot-animated;
+    in property <float> mascot-level;
+    // Saison des décorations (vide : aucune).
+    in property <string> season;
+    // La pilule respire au rythme des basses (1 : taille normale).
+    in property <float> pill-bounce: 1;
+    // En appel ou en partage d'écran : point rouge dans la pilule.
+    in property <bool> live;
+    // Retour d'un geste dans l'île ouverte (« Volume 46 % »), à la place de la date.
+    in property <string> toast;
+    // Gestes : molette ou pavé tactile (déplacements en pixels logiques,
+    // Maj enfoncée), glisser à la souris (déplacement horizontal), appui long.
+    callback wheel(float, float, bool);
+    callback drag(float);
+    callback long-press();
+    property <bool> long-fired;
+    property <bool> dragged;
+    // Place prise à droite de la pilule fermée par les points des non lues et
+    // la lune.
+    property <length> right-icons: root.unread-colors.length * 10px + (root.dnd ? 18px : 0px);
     // Couleurs d'état (charge, alerte) : les mêmes quel que soit le thème.
     property <color> ok-color: #30D158;
     property <color> alert-color: #FF453A;
@@ -461,9 +807,12 @@ export component Island inherits Window {
 
         y: root.top-offset;
         x: (root.width - self.width) / 2;
+        // Au rythme de la musique, la pilule fermée se resserre un peu entre
+        // deux basses (jamais plus large que sa taille : la zone cliquable
+        // reste la même).
         width: root.expanded ? root.expanded-width
-            : root.has-notif ? root.notif-width
-            : root.has-attention ? root.attention-width : root.compact-width;
+            : (root.has-notif ? root.notif-width
+            : root.has-attention ? root.attention-width : root.compact-width) - (1 - root.pill-bounce) * 5px;
         height: root.expanded ? root.expanded-height
             : root.has-notif ? root.notif-height
             : root.has-attention ? root.attention-height : root.compact-height;
@@ -488,7 +837,58 @@ export component Island inherits Window {
                 root.hover-changed(self.has-hover);
             }
             clicked => {
-                root.clicked();
+                // Un appui long ou un glissement n'est pas un clic.
+                if root.long-fired || root.dragged {
+                    root.long-fired = false;
+                    root.dragged = false;
+                } else {
+                    root.clicked();
+                }
+            }
+            scroll-event(event) => {
+                root.wheel(event.delta-x / 1px, event.delta-y / 1px, event.modifiers.shift);
+                accept
+            }
+            pointer-event(event) => {
+                if event.button == PointerEventButton.left {
+                    if event.kind == PointerEventKind.down {
+                        root.long-fired = false;
+                        root.dragged = false;
+                        long-timer.running = true;
+                    } else if event.kind == PointerEventKind.up {
+                        long-timer.running = false;
+                        if !root.long-fired && Math.abs(self.mouse-x - self.pressed-x) > 40px {
+                            root.dragged = true;
+                            root.drag((self.mouse-x - self.pressed-x) / 1px);
+                        }
+                    } else if event.kind == PointerEventKind.cancel {
+                        long-timer.running = false;
+                    }
+                }
+            }
+            moved => {
+                // Un glissement annule l'appui long.
+                if Math.abs(self.mouse-x - self.pressed-x) > 8px {
+                    long-timer.running = false;
+                }
+            }
+
+            long-timer := Timer {
+                interval: 600ms;
+                running: false;
+                triggered => {
+                    self.running = false;
+                    root.long-fired = true;
+                    root.long-press();
+                }
+            }
+
+            // Décorations de saison de l'île ouverte.
+            SeasonDecor {
+                season: root.season;
+                opacity: root.expanded && !root.custom-view ? 1 : 0;
+                visible: self.opacity > 0;
+                animate opacity { duration: root.anim; }
             }
 
             // Île ouverte sur la musique : halo de la couleur de la pochette
@@ -630,16 +1030,82 @@ export component Island inherits Window {
                 animate opacity { duration: root.anim; }
             }
 
+            // En appel ou en partage d'écran : point rouge, à gauche des non lues.
+            Rectangle {
+                x: parent.width - 14px - root.right-icons - self.width;
+                y: (parent.height - self.height) / 2;
+                width: 8px;
+                height: 8px;
+                border-radius: 4px;
+                background: root.alert-color;
+                drop-shadow-blur: 6px;
+                drop-shadow-color: root.alert-color.with-alpha(0.8);
+                opacity: root.live && !root.expanded && !root.has-notif ? 1 : 0;
+                visible: self.opacity > 0;
+                animate opacity { duration: root.anim; }
+            }
+
+            // Mascotte au centre de la pilule au repos, ou à droite quand la
+            // musique occupe la pilule (pochette à gauche).
+            if root.mascot-place == "center" || root.mascot-place == "right": Mascot {
+                x: root.mascot-place == "center" ? (parent.width - self.width) / 2
+                    : parent.width - 14px - root.right-icons - (root.live ? 14px : 0px) - self.width;
+                y: (parent.height - self.height) / 2;
+                mood: root.mascot-mood;
+                season: root.season;
+                animated: root.mascot-animated && !root.expanded;
+                level: root.mascot-level;
+                body-color: root.fg;
+                eye-color: root.bg.with-alpha(1);
+                accent: root.accent;
+                opacity: !root.expanded && !root.has-notif ? 1 : 0;
+                visible: self.opacity > 0;
+                animate opacity { duration: root.anim; }
+            }
+
+            // Halloween : deux petites citrouilles autour de la mascotte.
+            if root.mascot-place == "center" && root.season == "halloween": Rectangle {
+                opacity: !root.expanded && !root.has-notif ? 1 : 0;
+                visible: self.opacity > 0;
+                animate opacity { duration: root.anim; }
+
+                Pumpkin {
+                    x: parent.width / 2 - 30px;
+                    y: (parent.height - self.height) / 2 + 3px;
+                    size: 11px;
+                }
+
+                Pumpkin {
+                    x: parent.width / 2 + 20px;
+                    y: (parent.height - self.height) / 2 + 4px;
+                    size: 9px;
+                }
+            }
+
             // Contenu compact : le module qui réclame l'attention.
             HorizontalLayout {
-                padding-left: 14px;
-                // Laisse la place aux points des non lues et à la lune.
-                padding-right: 14px + root.unread-colors.length * 10px + (root.dnd ? 18px : 0px);
+                padding-left: root.mascot-place == "left" ? 8px : 14px;
+                // Laisse la place aux points des non lues, à la lune, au point
+                // « en direct » et à la mascotte.
+                padding-right: 14px + root.right-icons + (root.live ? 14px : 0px)
+                    + (root.mascot-place == "right" ? 30px : 0px);
                 spacing: 8px;
                 opacity: root.has-attention && !root.has-notif && !root.expanded ? 1 : 0;
                 animate opacity { duration: root.anim / 2; }
 
-                if !root.compact-art-visible && !root.compact-gauge-visible: Dot {
+                // Claude en tête : la mascotte remplace le point.
+                if root.mascot-place == "left": Mascot {
+                    y: (parent.height - self.height) / 2;
+                    mood: root.mascot-mood;
+                    season: root.season;
+                    animated: root.mascot-animated && !root.expanded;
+                    level: root.mascot-level;
+                    body-color: root.fg;
+                    eye-color: root.bg.with-alpha(1);
+                    accent: root.accent;
+                }
+
+                if root.mascot-place != "left" && !root.compact-art-visible && !root.compact-gauge-visible: Dot {
                     y: (parent.height - self.height) / 2;
                     background: root.urgent ? root.accent : root.fg.with-alpha(0.6);
                     drop-shadow-blur: root.urgent ? 8px : 0px;
@@ -755,8 +1221,8 @@ export component Island inherits Window {
                     }
 
                     Text {
-                        text: root.weather-hover ? root.weather.detail : root.date-text;
-                        color: root.fg.with-alpha(0.5);
+                        text: root.toast != "" ? root.toast : root.weather-hover ? root.weather.detail : root.date-text;
+                        color: root.toast != "" ? root.fg : root.fg.with-alpha(0.5);
                         font-size: 12px;
                         vertical-alignment: center;
                         horizontal-stretch: 1;
