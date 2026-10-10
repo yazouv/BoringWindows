@@ -4,8 +4,8 @@ Chaque changement du volume du système (touches du clavier, mélangeur Windows,
 une application) s'affiche un instant dans la pilule : « Volume 45 % » ou
 « Muet ». Désactivé par défaut, car Windows affiche déjà son propre indicateur.
 
-Active-le dans Réglages › **Général** › « Afficher les changements de volume
-dans l'île », ou dans `config.toml` :
+Active-le dans Réglages › **Notifications** › « Volume », ou dans
+`config.toml` :
 
 ```toml
 [modules.volume]
@@ -28,8 +28,8 @@ Même principe pour la luminosité de l'écran : « Luminosité 70 % » s'affich
 chaque changement (touches du clavier, centre de notifications, économiseur de
 batterie). Désactivé par défaut lui aussi.
 
-Active-le dans Réglages › **Général** › « Afficher les changements de
-luminosité dans l'île (portables) », ou dans `config.toml` :
+Active-le dans Réglages › **Notifications** › « Luminosité », ou dans
+`config.toml` :
 
 ```toml
 [modules.brightness]

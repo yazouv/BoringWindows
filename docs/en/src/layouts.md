@@ -9,7 +9,7 @@ it, without rebuilding BoringWindows.
 1. Settings › **Appearance** › **Layouts folder** (or create
    `%APPDATA%\BoringWindows\layouts\` by hand).
 2. Write `layouts\my-view.slint` (example below).
-3. Settings › **Custom view of the open island** › `my-view`, or in
+3. Settings › **Appearance** › **Custom view of the open island** › `my-view`, or in
    `config.toml`:
 
 ```toml

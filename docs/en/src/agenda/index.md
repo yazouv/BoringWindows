@@ -26,7 +26,7 @@ Pick your service to find that link:
 
 ### With the settings window (easiest)
 
-1. Right-click the BoringWindows icon › **Settings…** › **Calendar** tab.
+1. Right-click the BoringWindows icon › **Settings…** › **Calendar**.
 2. Pick your **service**: the window reminds you where to find the link, and
    **Step-by-step guide** opens the matching page of this guide.
 3. Paste the **ICS link** — or **Browse…** to pick an `.ics` file — optionally
@@ -34,7 +34,7 @@ Pick your service to find that link:
    downloads the calendar and shows how many events it found and the next one.
 4. **Add**. The calendar shows up in the island within a few seconds.
 
-![Agenda tab of the settings window](../images/reglages.png)
+![Calendar page of the settings window](../images/reglages.png)
 
 To remove a calendar: the **Remove** button next to its name.
 

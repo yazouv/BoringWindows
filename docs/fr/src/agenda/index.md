@@ -26,7 +26,7 @@ Choisis ton service pour savoir où trouver ce lien :
 
 ### Avec la fenêtre de réglages (le plus simple)
 
-1. Clic droit sur l'icône BoringWindows › **Réglages…** › onglet **Agenda**.
+1. Clic droit sur l'icône BoringWindows › **Réglages…** › **Agenda**.
 2. Choisis ton **service** : la fenêtre rappelle où trouver le lien, et
    **Guide détaillé** ouvre la page correspondante de cette doc.
 3. Colle le **lien ICS** (ou **Parcourir…** pour un fichier `.ics`), donne un
@@ -34,7 +34,7 @@ Choisis ton service pour savoir où trouver ce lien :
    affiche le nombre d'événements et le prochain.
 4. **Ajouter.** L'agenda apparaît dans l'île en quelques secondes.
 
-![Onglet Agenda de la fenêtre de réglages](../images/reglages.png)
+![Page Agenda de la fenêtre de réglages](../images/reglages.png)
 
 Pour retirer un calendrier : bouton **Supprimer** en face de son nom.
 

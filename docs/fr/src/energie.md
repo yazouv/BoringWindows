@@ -31,9 +31,8 @@ Activé par défaut.
 
 ## Réglages
 
-Réglages › **Général** › « Afficher le chargeur et le niveau de batterie dans
-l'île (portables) » et « Afficher la connexion des appareils Bluetooth, avec
-leur niveau de batterie ». Ou dans `config.toml` :
+Réglages › **Notifications** › « Batterie » et « Bluetooth ». Ou dans
+`config.toml` :
 
 ```toml
 [modules.battery]

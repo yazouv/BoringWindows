@@ -1,8 +1,13 @@
 // Fenêtre de réglages : édite config.toml sans avoir à l'ouvrir.
 // Créée à l'ouverture, détruite à la fermeture. Chaque modification appelle
 // `changed(clé)` ; Rust lit la propriété correspondante et l'enregistre.
+//
+// Mise en page à la manière des Réglages de Windows 11 : navigation à gauche,
+// une page par sujet, chaque réglage dans une tuile (titre et explication à
+// gauche, contrôle à droite). Les options qui dépendent d'un interrupteur sont
+// rangées sous lui, dans la même tuile.
 
-import { Button, CheckBox, ComboBox, GroupBox, LineEdit, ScrollView, SpinBox, TabWidget, TextEdit, VerticalBox, HorizontalBox } from "std-widgets.slint";
+import { Button, ComboBox, LineEdit, Palette, ScrollView, SpinBox, Switch, TextEdit } from "std-widgets.slint";
 
 export struct CalendarSourceRow {
     name: string,
@@ -15,44 +20,309 @@ export struct PlayerRow {
     ignored: bool,
 }
 
-component Hint inherits Text {
-    font-size: 12px;
-    opacity: 0.7;
-    wrap: word-wrap;
+// Couleurs de la fenêtre, d'après le thème clair ou sombre de Windows.
+global Ui {
+    out property <bool> dark: Palette.color-scheme == ColorScheme.dark;
+    out property <brush> window: dark ? #202020 : #f3f3f3;
+    out property <brush> card: dark ? #2b2b2b : #fbfbfb;
+    out property <brush> card-border: dark ? #1d1d1d : #e5e5e5;
+    out property <brush> divider: dark ? #1d1d1d : #ebebeb;
+    out property <brush> text: Palette.foreground;
+    out property <brush> muted: dark ? #c8c8c8 : #5f5f5f;
+    out property <brush> hover: dark ? #ffffff0d : #00000008;
+    out property <brush> selected: dark ? #ffffff12 : #0000000c;
+    out property <brush> accent: Palette.accent-background;
+    out property <brush> ok: dark ? #6ccb5f : #0f7b0f;
+    out property <brush> error: dark ? #ff99a4 : #c42b1c;
 }
 
-component Row inherits HorizontalLayout {
-    in property <string> label;
-    spacing: 12px;
+// Pictogrammes au trait, viewbox 24x24 (tracés d'après Lucide, licence ISC).
+component Icon inherits Path {
+    in property <string> name;
+    in property <brush> ink: Ui.text;
+    width: 16px;
+    height: 16px;
+    viewbox-width: 24;
+    viewbox-height: 24;
+    stroke: root.ink;
+    stroke-width: 1.6px;
+    fill: transparent;
+    commands: root.name == "general" ? "M21 4h-7 M10 4H3 M21 12h-9 M8 12H3 M21 20h-5 M12 20H3 M14 2v4 M8 10v4 M16 18v4"
+        : root.name == "appearance" ? "M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z M14 6.5a.5 .5 0 1 1-1 0a.5 .5 0 1 1 1 0 M18 10.5a.5 .5 0 1 1-1 0a.5 .5 0 1 1 1 0 M7 12.5a.5 .5 0 1 1-1 0a.5 .5 0 1 1 1 0 M9 7.5a.5 .5 0 1 1-1 0a.5 .5 0 1 1 1 0"
+        : root.name == "notifications" ? "M10.268 21a2 2 0 0 0 3.464 0 M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"
+        : root.name == "claude" ? "M4 17l6-6-6-6 M12 19h8"
+        : root.name == "calendar" ? "M8 2v4 M16 2v4 M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z M3 10h18"
+        : root.name == "music" ? "M9 18V5l12-2v13 M9 18a3 3 0 1 1-6 0a3 3 0 1 1 6 0 M21 16a3 3 0 1 1-6 0a3 3 0 1 1 6 0"
+        : root.name == "weather" ? "M12 2v2 M4.93 4.93l1.41 1.41 M20 12h2 M19.07 4.93l-1.41 1.41 M15.947 12.65a4 4 0 0 0-5.925-4.128 M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6Z"
+        : root.name == "timer" ? "M10 2h4 M12 14l3-3 M20 14a8 8 0 1 1-16 0a8 8 0 1 1 16 0"
+        : root.name == "shelf" ? "M2 12h6l2 3h4l2-3h6 M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"
+        : root.name == "mascot" ? "M22 12a10 10 0 1 1-20 0a10 10 0 1 1 20 0 M8 14s1.5 2 4 2 4-2 4-2 M9 9h.01 M15 9h.01"
+        : root.name == "docs" ? "M12 7v14 M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"
+        : root.name == "file" ? "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z M14 2v4a2 2 0 0 0 2 2h4 M16 13H8 M16 17H8 M10 9H8"
+        : root.name == "check" ? "M20 6L9 17l-5-5"
+        : root.name == "alert" ? "M12 8v4 M12 16h.01 M22 12a10 10 0 1 1-20 0a10 10 0 1 1 20 0"
+        : "";
+}
 
-    Text {
-        text: root.label;
-        min-width: 220px;
-        vertical-alignment: center;
+// Entrée de la barre latérale.
+component NavItem inherits Rectangle {
+    in property <string> icon;
+    in property <string> label;
+    in property <bool> selected;
+    callback clicked;
+    height: 36px;
+    border-radius: 5px;
+    background: root.selected ? Ui.selected : ta.has-hover ? Ui.hover : transparent;
+
+    // Trait d'accent devant l'entrée choisie.
+    Rectangle {
+        x: 0;
+        y: (parent.height - self.height) / 2;
+        width: 3px;
+        height: root.selected ? 16px : 0px;
+        border-radius: 1.5px;
+        background: Ui.accent;
+        animate height { duration: 150ms; easing: ease-out; }
+    }
+
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 10px;
+        spacing: 12px;
+
+        VerticalLayout {
+            alignment: center;
+            Icon { name: root.icon; }
+        }
+
+        Text {
+            text: root.label;
+            color: Ui.text;
+            font-size: 14px;
+            font-weight: root.selected ? 600 : 400;
+            vertical-alignment: center;
+            overflow: elide;
+            horizontal-stretch: 1;
+        }
+    }
+
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
     }
 }
 
+// Titre d'un groupe de tuiles.
+component Section inherits VerticalLayout {
+    in property <string> title;
+    spacing: 4px;
+
+    if root.title != "": Text {
+        text: root.title;
+        color: Ui.text;
+        font-size: 14px;
+        font-weight: 600;
+        // Espace entre le titre et sa première tuile.
+        height: self.preferred-height + 6px;
+        vertical-alignment: top;
+    }
+}
+
+// Fond d'une tuile ; contient une ou plusieurs lignes `Setting`.
+component Card inherits Rectangle {
+    background: Ui.card;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: Ui.card-border;
+
+    VerticalLayout {
+        @children
+    }
+}
+
+// Ligne de réglage : titre et explication à gauche, contrôles à droite.
+// `nested` la range sous la ligne précédente (retrait et filet au-dessus),
+// `divided` ajoute seulement le filet.
+component Setting inherits Rectangle {
+    in property <string> title;
+    in property <string> description;
+    in property <bool> enabled: true;
+    in property <bool> nested;
+    in property <bool> divided: root.nested;
+    in property <brush> title-color: Ui.text;
+    min-height: 62px;
+
+    if root.divided: Rectangle {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: 1px;
+        background: Ui.divider;
+    }
+
+    HorizontalLayout {
+        padding-left: root.nested ? 52px : 16px;
+        padding-right: 16px;
+        padding-top: 11px;
+        padding-bottom: 11px;
+        spacing: 24px;
+
+        VerticalLayout {
+            alignment: center;
+            spacing: root.description == "" ? 0px : 2px;
+            horizontal-stretch: 1;
+
+            Text {
+                text: root.title;
+                color: root.title-color;
+                font-size: 14px;
+                wrap: word-wrap;
+                height: self.preferred-height;
+                opacity: root.enabled ? 1 : 0.45;
+            }
+
+            // Toujours présent (pas de `if`) : la hauteur suit la largeur réelle.
+            Text {
+                text: root.description;
+                color: Ui.muted;
+                font-size: 12px;
+                wrap: word-wrap;
+                opacity: root.enabled ? 1 : 0.45;
+                height: root.description == "" ? 0px : self.preferred-height;
+            }
+        }
+
+        controls := VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: end;
+                @children
+            }
+        }
+    }
+}
+
+// Interrupteur sans texte, aligné à droite d'une ligne `Setting`.
+component Toggle inherits Switch {
+    text: "";
+}
+
+// Petit texte d'explication sous une tuile.
+component Hint inherits Text {
+    color: Ui.muted;
+    font-size: 12px;
+    wrap: word-wrap;
+}
+
+// Page : titre fixe, contenu qui défile.
+component Page inherits VerticalLayout {
+    in property <string> title;
+    // Titre aligné sur le contenu (marge de 32 px, comme les tuiles).
+    padding-left: 0px;
+
+    HorizontalLayout {
+        padding-left: 32px;
+        padding-right: 32px;
+
+      Text {
+        text: root.title;
+        color: Ui.text;
+        font-size: 28px;
+        font-weight: 600;
+        height: self.preferred-height + 28px;
+        vertical-alignment: bottom;
+      }
+    }
+
+    Rectangle { height: 14px; }
+
+    sv := ScrollView {
+        vertical-stretch: 1;
+        content-width: self.visible-width;
+        content-height: content.preferred-height;
+
+        content := VerticalLayout {
+            width: sv.visible-width;
+            padding-left: 32px;
+            padding-right: 32px;
+            padding-bottom: 32px;
+            spacing: 24px;
+            alignment: start;
+            @children
+        }
+    }
+}
+
+// Pastille de couleur proposée pour l'accent.
 component Swatch inherits Rectangle {
     in property <color> swatch;
+    in property <bool> current;
     callback picked;
-    width: 22px;
-    height: 22px;
-    border-radius: 11px;
-    background: root.swatch;
-    border-width: ta.has-hover ? 2px : 0px;
-    border-color: white;
+    width: 26px;
+    height: 26px;
+    border-radius: 13px;
+    border-width: root.current ? 2px : ta.has-hover ? 2px : 0px;
+    border-color: root.current ? Ui.text : Ui.muted;
+
+    Rectangle {
+        width: root.current || ta.has-hover ? 18px : 26px;
+        height: self.width;
+        border-radius: self.width / 2;
+        background: root.swatch;
+        animate width { duration: 100ms; }
+    }
 
     ta := TouchArea {
+        mouse-cursor: pointer;
         clicked => { root.picked(); }
+    }
+}
+
+// Badge d'état (vert : bon, orange : à faire).
+component Badge inherits Rectangle {
+    in property <string> text;
+    in property <bool> good;
+    border-radius: 10px;
+    height: 22px;
+    background: root.good ? (Ui.dark ? #6ccb5f26 : #0f7b0f1a) : (Ui.dark ? #fce10026 : #9d5d001a);
+
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 10px;
+        spacing: 6px;
+
+        VerticalLayout {
+            alignment: center;
+            Icon {
+                name: root.good ? "check" : "alert";
+                ink: root.good ? Ui.ok : (Ui.dark ? #fce100 : #9d5d00);
+                width: 12px;
+                height: 12px;
+            }
+        }
+
+        Text {
+            text: root.text;
+            font-size: 12px;
+            color: root.good ? Ui.ok : (Ui.dark ? #fce100 : #9d5d00);
+            vertical-alignment: center;
+        }
     }
 }
 
 export component SettingsWindow inherits Window {
     title: @tr("BoringWindows · Settings");
-    preferred-width: 760px;
-    preferred-height: 580px;
-    min-width: 640px;
-    min-height: 480px;
+    preferred-width: 980px;
+    preferred-height: 700px;
+    min-width: 780px;
+    min-height: 520px;
+    background: Ui.window;
+
+    // Page affichée (ordre de la barre latérale).
+    in-out property <int> page;
 
     // --- Général ---
     in-out property <int> language-index;
@@ -139,7 +409,7 @@ export component SettingsWindow inherits Window {
     in-out property <bool> timer-enabled;
     in-out property <bool> timer-sound;
     in-out property <string> timer-presets;
-    // --- Pied de page ---
+    // --- État de l'enregistrement ---
     in property <string> status;
     in property <bool> status-error;
 
@@ -162,139 +432,213 @@ export component SettingsWindow inherits Window {
     callback open-config-file();
     callback open-docs();
 
-    VerticalLayout {
-        padding: 12px;
-        spacing: 8px;
+    property <bool> source-ready: root.new-url != "" && (!root.provider-is-caldav || (root.new-username != "" && root.new-password != ""));
 
-        TabWidget {
-            Tab {
-                title: @tr("General");
-                VerticalBox {
-                    alignment: start;
+    HorizontalLayout {
+        // --- Barre latérale ---
+        VerticalLayout {
+            width: 248px;
+            padding: 12px;
+            padding-top: 16px;
+            spacing: 2px;
 
-                    Row {
-                        label: @tr("Language");
+            // L'île en miniature, en guise de logo.
+            HorizontalLayout {
+                padding-left: 14px;
+                padding-bottom: 18px;
+                spacing: 12px;
+
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 30px;
+                        height: 12px;
+                        border-radius: 6px;
+                        background: #000000;
+                        border-width: Ui.dark ? 1px : 0px;
+                        border-color: #ffffff26;
+
+                        Rectangle {
+                            x: parent.width - 10px;
+                            width: 5px;
+                            height: 5px;
+                            border-radius: 2.5px;
+                            background: Ui.accent;
+                        }
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+
+                    Text {
+                        text: "BoringWindows";
+                        color: Ui.text;
+                        font-size: 14px;
+                        font-weight: 600;
+                    }
+
+                    Text {
+                        text: @tr("Version {}", root.app-version);
+                        color: Ui.muted;
+                        font-size: 11px;
+                    }
+                }
+            }
+
+            for item[i] in [
+                { icon: "general", label: @tr("General") },
+                { icon: "appearance", label: @tr("Appearance") },
+                { icon: "notifications", label: @tr("Notifications") },
+                { icon: "claude", label: "Claude Code" },
+                { icon: "calendar", label: @tr("Calendar") },
+                { icon: "music", label: @tr("Music") },
+                { icon: "weather", label: @tr("Weather") },
+                { icon: "timer", label: @tr("Timer") },
+                { icon: "shelf", label: @tr("Shelf") },
+                { icon: "mascot", label: @tr("Mascot") },
+            ]: NavItem {
+                icon: item.icon;
+                label: item.label;
+                selected: root.page == i;
+                clicked => { root.page = i; }
+            }
+
+            Rectangle { vertical-stretch: 1; }
+
+            // Dernier enregistrement : discret quand tout va bien.
+            if root.status != "": HorizontalLayout {
+                padding-left: 14px;
+                padding-right: 10px;
+                padding-bottom: 6px;
+                spacing: 8px;
+
+                VerticalLayout {
+                    alignment: center;
+                    Icon {
+                        name: root.status-error ? "alert" : "check";
+                        ink: root.status-error ? Ui.error : Ui.ok;
+                        width: 14px;
+                        height: 14px;
+                    }
+                }
+
+                Text {
+                    text: root.status;
+                    color: root.status-error ? Ui.error : Ui.muted;
+                    font-size: 12px;
+                    wrap: word-wrap;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+            }
+
+            NavItem {
+                icon: "docs";
+                label: @tr("Documentation");
+                clicked => { root.open-docs(); }
+            }
+
+            NavItem {
+                icon: "file";
+                label: @tr("Open config.toml");
+                clicked => { root.open-config-file(); }
+            }
+        }
+
+        // --- Pages ---
+        if root.page == 0: Page {
+            title: @tr("General");
+
+            Section {
+                title: @tr("Island");
+
+                Card {
+                    Setting {
+                        title: @tr("Language");
                         ComboBox {
+                            width: 220px;
                             // Noms des langues dans leur propre langue : non traduits.
                             model: [@tr("Automatic (Windows)"), "English", "Français"];
                             current-index <=> root.language-index;
                             selected => { root.changed("general.language"); }
                         }
                     }
+                }
 
-                    Row {
-                        label: @tr("Open the island");
+                Card {
+                    Setting {
+                        title: @tr("Open the island");
                         ComboBox {
+                            width: 220px;
                             model: [@tr("on hover"), @tr("on click")];
                             current-index <=> root.open-on-index;
                             selected => { root.changed("general.open_on"); }
                         }
                     }
+                }
 
-                    Row {
-                        label: @tr("Screen");
+                Card {
+                    Setting {
+                        title: @tr("Screen");
                         ComboBox {
+                            width: 220px;
                             model: [@tr("main screen"), @tr("screen under the mouse (at startup)")];
                             current-index <=> root.monitor-index;
                             selected => { root.changed("general.monitor"); }
                         }
                     }
+                }
 
-                    CheckBox {
-                        text: @tr("Hide the island when an app is full screen");
-                        checked <=> root.hide-fullscreen;
-                        toggled => { root.changed("general.hide_in_fullscreen"); }
-                    }
-
-                    CheckBox {
-                        text: @tr("Start BoringWindows with Windows");
-                        checked <=> root.autostart;
-                        toggled => { root.changed("autostart"); }
-                    }
-
-                    CheckBox {
-                        text: @tr("Show volume changes in the island");
-                        checked <=> root.volume-enabled;
-                        toggled => { root.changed("modules.volume.enabled"); }
-                    }
-
-                    CheckBox {
-                        text: @tr("Show brightness changes in the island (laptops)");
-                        checked <=> root.brightness-enabled;
-                        toggled => { root.changed("modules.brightness.enabled"); }
-                    }
-
-                    CheckBox {
-                        text: @tr("Show the charger and battery level in the island (laptops)");
-                        checked <=> root.battery-enabled;
-                        toggled => { root.changed("modules.battery.enabled"); }
-                    }
-
-                    CheckBox {
-                        text: @tr("Show Bluetooth devices connecting, with their battery level");
-                        checked <=> root.bluetooth-enabled;
-                        toggled => { root.changed("modules.bluetooth.enabled"); }
-                    }
-
-                    CheckBox {
-                        text: @tr("Gestures on the island: wheel for volume, swipe to change track, long press for do not disturb");
-                        checked <=> root.gestures-enabled;
-                        toggled => { root.changed("modules.gestures.enabled"); }
-                    }
-
-                    CheckBox {
-                        text: @tr("Presentation mode: stay quiet during calls and screen sharing");
-                        checked <=> root.presentation-enabled;
-                        toggled => { root.changed("modules.presentation.enabled"); }
-                    }
-
-                    CheckBox {
-                        text: @tr("Hide the island from screen sharing, recordings and screenshots");
-                        checked <=> root.hide-from-capture;
-                        toggled => { root.changed("modules.presentation.hide_from_capture"); }
-                    }
-
-                    CheckBox {
-                        text: @tr("Show app notifications in the island (Discord, Slack, Teams…)");
-                        checked <=> root.notifications-enabled;
-                        toggled => { root.changed("modules.notifications.enabled"); }
-                    }
-
-                    CheckBox {
-                        text: @tr("Show the sender and the message of notifications");
-                        enabled: root.notifications-enabled;
-                        checked <=> root.notifications-content;
-                        toggled => { root.changed("modules.notifications.show_content"); }
-                    }
-
-                    CheckBox {
-                        text: @tr("Clicking a notification opens the right place (Discord channel, tab…)");
-                        enabled: root.notifications-enabled;
-                        checked <=> root.notifications-original;
-                        toggled => { root.changed("modules.notifications.open_original"); }
-                    }
-
-                    Row {
-                        label: "";
-                        CheckBox {
-                            text: @tr("Run WASM plugins (third-party code, sandboxed)");
-                            checked <=> root.plugins-enabled;
-                            toggled => { root.changed("modules.plugins.enabled"); }
+                Card {
+                    Setting {
+                        title: @tr("Hide in full screen");
+                        description: @tr("Hide the island when an app is full screen");
+                        Toggle {
+                            checked <=> root.hide-fullscreen;
+                            toggled => { root.changed("general.hide_in_fullscreen"); }
                         }
-                        Button {
-                            text: @tr("Plugins folder");
-                            clicked => { root.open-plugins-folder(); }
+                    }
+                }
+
+                Card {
+                    Setting {
+                        title: @tr("Gestures");
+                        description: @tr("Wheel for volume, swipe to change track, long press for do not disturb");
+                        Toggle {
+                            checked <=> root.gestures-enabled;
+                            toggled => { root.changed("modules.gestures.enabled"); }
+                        }
+                    }
+                }
+            }
+
+            Section {
+                title: @tr("Startup and updates");
+
+                Card {
+                    Setting {
+                        title: @tr("Start BoringWindows with Windows");
+                        Toggle {
+                            checked <=> root.autostart;
+                            toggled => { root.changed("autostart"); }
+                        }
+                    }
+                }
+
+                Card {
+                    Setting {
+                        title: @tr("Install updates automatically");
+                        Toggle {
+                            checked <=> root.auto-update;
+                            toggled => { root.changed("general.auto_update"); }
                         }
                     }
 
-                    CheckBox {
-                        text: @tr("Install updates automatically");
-                        checked <=> root.auto-update;
-                        toggled => { root.changed("general.auto_update"); }
-                    }
-
-                    Row {
-                        label: @tr("Version {}", root.app-version);
+                    Setting {
+                        divided: true;
+                        title: @tr("Version {}", root.app-version);
+                        description: root.update-ready ? @tr("An update is ready.") : "";
                         Button {
                             text: root.update-ready ? @tr("Restart to update")
                                 : root.update-checking ? @tr("Checking…") : @tr("Check for updates");
@@ -306,119 +650,143 @@ export component SettingsWindow inherits Window {
                 }
             }
 
-            Tab {
-                title: @tr("Appearance");
-                VerticalBox {
-                    alignment: start;
+            Section {
+                title: @tr("Advanced");
 
-                    Row {
-                        label: @tr("Theme");
-                        ComboBox {
-                            model: root.themes;
-                            current-index <=> root.theme-index;
-                            selected => { root.theme-picked(self.current-index); }
+                Card {
+                    Setting {
+                        title: @tr("WASM plugins");
+                        description: @tr("Run WASM plugins (third-party code, sandboxed)");
+                        Button {
+                            text: @tr("Plugins folder");
+                            clicked => { root.open-plugins-folder(); }
                         }
+                        Toggle {
+                            checked <=> root.plugins-enabled;
+                            toggled => { root.changed("modules.plugins.enabled"); }
+                        }
+                    }
+                }
+            }
+        }
+
+        if root.page == 1: Page {
+            title: @tr("Appearance");
+
+            Section {
+                title: @tr("Theme");
+
+                Card {
+                    Setting {
+                        title: @tr("Theme");
+                        description: @tr("Picking a theme replaces the colors below with the theme's. Your own themes go in the themes folder.");
                         Button {
                             text: @tr("Themes folder");
                             clicked => { root.open-themes-folder(); }
                         }
-                    }
-
-                    CheckBox {
-                        text: @tr("Blur what is behind the island (Windows 11, translucent themes)");
-                        checked <=> root.blur;
-                        toggled => { root.changed("theme.blur"); }
-                    }
-
-                    CheckBox {
-                        text: @tr("Use the Windows accent color");
-                        checked <=> root.system-accent;
-                        toggled => { root.changed("theme.system_accent"); }
-                    }
-
-                    Row {
-                        label: @tr("Custom view of the open island");
-                        LineEdit {
-                            text <=> root.view-name;
-                            placeholder-text: "my-view";
-                            edited => { root.changed("layout.view"); }
+                        ComboBox {
+                            width: 180px;
+                            model: root.themes;
+                            current-index <=> root.theme-index;
+                            selected => { root.theme-picked(self.current-index); }
                         }
-                        Button {
-                            text: @tr("Layouts folder");
-                            clicked => { root.open-layouts-folder(); }
+                    }
+                }
+
+                Card {
+                    Setting {
+                        title: @tr("Use the Windows accent color");
+                        Toggle {
+                            checked <=> root.system-accent;
+                            toggled => { root.changed("theme.system_accent"); }
                         }
                     }
 
-                    Hint {
-                        text: @tr("Name of a file in the layouts folder, without .slint. Leave empty for the built-in view; see the documentation for the data you can use.");
-                    }
-
-                    Row {
-                        label: @tr("Accent color");
+                    Setting {
+                        nested: true;
+                        enabled: !root.system-accent;
+                        title: @tr("Accent color");
+                        description: @tr("Replaced by the album art color while music plays.");
+                        Rectangle {
+                            width: 32px;
+                            height: 32px;
+                            border-radius: 6px;
+                            background: root.accent-preview;
+                            border-width: 1px;
+                            border-color: Ui.card-border;
+                        }
                         LineEdit {
+                            width: 120px;
+                            enabled: !root.system-accent;
                             text <=> root.accent;
                             placeholder-text: "#FF8A3D";
                             edited => { root.changed("theme.accent"); }
                         }
-                        Rectangle {
-                            width: 28px;
-                            height: 28px;
-                            border-radius: 6px;
-                            background: root.accent-preview;
-                        }
                     }
 
-                    HorizontalLayout {
-                        spacing: 8px;
-                        padding-left: 232px;
+                    if !root.system-accent: HorizontalLayout {
+                        padding-left: 52px;
+                        padding-right: 16px;
+                        padding-bottom: 14px;
+                        spacing: 6px;
+                        alignment: start;
+
                         for c[i] in [#FF8A3D, #FF453A, #FFD60A, #30D158, #5AC8FA, #0A84FF, #BF5AF2, #FF375F]: Swatch {
                             swatch: c;
+                            current: root.accent-preview == c;
                             picked => {
                                 root.accent = ["#FF8A3D", "#FF453A", "#FFD60A", "#30D158", "#5AC8FA", "#0A84FF", "#BF5AF2", "#FF375F"][i];
                                 root.changed("theme.accent");
                             }
                         }
                     }
+                }
 
-                    Row {
-                        label: @tr("Background color");
+                Card {
+                    Setting {
+                        title: @tr("Background color");
                         LineEdit {
+                            width: 120px;
                             text <=> root.background-color;
                             placeholder-text: "#000000";
                             edited => { root.changed("theme.background"); }
                         }
                     }
+                }
 
-                    Row {
-                        label: @tr("Animation duration (ms)");
-                        SpinBox {
-                            minimum: 0;
-                            maximum: 2000;
-                            step-size: 20;
-                            value <=> root.animation-ms;
-                            edited => { root.changed("theme.animation_ms"); }
+                Card {
+                    Setting {
+                        title: @tr("Blur");
+                        description: @tr("Blur what is behind the island (Windows 11, translucent themes)");
+                        Toggle {
+                            checked <=> root.blur;
+                            toggled => { root.changed("theme.blur"); }
                         }
                     }
+                }
+            }
 
-                    Row {
-                        label: @tr("Corner radius of the open island");
-                        SpinBox {
-                            minimum: 0;
-                            maximum: 100;
-                            value <=> root.corner-radius;
-                            edited => { root.changed("theme.corner_radius"); }
-                        }
-                    }
+            Section {
+                title: @tr("Size and motion");
 
-                    Row {
-                        label: @tr("Compact island size (px)");
+                Card {
+                    Setting {
+                        title: @tr("Compact island size (px)");
+                        description: @tr("Width × height");
                         SpinBox {
+                            width: 110px;
                             minimum: 16;
                             maximum: 4000;
                             value <=> root.compact-w;
                             edited => { root.changed("theme.compact"); }
                         }
+                        Text {
+                            text: "×";
+                            color: Ui.muted;
+                            vertical-alignment: center;
+                        }
                         SpinBox {
+                            width: 110px;
                             minimum: 8;
                             maximum: 2000;
                             value <=> root.compact-h;
@@ -426,15 +794,24 @@ export component SettingsWindow inherits Window {
                         }
                     }
 
-                    Row {
-                        label: @tr("Open island size (px)");
+                    Setting {
+                        divided: true;
+                        title: @tr("Open island size (px)");
+                        description: @tr("Width × height");
                         SpinBox {
+                            width: 110px;
                             minimum: 16;
                             maximum: 4000;
                             value <=> root.expanded-w;
                             edited => { root.changed("theme.expanded"); }
                         }
+                        Text {
+                            text: "×";
+                            color: Ui.muted;
+                            vertical-alignment: center;
+                        }
                         SpinBox {
+                            width: 110px;
                             minimum: 8;
                             maximum: 2000;
                             value <=> root.expanded-h;
@@ -442,232 +819,276 @@ export component SettingsWindow inherits Window {
                         }
                     }
 
-                    Text {
-                        text: @tr("Priority in the compact island (first wins)");
-                    }
-                    for name[i] in root.module-order: HorizontalLayout {
-                        spacing: 8px;
-                        Text {
-                            text: name;
-                            min-width: 220px;
-                            vertical-alignment: center;
+                    Setting {
+                        divided: true;
+                        title: @tr("Corner radius of the open island");
+                        SpinBox {
+                            width: 110px;
+                            minimum: 0;
+                            maximum: 100;
+                            value <=> root.corner-radius;
+                            edited => { root.changed("theme.corner_radius"); }
                         }
+                    }
+
+                    Setting {
+                        divided: true;
+                        title: @tr("Animation duration (ms)");
+                        SpinBox {
+                            width: 110px;
+                            minimum: 0;
+                            maximum: 2000;
+                            step-size: 20;
+                            value <=> root.animation-ms;
+                            edited => { root.changed("theme.animation_ms"); }
+                        }
+                    }
+                }
+            }
+
+            Section {
+                title: @tr("Priority in the compact island");
+
+                Card {
+                    for name[i] in root.module-order: Setting {
+                        divided: i > 0;
+                        min-height: 48px;
+                        title: (i + 1) + ".  " + name;
+                        description: i == 0 ? @tr("Wins when several modules want the island") : "";
                         Button {
                             text: "↑";
+                            width: 40px;
                             enabled: i > 0;
                             clicked => { root.module-moved(i, -1); }
                         }
                         Button {
                             text: "↓";
+                            width: 40px;
                             enabled: i < root.module-order.length - 1;
                             clicked => { root.module-moved(i, 1); }
                         }
                     }
-
-                    Hint {
-                        text: @tr("Changes apply to the island right away. Picking a theme replaces the colors above with the theme's; your own themes go in the themes folder (one .toml file each, see the documentation). The accent color is replaced by the album art color while music plays (Music tab).");
-                    }
                 }
             }
 
-            Tab {
-                title: @tr("Calendar");
-                ScrollView {
-                    VerticalBox {
-                        alignment: start;
+            Section {
+                title: @tr("Advanced");
 
-                        GroupBox {
-                            title: @tr("My calendars");
-                            VerticalLayout {
-                                spacing: 6px;
-
-                                if root.sources.length == 0: Hint {
-                                    text: @tr("No calendar yet: add one below.");
-                                }
-
-                                for source[i] in root.sources: HorizontalLayout {
-                                    spacing: 8px;
-
-                                    Text {
-                                        text: source.name != "" ? source.name : @tr("(no name)");
-                                        font-weight: 600;
-                                        min-width: 120px;
-                                        vertical-alignment: center;
-                                    }
-
-                                    Text {
-                                        text: source.url;
-                                        opacity: 0.7;
-                                        overflow: elide;
-                                        horizontal-stretch: 1;
-                                        vertical-alignment: center;
-                                    }
-
-                                    Button {
-                                        text: @tr("Remove");
-                                        clicked => { root.remove-source(i); }
-                                    }
-                                }
-                            }
+                Card {
+                    Setting {
+                        title: @tr("Custom view of the open island");
+                        description: @tr("Name of a file in the layouts folder, without .slint. Leave empty for the built-in view; see the documentation for the data you can use.");
+                        Button {
+                            text: @tr("Layouts folder");
+                            clicked => { root.open-layouts-folder(); }
                         }
-
-                        GroupBox {
-                            title: @tr("Add a calendar");
-                            VerticalLayout {
-                                spacing: 8px;
-
-                                Row {
-                                    label: @tr("Service");
-                                    ComboBox {
-                                        model: root.providers;
-                                        current-index <=> root.provider-index;
-                                        selected => { root.provider-changed(self.current-index); }
-                                    }
-                                    Button {
-                                        text: @tr("Step-by-step guide");
-                                        clicked => { root.open-guide(); }
-                                    }
-                                }
-
-                                Hint {
-                                    text: root.provider-help;
-                                }
-
-                                Row {
-                                    label: @tr("Name (optional)");
-                                    LineEdit {
-                                        text <=> root.new-name;
-                                        placeholder-text: @tr("Work, School, Personal…");
-                                    }
-                                }
-
-                                Row {
-                                    label: root.provider-is-file ? @tr(".ics file") : root.provider-is-caldav ? @tr("Server address") : @tr("ICS link");
-                                    LineEdit {
-                                        text <=> root.new-url;
-                                        placeholder-text: root.provider-is-file ? "C:/Users/…/agenda.ics" : root.provider-is-caldav ? "https://caldav.icloud.com" : @tr("https://…  or  webcal://…");
-                                    }
-                                    if root.provider-is-file: Button {
-                                        text: @tr("Browse…");
-                                        clicked => { root.browse-file(); }
-                                    }
-                                }
-
-                                if root.provider-is-caldav: Row {
-                                    label: @tr("Login");
-                                    LineEdit {
-                                        text <=> root.new-username;
-                                        placeholder-text: "name@icloud.com";
-                                    }
-                                }
-
-                                if root.provider-is-caldav: Row {
-                                    label: @tr("App password");
-                                    LineEdit {
-                                        text <=> root.new-password;
-                                        input-type: password;
-                                    }
-                                }
-
-                                HorizontalLayout {
-                                    spacing: 8px;
-                                    alignment: end;
-
-                                    Text {
-                                        text: root.test-status;
-                                        color: root.test-ok ? #30D158 : #FF453A;
-                                        wrap: word-wrap;
-                                        horizontal-stretch: 1;
-                                        vertical-alignment: center;
-                                    }
-
-                                    Button {
-                                        text: root.testing ? @tr("Testing…") : @tr("Test");
-                                        enabled: !root.testing && root.new-url != "" && (!root.provider-is-caldav || (root.new-username != "" && root.new-password != ""));
-                                        clicked => { root.test-source(); }
-                                    }
-
-                                    Button {
-                                        text: @tr("Add");
-                                        primary: true;
-                                        enabled: root.new-url != "" && (!root.provider-is-caldav || (root.new-username != "" && root.new-password != ""));
-                                        clicked => { root.add-source(); }
-                                    }
-                                }
-                            }
+                        LineEdit {
+                            width: 150px;
+                            text <=> root.view-name;
+                            placeholder-text: "my-view";
+                            edited => { root.changed("layout.view"); }
                         }
+                    }
+                }
+            }
+        }
 
-                        GroupBox {
-                            title: @tr("Display");
-                            VerticalLayout {
-                                spacing: 6px;
+        if root.page == 2: Page {
+            title: @tr("Notifications");
 
-                                Row {
-                                    label: @tr("Reminder before start (min)");
-                                    SpinBox {
-                                        minimum: 0;
-                                        maximum: 120;
-                                        value <=> root.remind-minutes;
-                                        edited => { root.changed("modules.calendar.remind_minutes"); }
-                                    }
-                                }
+            Section {
+                title: @tr("Apps");
 
-                                Row {
-                                    label: @tr("Time span shown (hours)");
-                                    SpinBox {
-                                        minimum: 1;
-                                        maximum: 168;
-                                        value <=> root.lookahead-hours;
-                                        edited => { root.changed("modules.calendar.lookahead_hours"); }
-                                    }
-                                }
+                Card {
+                    Setting {
+                        title: @tr("App notifications");
+                        description: @tr("Show app notifications in the island (Discord, Slack, Teams…)");
+                        Toggle {
+                            checked <=> root.notifications-enabled;
+                            toggled => { root.changed("modules.notifications.enabled"); }
+                        }
+                    }
 
-                                Row {
-                                    label: @tr("Refresh every (min)");
-                                    SpinBox {
-                                        minimum: 2;
-                                        maximum: 1440;
-                                        value <=> root.refresh-minutes;
-                                        edited => { root.changed("modules.calendar.refresh_minutes"); }
-                                    }
-                                }
+                    Setting {
+                        nested: true;
+                        enabled: root.notifications-enabled;
+                        title: @tr("Show the sender and the message of notifications");
+                        Toggle {
+                            enabled: root.notifications-enabled;
+                            checked <=> root.notifications-content;
+                            toggled => { root.changed("modules.notifications.show_content"); }
+                        }
+                    }
 
-                                CheckBox {
-                                    text: @tr("Show all-day events");
-                                    checked <=> root.show-all-day;
-                                    toggled => { root.changed("modules.calendar.show_all_day"); }
-                                }
-                            }
+                    Setting {
+                        nested: true;
+                        enabled: root.notifications-enabled;
+                        title: @tr("Open the right place on click");
+                        description: @tr("The Discord channel, the browser tab… instead of just the app");
+                        Toggle {
+                            enabled: root.notifications-enabled;
+                            checked <=> root.notifications-original;
+                            toggled => { root.changed("modules.notifications.open_original"); }
                         }
                     }
                 }
             }
 
-            Tab {
-                title: "Claude Code";
-                VerticalBox {
-                    Row {
-                        label: root.hooks-installed ? @tr("Hooks installed ✓") : @tr("Hooks not installed");
+            Section {
+                title: @tr("System");
+
+                Card {
+                    Setting {
+                        title: @tr("Volume");
+                        description: @tr("Show volume changes in the island");
+                        Toggle {
+                            checked <=> root.volume-enabled;
+                            toggled => { root.changed("modules.volume.enabled"); }
+                        }
+                    }
+                }
+
+                Card {
+                    Setting {
+                        title: @tr("Brightness");
+                        description: @tr("Show brightness changes in the island (laptops)");
+                        Toggle {
+                            checked <=> root.brightness-enabled;
+                            toggled => { root.changed("modules.brightness.enabled"); }
+                        }
+                    }
+                }
+
+                Card {
+                    Setting {
+                        title: @tr("Battery");
+                        description: @tr("Show the charger and battery level in the island (laptops)");
+                        Toggle {
+                            checked <=> root.battery-enabled;
+                            toggled => { root.changed("modules.battery.enabled"); }
+                        }
+                    }
+                }
+
+                Card {
+                    Setting {
+                        title: "Bluetooth";
+                        description: @tr("Show Bluetooth devices connecting, with their battery level");
+                        Toggle {
+                            checked <=> root.bluetooth-enabled;
+                            toggled => { root.changed("modules.bluetooth.enabled"); }
+                        }
+                    }
+                }
+            }
+
+            Section {
+                title: @tr("Calls and screen sharing");
+
+                Card {
+                    Setting {
+                        title: @tr("Presentation mode");
+                        description: @tr("Stay quiet during calls and screen sharing");
+                        Toggle {
+                            checked <=> root.presentation-enabled;
+                            toggled => { root.changed("modules.presentation.enabled"); }
+                        }
+                    }
+                }
+
+                Card {
+                    Setting {
+                        title: @tr("Hide from capture");
+                        description: @tr("Hide the island from screen sharing, recordings and screenshots");
+                        Toggle {
+                            checked <=> root.hide-from-capture;
+                            toggled => { root.changed("modules.presentation.hide_from_capture"); }
+                        }
+                    }
+                }
+            }
+        }
+
+        if root.page == 3: Page {
+            title: "Claude Code";
+
+            Section {
+                Card {
+                    Setting {
+                        title: @tr("Claude Code hooks");
+                        description: @tr("After installing, restart your Claude Code sessions: they only read their hooks at startup.");
+                        Badge {
+                            text: root.hooks-installed ? @tr("Installed") : @tr("Not installed");
+                            good: root.hooks-installed;
+                        }
                         Button {
                             text: root.hooks-installed ? @tr("Remove hooks") : @tr("Install hooks");
                             primary: !root.hooks-installed;
                             clicked => { root.toggle-hooks(); }
                         }
                     }
+                }
+            }
 
-                    Hint {
-                        text: @tr("After installing, restart your Claude Code sessions: they only read their hooks at startup.");
+            Section {
+                title: @tr("Permissions");
+
+                Card {
+                    Setting {
+                        title: @tr("Answer permission requests from the island");
+                        Toggle {
+                            checked <=> root.claude-permissions;
+                            toggled => { root.changed("modules.claude.permissions"); }
+                        }
                     }
 
-                    CheckBox {
-                        text: @tr("Recent conversations and usage (Claude Code)");
-                        checked <=> root.activity-enabled;
-                        toggled => { root.changed("modules.claude_activity.enabled"); }
-                    }
-
-                    Row {
-                        label: @tr("Estimated limit, millions of tokens (0 = no gauge)");
+                    Setting {
+                        nested: true;
+                        enabled: root.claude-permissions;
+                        title: @tr("Time to answer in the island (s)");
                         SpinBox {
+                            width: 110px;
+                            enabled: root.claude-permissions;
+                            minimum: 5;
+                            maximum: 280;
+                            value <=> root.claude-wait;
+                            edited => { root.changed("modules.claude.permission_wait_secs"); }
+                        }
+                    }
+                }
+
+                Card {
+                    Setting {
+                        title: @tr("Sound when Claude is waiting for you");
+                        description: @tr("A question, a plan or a permission");
+                        Toggle {
+                            checked <=> root.claude-sound;
+                            toggled => { root.changed("modules.claude.sound"); }
+                        }
+                    }
+                }
+            }
+
+            Section {
+                title: @tr("Usage");
+
+                Card {
+                    Setting {
+                        title: @tr("Recent conversations and usage (Claude Code)");
+                        description: @tr("Usage is an estimate from Claude Code only; your plan's window also counts claude.ai and the app.");
+                        Toggle {
+                            checked <=> root.activity-enabled;
+                            toggled => { root.changed("modules.claude_activity.enabled"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.activity-enabled;
+                        title: @tr("Estimated limit, millions of tokens (0 = no gauge)");
+                        SpinBox {
+                            width: 130px;
+                            enabled: root.activity-enabled;
                             minimum: 0;
                             maximum: 100000;
                             value <=> root.activity-limit-millions;
@@ -675,43 +1096,29 @@ export component SettingsWindow inherits Window {
                         }
                     }
 
-                    Row {
-                        label: @tr("Window reset time (optional)");
+                    Setting {
+                        nested: true;
+                        enabled: root.activity-enabled;
+                        title: @tr("Window reset time (optional)");
+                        description: @tr("Type the reset time that /usage shows (HH:MM) to align the countdown.");
                         LineEdit {
+                            width: 90px;
+                            enabled: root.activity-enabled;
                             text <=> root.activity-reset;
                             placeholder-text: "01:00";
                             edited => { root.changed("modules.claude_activity.reset_at"); }
                         }
                     }
+                }
+            }
 
-                    Hint {
-                        text: @tr("Usage is an estimate from Claude Code only; your plan's window also counts claude.ai and the app. Type the reset time that /usage shows (HH:MM) to align the countdown.");
-                    }
+            Section {
+                title: @tr("Troubleshooting");
 
-                    CheckBox {
-                        text: @tr("Answer permission requests from the island");
-                        checked <=> root.claude-permissions;
-                        toggled => { root.changed("modules.claude.permissions"); }
-                    }
-
-                    CheckBox {
-                        text: @tr("Sound when Claude is waiting for you (question, plan, permission)");
-                        checked <=> root.claude-sound;
-                        toggled => { root.changed("modules.claude.sound"); }
-                    }
-
-                    Row {
-                        label: @tr("Time to answer in the island (s)");
-                        SpinBox {
-                            minimum: 5;
-                            maximum: 280;
-                            value <=> root.claude-wait;
-                            edited => { root.changed("modules.claude.permission_wait_secs"); }
-                        }
-                    }
-
-                    HorizontalLayout {
-                        alignment: start;
+                Card {
+                    Setting {
+                        title: @tr("Diagnostic");
+                        description: @tr("Checks the whole chain, from the hooks to the island.");
                         Button {
                             text: root.doctor-running ? @tr("Running diagnostic…") : @tr("Run diagnostic");
                             enabled: !root.doctor-running;
@@ -719,74 +1126,353 @@ export component SettingsWindow inherits Window {
                         }
                     }
 
-                    if root.doctor-report != "": TextEdit {
-                        text: root.doctor-report;
-                        read-only: true;
-                        font-size: 11px;
-                        vertical-stretch: 1;
+                    if root.doctor-report != "": VerticalLayout {
+                        padding: 16px;
+                        padding-top: 0px;
+
+                        TextEdit {
+                            text: root.doctor-report;
+                            read-only: true;
+                            font-size: 11px;
+                            height: 260px;
+                        }
                     }
-                    // Sans rapport, l'espace libre reste en bas.
-                    if root.doctor-report == "": Rectangle {
-                        vertical-stretch: 1;
+                }
+            }
+        }
+
+        if root.page == 4: Page {
+            title: @tr("Calendar");
+
+            Section {
+                title: @tr("My calendars");
+
+                if root.sources.length == 0: Card {
+                    Setting {
+                        title: @tr("No calendar yet: add one below.");
+                    }
+                }
+
+                if root.sources.length > 0: Card {
+                    for source[i] in root.sources: Setting {
+                        divided: i > 0;
+                        title: source.name != "" ? source.name : @tr("(no name)");
+                        description: source.url;
+                        Button {
+                            text: @tr("Remove");
+                            clicked => { root.remove-source(i); }
+                        }
                     }
                 }
             }
 
-            Tab {
-                title: @tr("Music");
-                VerticalBox {
-                    alignment: start;
+            Section {
+                title: @tr("Add a calendar");
 
-                    CheckBox {
-                        text: @tr("Tint the island with the album art color");
-                        checked <=> root.media-accent;
-                        toggled => { root.changed("modules.media.accent_from_artwork"); }
+                Card {
+                    Setting {
+                        title: @tr("Service");
+                        description: root.provider-help;
+                        Button {
+                            text: @tr("Step-by-step guide");
+                            clicked => { root.open-guide(); }
+                        }
+                        ComboBox {
+                            width: 200px;
+                            model: root.providers;
+                            current-index <=> root.provider-index;
+                            selected => { root.provider-changed(self.current-index); }
+                        }
                     }
 
-                    if root.players.length > 0: Text {
-                        text: @tr("Players seen recently (tick to ignore)");
-                    }
-                    for player in root.players: CheckBox {
-                        text: player.name;
-                        checked: player.ignored;
-                        toggled => { root.player-toggled(player.token, self.checked); }
-                    }
-
-                    CheckBox {
-                        text: @tr("Audio visualizer (uses some CPU while the island is open and music plays)");
-                        checked <=> root.viz-enabled;
-                        toggled => { root.changed("modules.visualizer.enabled"); }
-                    }
-
-                    Row {
-                        label: @tr("Players to ignore");
+                    Setting {
+                        divided: true;
+                        title: @tr("Name (optional)");
                         LineEdit {
+                            width: 300px;
+                            text <=> root.new-name;
+                            placeholder-text: @tr("Work, School, Personal…");
+                        }
+                    }
+
+                    Setting {
+                        divided: true;
+                        title: root.provider-is-file ? @tr(".ics file") : root.provider-is-caldav ? @tr("Server address") : @tr("ICS link");
+                        if root.provider-is-file: Button {
+                            text: @tr("Browse…");
+                            clicked => { root.browse-file(); }
+                        }
+                        LineEdit {
+                            width: 300px;
+                            text <=> root.new-url;
+                            placeholder-text: root.provider-is-file ? "C:/Users/…/agenda.ics" : root.provider-is-caldav ? "https://caldav.icloud.com" : @tr("https://…  or  webcal://…");
+                        }
+                    }
+
+                    if root.provider-is-caldav: Setting {
+                        divided: true;
+                        title: @tr("Login");
+                        LineEdit {
+                            width: 300px;
+                            text <=> root.new-username;
+                            placeholder-text: "name@icloud.com";
+                        }
+                    }
+
+                    if root.provider-is-caldav: Setting {
+                        divided: true;
+                        title: @tr("App password");
+                        LineEdit {
+                            width: 300px;
+                            text <=> root.new-password;
+                            input-type: password;
+                        }
+                    }
+
+                    Setting {
+                        divided: true;
+                        title: root.test-status;
+                        title-color: root.test-ok ? Ui.ok : Ui.error;
+                        Button {
+                            text: root.testing ? @tr("Testing…") : @tr("Test");
+                            enabled: !root.testing && root.source-ready;
+                            clicked => { root.test-source(); }
+                        }
+                        Button {
+                            text: @tr("Add");
+                            primary: true;
+                            enabled: root.source-ready;
+                            clicked => { root.add-source(); }
+                        }
+                    }
+                }
+            }
+
+            Section {
+                title: @tr("Display");
+
+                Card {
+                    Setting {
+                        title: @tr("Reminder before start (min)");
+                        SpinBox {
+                            width: 110px;
+                            minimum: 0;
+                            maximum: 120;
+                            value <=> root.remind-minutes;
+                            edited => { root.changed("modules.calendar.remind_minutes"); }
+                        }
+                    }
+
+                    Setting {
+                        divided: true;
+                        title: @tr("Time span shown (hours)");
+                        SpinBox {
+                            width: 110px;
+                            minimum: 1;
+                            maximum: 168;
+                            value <=> root.lookahead-hours;
+                            edited => { root.changed("modules.calendar.lookahead_hours"); }
+                        }
+                    }
+
+                    Setting {
+                        divided: true;
+                        title: @tr("Refresh every (min)");
+                        SpinBox {
+                            width: 110px;
+                            minimum: 2;
+                            maximum: 1440;
+                            value <=> root.refresh-minutes;
+                            edited => { root.changed("modules.calendar.refresh_minutes"); }
+                        }
+                    }
+
+                    Setting {
+                        divided: true;
+                        title: @tr("Show all-day events");
+                        Toggle {
+                            checked <=> root.show-all-day;
+                            toggled => { root.changed("modules.calendar.show_all_day"); }
+                        }
+                    }
+                }
+            }
+        }
+
+        if root.page == 5: Page {
+            title: @tr("Music");
+
+            Section {
+                Card {
+                    Setting {
+                        title: @tr("Tint the island with the album art color");
+                        Toggle {
+                            checked <=> root.media-accent;
+                            toggled => { root.changed("modules.media.accent_from_artwork"); }
+                        }
+                    }
+                }
+
+                Card {
+                    Setting {
+                        title: @tr("Audio visualizer");
+                        description: @tr("Uses some CPU while the island is open and music plays");
+                        Toggle {
+                            checked <=> root.viz-enabled;
+                            toggled => { root.changed("modules.visualizer.enabled"); }
+                        }
+                    }
+                }
+            }
+
+            Section {
+                title: @tr("Players");
+
+                if root.players.length > 0: Card {
+                    for player[i] in root.players: Setting {
+                        divided: i > 0;
+                        min-height: 48px;
+                        title: player.name;
+                        // Allumé = affiché dans l'île ; éteint = ignoré.
+                        Toggle {
+                            checked: !player.ignored;
+                            toggled => { root.player-toggled(player.token, !self.checked); }
+                        }
+                    }
+                }
+
+                Card {
+                    Setting {
+                        title: @tr("Players to ignore");
+                        description: @tr("Separate names with commas; part of the name is enough. Spotify, Apple Music, browsers, VLC… are detected automatically.");
+                        LineEdit {
+                            width: 220px;
                             text <=> root.media-ignore;
                             placeholder-text: "msedge, chrome";
                             edited => { root.changed("modules.media.ignore"); }
                         }
                     }
+                }
 
-                    Hint {
-                        text: @tr("Separate names with commas; part of the name is enough. Spotify, Apple Music, browsers, VLC… are detected automatically.");
-                    }
+                if root.players.length > 0: Hint {
+                    text: @tr("Players seen recently: turn one off to ignore it.");
                 }
             }
+        }
 
-            Tab {
-                title: @tr("Shelf");
-                VerticalBox {
-                    alignment: start;
+        if root.page == 6: Page {
+            title: @tr("Weather");
 
-                    CheckBox {
-                        text: @tr("Keep files dropped on the island");
-                        checked <=> root.shelf-enabled;
-                        toggled => { root.changed("modules.shelf.enabled"); }
+            Section {
+                Card {
+                    Setting {
+                        title: @tr("Show the weather");
+                        description: @tr("Next to the date in the open island. Hover the temperature to see the forecast of the day.");
+                        Toggle {
+                            checked <=> root.weather-enabled;
+                            toggled => { root.changed("modules.weather.enabled"); }
+                        }
                     }
 
-                    Row {
-                        label: @tr("Files kept (max)");
+                    Setting {
+                        nested: true;
+                        enabled: root.weather-enabled;
+                        title: @tr("City");
+                        LineEdit {
+                            width: 200px;
+                            enabled: root.weather-enabled;
+                            text <=> root.weather-city;
+                            placeholder-text: "Lyon";
+                            edited => { root.changed("modules.weather.city"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.weather-enabled;
+                        title: @tr("Unit");
+                        ComboBox {
+                            width: 100px;
+                            enabled: root.weather-enabled;
+                            model: ["°C", "°F"];
+                            current-index <=> root.weather-units-index;
+                            selected => { root.changed("modules.weather.units"); }
+                        }
+                    }
+                }
+
+                Hint {
+                    text: @tr("Data from open-meteo.com, free and without an account; only the city name and its coordinates are sent.");
+                }
+            }
+        }
+
+        if root.page == 7: Page {
+            title: @tr("Timer");
+
+            Section {
+                Card {
+                    Setting {
+                        title: @tr("Show the timer in the open island");
+                        Toggle {
+                            checked <=> root.timer-enabled;
+                            toggled => { root.changed("modules.timer.enabled"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.timer-enabled;
+                        title: @tr("Play a sound when it ends");
+                        Toggle {
+                            enabled: root.timer-enabled;
+                            checked <=> root.timer-sound;
+                            toggled => { root.changed("modules.timer.sound"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.timer-enabled;
+                        title: @tr("Durations (minutes)");
+                        description: @tr("Up to 5 durations, separated by commas (1 to 600). 25 is the classic Pomodoro.");
+                        LineEdit {
+                            width: 160px;
+                            enabled: root.timer-enabled;
+                            text <=> root.timer-presets;
+                            placeholder-text: "5, 15, 25";
+                            edited => { root.changed("modules.timer.presets"); }
+                        }
+                    }
+                }
+
+                Hint {
+                    text: @tr("Open the island and pick a duration to start.");
+                }
+            }
+        }
+
+        if root.page == 8: Page {
+            title: @tr("Shelf");
+
+            Section {
+                Card {
+                    Setting {
+                        title: @tr("Keep files dropped on the island");
+                        description: @tr("Drag files onto the island to keep them at hand; click one to open it, × to remove it. Only the path is kept, never a copy.");
+                        Toggle {
+                            checked <=> root.shelf-enabled;
+                            toggled => { root.changed("modules.shelf.enabled"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.shelf-enabled;
+                        title: @tr("Files kept (max)");
                         SpinBox {
+                            width: 110px;
+                            enabled: root.shelf-enabled;
                             minimum: 1;
                             maximum: 30;
                             value <=> root.shelf-max;
@@ -794,144 +1480,68 @@ export component SettingsWindow inherits Window {
                         }
                     }
 
-                    HorizontalLayout {
-                        alignment: start;
+                    Setting {
+                        nested: true;
+                        enabled: root.shelf-enabled;
+                        title: @tr("Empty the shelf");
                         Button {
-                            text: @tr("Empty the shelf");
+                            text: @tr("Empty");
+                            enabled: root.shelf-enabled;
                             clicked => { root.shelf-clear(); }
                         }
-                    }
-
-                    Hint {
-                        text: @tr("Drag files onto the island to keep them at hand; click one to open it, × to remove it. Only the path is kept, never a copy.");
-                    }
-                }
-            }
-
-            Tab {
-                title: @tr("Timer");
-                VerticalBox {
-                    alignment: start;
-
-                    CheckBox {
-                        text: @tr("Show the timer in the open island");
-                        checked <=> root.timer-enabled;
-                        toggled => { root.changed("modules.timer.enabled"); }
-                    }
-
-                    CheckBox {
-                        text: @tr("Play a sound when it ends");
-                        checked <=> root.timer-sound;
-                        toggled => { root.changed("modules.timer.sound"); }
-                    }
-
-                    Row {
-                        label: @tr("Durations (minutes)");
-                        LineEdit {
-                            text <=> root.timer-presets;
-                            placeholder-text: "5, 15, 25";
-                            edited => { root.changed("modules.timer.presets"); }
-                        }
-                    }
-
-                    Hint {
-                        text: @tr("Up to 5 durations, separated by commas (1 to 600). Open the island and pick one to start; 25 is the classic Pomodoro.");
-                    }
-                }
-            }
-
-            Tab {
-                title: @tr("Mascot");
-                VerticalBox {
-                    alignment: start;
-
-                    CheckBox {
-                        text: @tr("Show the mascot in the island");
-                        checked <=> root.mascot-enabled;
-                        toggled => { root.changed("modules.mascot.enabled"); }
-                    }
-
-                    CheckBox {
-                        text: @tr("Always animated (breathes and blinks, uses a little CPU)");
-                        enabled: root.mascot-enabled;
-                        checked <=> root.mascot-always-animated;
-                        toggled => { root.changed("modules.mascot.always_animated"); }
-                    }
-
-                    CheckBox {
-                        text: @tr("Dance to the music");
-                        enabled: root.mascot-enabled;
-                        checked <=> root.mascot-music;
-                        toggled => { root.changed("modules.mascot.music"); }
-                    }
-
-                    CheckBox {
-                        text: @tr("Seasonal decorations (Halloween, Christmas, New Year)");
-                        checked <=> root.mascot-seasonal;
-                        toggled => { root.changed("modules.mascot.seasonal"); }
-                    }
-
-                    Hint {
-                        text: @tr("The mascot reacts to Claude Code (working, waiting for you, done), dances to the music, falls asleep when you are away and gets sleepy in the evening. By default it only moves when something happens, so the island uses no CPU at rest.");
-                    }
-                }
-            }
-
-            Tab {
-                title: @tr("Weather");
-                VerticalBox {
-                    alignment: start;
-
-                    CheckBox {
-                        text: @tr("Show the weather next to the date in the open island");
-                        checked <=> root.weather-enabled;
-                        toggled => { root.changed("modules.weather.enabled"); }
-                    }
-
-                    Row {
-                        label: @tr("City");
-                        LineEdit {
-                            text <=> root.weather-city;
-                            placeholder-text: "Lyon";
-                            edited => { root.changed("modules.weather.city"); }
-                        }
-                    }
-
-                    Row {
-                        label: @tr("Unit");
-                        ComboBox {
-                            model: ["°C", "°F"];
-                            current-index <=> root.weather-units-index;
-                            selected => { root.changed("modules.weather.units"); }
-                        }
-                    }
-
-                    Hint {
-                        text: @tr("Data from open-meteo.com, free and without an account; only the city name and its coordinates are sent. Hover the temperature to see the forecast of the day.");
                     }
                 }
             }
         }
 
-        HorizontalLayout {
-            spacing: 8px;
+        if root.page == 9: Page {
+            title: @tr("Mascot");
 
-            Text {
-                text: root.status;
-                color: root.status-error ? #FF453A : #30D158;
-                overflow: elide;
-                horizontal-stretch: 1;
-                vertical-alignment: center;
-            }
+            Section {
+                Card {
+                    Setting {
+                        title: @tr("Show the mascot in the island");
+                        description: @tr("It reacts to Claude Code, dances to the music, falls asleep when you are away and gets sleepy in the evening.");
+                        Toggle {
+                            checked <=> root.mascot-enabled;
+                            toggled => { root.changed("modules.mascot.enabled"); }
+                        }
+                    }
 
-            Button {
-                text: @tr("Documentation");
-                clicked => { root.open-docs(); }
-            }
+                    Setting {
+                        nested: true;
+                        enabled: root.mascot-enabled;
+                        title: @tr("Always animated");
+                        description: @tr("Breathes and blinks, uses a little CPU. Otherwise it only moves when something happens.");
+                        Toggle {
+                            enabled: root.mascot-enabled;
+                            checked <=> root.mascot-always-animated;
+                            toggled => { root.changed("modules.mascot.always_animated"); }
+                        }
+                    }
 
-            Button {
-                text: @tr("Open config.toml");
-                clicked => { root.open-config-file(); }
+                    Setting {
+                        nested: true;
+                        enabled: root.mascot-enabled;
+                        title: @tr("Dance to the music");
+                        Toggle {
+                            enabled: root.mascot-enabled;
+                            checked <=> root.mascot-music;
+                            toggled => { root.changed("modules.mascot.music"); }
+                        }
+                    }
+                }
+
+                Card {
+                    Setting {
+                        title: @tr("Seasonal decorations");
+                        description: @tr("Halloween, Christmas, New Year");
+                        Toggle {
+                            checked <=> root.mascot-seasonal;
+                            toggled => { root.changed("modules.mascot.seasonal"); }
+                        }
+                    }
+                }
             }
         }
     }

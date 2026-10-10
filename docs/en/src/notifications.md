@@ -45,8 +45,8 @@ place" in the settings. Windows 11 only; on Windows 10, the click opens the app.
 
 ## Settings
 
-On by default. Settings › **General** › "Show app notifications in the island",
-or in `config.toml`:
+On by default. Settings › **Notifications** › "App notifications", or in
+`config.toml`:
 
 ```toml
 [modules.notifications]

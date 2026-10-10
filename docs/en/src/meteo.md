@@ -7,8 +7,8 @@ makes room for the day's details, for example "Lyon · Partly cloudy · 9° /
 
 Off by default: it needs a city.
 
-Settings › **Weather**: tick "Show the weather next to the date in the open
-island", type your city and pick the unit. Or in `config.toml`:
+Settings › **Weather**: turn on "Show the weather", type your city and pick
+the unit. Or in `config.toml`:
 
 ```toml
 [modules.weather]

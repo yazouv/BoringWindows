@@ -73,8 +73,9 @@ avec une barre de taille normale, rien ne change.
 
 ## Modifier la configuration
 
-Le plus simple : clic droit sur l'icône › **Réglages…**. Une fenêtre à onglets
-(Général, Apparence, Agenda, Claude Code, Musique) modifie les réglages
+Le plus simple : clic droit sur l'icône › **Réglages…**. Une page par sujet,
+choisie dans la colonne de gauche (Général, Apparence, Notifications, Claude
+Code, Agenda, Musique…), modifie les réglages
 courants ; **chaque changement est enregistré et appliqué tout de suite**, pas
 de bouton « Valider ». C'est aussi là qu'on ajoute un calendrier (assistant par
 service, bouton **Tester**), qu'on installe les hooks Claude Code et qu'on
