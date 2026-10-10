@@ -240,6 +240,8 @@ component Mascot inherits Rectangle {
     in property <color> body-color: white;
     in property <color> eye-color: black;
     in property <color> accent: #ff8a3d;
+    // Accessoire (en grand) : sprout | glasses | headphones | bow | none.
+    in property <string> accessory: "sprout";
     width: 26px;
     height: self.width * 24 / 26;
 
@@ -257,40 +259,80 @@ component Mascot inherits Rectangle {
 
     property <bool> calm: root.mood == "idle" || root.mood == "morning" || root.mood == "evening";
     property <bool> blink: root.animated && (root.calm || root.big) && Math.mod(root.t, 3.7) < 0.14;
+    // Regard vers le curseur (grande mascotte) : écart depuis son centre.
+    in property <bool> gazing;
+    in property <length> gaze-x;
+    in property <length> gaze-y;
+    property <float> gx: root.gazing && root.big ? clamp(root.gaze-x / 45px, -1, 1) * 1.4 : 0;
+    property <float> gy: root.gazing && root.big ? clamp(root.gaze-y / 45px, -1, 1) * 0.9 : 0;
+    animate gx, gy { duration: 140ms; easing: ease-out; }
+
+    // Interactions (en grand) : un clic l'écrase comme de la gelée et la fait
+    // rire ; des caresses font sortir des cœurs. Mesuré sur `t`, qui avance
+    // tant que l'île est ouverte.
+    property <float> poke-at: -10;
+    property <float> pet-at: -10;
+    property <bool> giggling: root.t - root.poke-at < 1.1;
+    property <bool> loved: root.t - root.pet-at < 2;
+    // Expression du visage : l'humeur, sauf pendant un rire ou des caresses.
+    property <string> face: root.giggling || root.loved ? "happy" : root.mood;
+    property <bool> squeezed;
+    property <float> squish: root.squeezed ? 1 : 0;
+    animate squish {
+        duration: root.squeezed ? 90ms : 700ms;
+        easing: root.squeezed ? ease-out : spring(0.6);
+    }
+    squeeze-timer := Timer {
+        interval: 110ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.squeezed = false;
+        }
+    }
+    public function poke() {
+        root.poke-at = root.t;
+        root.squeezed = true;
+        squeeze-timer.running = true;
+    }
+    public function pet() {
+        root.pet-at = root.t;
+    }
+
     // Basses lissées : la mascotte danse au lieu de trembler.
     property <float> beat: root.level;
     animate beat { duration: 140ms; easing: ease-out; }
     // Rebond des sauts (0 au sol, 1 en haut).
-    property <float> bounce: root.mood == "wait" ? Math.abs(Math.sin(root.t * 2 * 360deg))
-        : root.mood == "happy" ? Math.abs(Math.sin(root.t * 1.2 * 360deg)) : 0;
+    property <float> bounce: root.face == "wait" ? Math.abs(Math.sin(root.t * 2 * 360deg))
+        : root.face == "happy" ? Math.abs(Math.sin(root.t * 1.2 * 360deg)) : 0;
     // Décalages en unités (négatif : vers le haut).
     property <float> hop: !root.animated ? 0
-        : root.mood == "wait" ? -root.bounce * 3
-        : root.mood == "happy" ? -root.bounce * 2.5
-        : root.mood == "work" ? Math.sin(root.t * 1.6 * 360deg)
-        : root.mood == "music" ? -root.beat * (root.big ? 2.5 : 4)
+        : root.face == "wait" ? -root.bounce * 3
+        : root.face == "happy" ? -root.bounce * 2.5
+        : root.face == "work" ? Math.sin(root.t * 1.6 * 360deg)
+        : root.face == "music" ? -root.beat * (root.big ? 2.5 : 4)
         : 0;
     // Respiration lente (plus ample quand elle dort, en grand).
     property <float> breath: !root.animated ? 0
         : root.calm ? Math.sin(root.t * 0.25 * 360deg) * 0.7
-        : root.big && root.mood == "sleep" ? Math.sin(root.t * 0.18 * 360deg) * 1.1 : 0;
+        : root.big && root.face == "sleep" ? Math.sin(root.t * 0.18 * 360deg) * 1.1 : 0;
     // Écrasée à l'atterrissage (en grand) : plus large, moins haute.
-    property <float> squash: root.big && root.animated && (root.mood == "wait" || root.mood == "happy")
+    property <float> squash: root.big && root.animated && (root.face == "wait" || root.face == "happy")
         ? Math.max(0, 1 - root.bounce * 4) * 1.6 : 0;
-    property <float> look: root.animated && root.mood == "work" ? Math.sin(root.t * 0.8 * 360deg) * 1.3 : 0;
-    property <string> eyes: root.blink || root.mood == "sleep" ? "closed"
-        : root.mood == "happy" || root.mood == "music" || root.mood == "morning" ? "happy"
-        : root.mood == "evening" ? "half"
-        : root.mood == "wait" ? "big" : "open";
+    property <float> look: root.animated && root.face == "work" ? Math.sin(root.t * 0.8 * 360deg) * 1.3 : 0;
+    property <string> eyes: root.blink || root.face == "sleep" ? "closed"
+        : root.face == "happy" || root.face == "music" || root.face == "morning" ? "happy"
+        : root.face == "evening" ? "half"
+        : root.face == "wait" ? "big" : "open";
     property <color> tone: root.mood == "wait" ? root.accent : root.body-color;
     // Ombre du corps : sa couleur mêlée à celle des yeux (thèmes clairs et sombres).
     property <color> shade: root.tone.mix(root.eye-color, 0.8);
     property <bool> hat: root.season == "halloween" || root.season == "christmas" || root.season == "newyear";
     // Bras : levés de joie, en l'air quand Claude attend, qui tapent quand il travaille.
-    property <angle> arm: root.mood == "happy" || root.mood == "music" ? 135deg + Math.sin(root.t * 2.4 * 360deg) * 22deg
-        : root.mood == "wait" ? 150deg + Math.sin(root.t * 4 * 360deg) * 10deg
-        : root.mood == "work" ? 35deg + Math.sin(root.t * 5 * 360deg) * 12deg
-        : root.mood == "sleep" ? 8deg
+    property <angle> arm: root.face == "happy" || root.face == "music" ? 135deg + Math.sin(root.t * 2.4 * 360deg) * 22deg
+        : root.face == "wait" ? 150deg + Math.sin(root.t * 4 * 360deg) * 10deg
+        : root.face == "work" ? 35deg + Math.sin(root.t * 5 * 360deg) * 12deg
+        : root.face == "sleep" ? 8deg
         : 18deg + root.breath * 4deg;
 
     // Ombre au sol, plus petite quand elle saute.
@@ -326,9 +368,23 @@ component Mascot inherits Rectangle {
         transform-rotation: -root.arm;
     }
 
+    // Casque audio : l'arceau passe derrière la tête.
+    if root.big && root.accessory == "headphones": Path {
+        x: body.x - root.k * 1.2;
+        y: body.y - root.k * 3;
+        width: body.width + root.k * 2.4;
+        height: root.k * 8;
+        viewbox-width: 20;
+        viewbox-height: 10;
+        fill: transparent;
+        stroke: root.eye-color;
+        stroke-width: root.k * 1.3;
+        commands: "M1 10 C1 -1.5 19 -1.5 19 10";
+    }
+
     body := Rectangle {
-        width: root.k * (18 + root.squash);
-        height: root.k * (14 + root.breath - root.squash * 0.8);
+        width: root.k * (18 + root.squash + root.squish * 3.5);
+        height: root.k * (14 + root.breath - root.squash * 0.8 - root.squish * 3.5);
         x: (root.width - self.width) / 2;
         y: root.k * (23 + root.hop) - self.height;
         border-radius: root.k * 7;
@@ -345,7 +401,7 @@ component Mascot inherits Rectangle {
         }
 
         // Joues.
-        if root.big && root.mood != "work" && root.mood != "wait": Rectangle {
+        if root.big && root.face != "work" && root.face != "wait": Rectangle {
             x: root.k * 1.6;
             y: root.k * 7.4;
             width: root.k * 3.2;
@@ -354,7 +410,7 @@ component Mascot inherits Rectangle {
             background: root.accent.with-alpha(0.4);
         }
 
-        if root.big && root.mood != "work" && root.mood != "wait": Rectangle {
+        if root.big && root.face != "work" && root.face != "wait": Rectangle {
             x: parent.width - root.k * 4.8;
             y: root.k * 7.4;
             width: root.k * 3.2;
@@ -364,8 +420,8 @@ component Mascot inherits Rectangle {
         }
 
         MascotEye {
-            x: parent.width / 2 - root.k * (5.5 - root.look);
-            y: root.k * 3;
+            x: parent.width / 2 - root.k * (5.5 - root.look - root.gx);
+            y: root.k * (3 + root.gy);
             k: root.k;
             kind: root.eyes;
             ink: root.eye-color;
@@ -374,8 +430,8 @@ component Mascot inherits Rectangle {
         }
 
         MascotEye {
-            x: parent.width / 2 + root.k * (1.5 + root.look);
-            y: root.k * 3;
+            x: parent.width / 2 + root.k * (1.5 + root.look + root.gx);
+            y: root.k * (3 + root.gy);
             k: root.k;
             kind: root.eyes;
             ink: root.eye-color;
@@ -383,29 +439,51 @@ component Mascot inherits Rectangle {
             shine-color: root.tone;
         }
 
-        // Sourcils : froncés au travail, levés quand Claude attend.
-        if root.big && (root.mood == "work" || root.mood == "wait"): Rectangle {
-            x: parent.width / 2 - root.k * (5.8 - root.look);
-            y: root.k * (root.mood == "wait" ? 0.6 : 1.5);
-            width: root.k * 3.2;
-            height: root.k * 0.8;
-            border-radius: self.height / 2;
-            background: root.eye-color;
-            transform-rotation: root.mood == "wait" ? -14deg : 14deg;
+        // Lunettes rondes (montures fixes : les yeux bougent derrière).
+        if root.big && root.accessory == "glasses": Rectangle {
+            for side in 2: Rectangle {
+                x: parent.width / 2 + root.k * (side == 0 ? -6.7 : 0.3);
+                y: root.k * 3;
+                width: root.k * 6.4;
+                height: self.width;
+                border-radius: self.width / 2;
+                border-width: root.k * 0.8;
+                border-color: root.eye-color;
+                background: root.eye-color.with-alpha(0.08);
+            }
+
+            Rectangle {
+                x: parent.width / 2 - root.k * 0.8;
+                y: root.k * 5.4;
+                width: root.k * 1.6;
+                height: root.k * 0.7;
+                background: root.eye-color;
+            }
         }
 
-        if root.big && (root.mood == "work" || root.mood == "wait"): Rectangle {
-            x: parent.width / 2 + root.k * (1.4 + root.look);
-            y: root.k * (root.mood == "wait" ? 0.6 : 1.5);
+        // Sourcils : froncés au travail, levés quand Claude attend.
+        if root.big && (root.face == "work" || root.face == "wait"): Rectangle {
+            x: parent.width / 2 - root.k * (5.8 - root.look);
+            y: root.k * (root.face == "wait" ? 0.6 : 1.5);
             width: root.k * 3.2;
             height: root.k * 0.8;
             border-radius: self.height / 2;
             background: root.eye-color;
-            transform-rotation: root.mood == "wait" ? 14deg : -14deg;
+            transform-rotation: root.face == "wait" ? -14deg : 14deg;
+        }
+
+        if root.big && (root.face == "work" || root.face == "wait"): Rectangle {
+            x: parent.width / 2 + root.k * (1.4 + root.look);
+            y: root.k * (root.face == "wait" ? 0.6 : 1.5);
+            width: root.k * 3.2;
+            height: root.k * 0.8;
+            border-radius: self.height / 2;
+            background: root.eye-color;
+            transform-rotation: root.face == "wait" ? 14deg : -14deg;
         }
 
         // Bouche. Petite : un sourire quand Claude a fini ou que la musique joue.
-        if !root.big && (root.mood == "happy" || root.mood == "music"): Path {
+        if !root.big && (root.face == "happy" || root.face == "music"): Path {
             x: root.k * 7;
             y: root.k * 9.5;
             width: root.k * 4;
@@ -419,7 +497,7 @@ component Mascot inherits Rectangle {
         }
 
         // Grande : bouche ouverte avec la langue, de joie.
-        if root.big && (root.mood == "happy" || root.mood == "music"): Rectangle {
+        if root.big && (root.face == "happy" || root.face == "music"): Rectangle {
             x: (parent.width - self.width) / 2;
             y: root.k * 8.6;
             width: root.k * 4.6;
@@ -443,11 +521,11 @@ component Mascot inherits Rectangle {
         }
 
         // Grande, au calme : un sourire.
-        if root.big && root.calm: Path {
+        if root.big && root.calm && root.face == root.mood: Path {
             x: (parent.width - self.width) / 2;
             y: root.k * 9.2;
-            width: root.k * (root.mood == "evening" ? 3 : 4);
-            height: root.k * (root.mood == "evening" ? 1.2 : 1.9);
+            width: root.k * (root.face == "evening" ? 3 : 4);
+            height: root.k * (root.face == "evening" ? 1.2 : 1.9);
             viewbox-width: 4;
             viewbox-height: 2;
             fill: transparent;
@@ -457,7 +535,7 @@ component Mascot inherits Rectangle {
         }
 
         // Concentrée : bouche plate et bout de langue qui dépasse.
-        if root.big && root.mood == "work": Rectangle {
+        if root.big && root.face == "work": Rectangle {
             x: parent.width / 2 - root.k * 1.6;
             y: root.k * 9.6;
             width: root.k * 2.8;
@@ -476,7 +554,7 @@ component Mascot inherits Rectangle {
         }
 
         // Claude attend : bouche en « o ».
-        if root.big && root.mood == "wait": Rectangle {
+        if root.big && root.face == "wait": Rectangle {
             x: (parent.width - self.width) / 2;
             y: root.k * 8.6;
             width: root.k * 2.2;
@@ -487,7 +565,7 @@ component Mascot inherits Rectangle {
         }
 
         // Endormie : petite bouche ronde.
-        if root.big && root.mood == "sleep": Rectangle {
+        if root.big && root.face == "sleep": Rectangle {
             x: (parent.width - self.width) / 2;
             y: root.k * 9.4;
             width: root.k * 1.5;
@@ -502,7 +580,7 @@ component Mascot inherits Rectangle {
         width: root.k * 4.6;
         height: root.k * 2.4;
         x: body.x + root.k * 2.4;
-        y: body.y + body.height - root.k * (1.6 + (root.mood == "work" && root.animated ? Math.max(0, Math.sin(root.t * 3 * 360deg)) * 0.9 : 0));
+        y: body.y + body.height - root.k * (1.6 + (root.face == "work" && root.animated ? Math.max(0, Math.sin(root.t * 3 * 360deg)) * 0.9 : 0));
         border-radius: self.height / 2;
         background: root.shade;
     }
@@ -511,13 +589,13 @@ component Mascot inherits Rectangle {
         width: root.k * 4.6;
         height: root.k * 2.4;
         x: body.x + body.width - self.width - root.k * 2.4;
-        y: body.y + body.height - root.k * (1.6 + (root.mood == "work" && root.animated ? Math.max(0, -Math.sin(root.t * 3 * 360deg)) * 0.9 : 0));
+        y: body.y + body.height - root.k * (1.6 + (root.face == "work" && root.animated ? Math.max(0, -Math.sin(root.t * 3 * 360deg)) * 0.9 : 0));
         border-radius: self.height / 2;
         background: root.shade;
     }
 
     // Pousse sur la tête, qui se balance (sauf sous un chapeau de saison).
-    if root.big && !root.hat: Path {
+    if root.big && !root.hat && root.accessory == "sprout": Path {
         width: root.k * 7;
         height: root.k * 6;
         x: body.x + (body.width - self.width) / 2;
@@ -526,8 +604,48 @@ component Mascot inherits Rectangle {
         viewbox-height: 6;
         fill: root.accent;
         transform-origin: { x: self.width / 2, y: self.height };
-        transform-rotation: root.animated ? Math.sin(root.t * 0.6 * 360deg) * 9deg + root.hop * 3deg : 0deg;
+        transform-rotation: root.animated ? Math.sin(root.t * 0.6 * 360deg) * 9deg + root.hop * 3deg + root.gx * 6deg : 0deg;
         commands: "M3.15 6 L3.15 3.3 L3.85 3.3 L3.85 6 Z M3.5 3.5 C2.6 1.2 0.8 0.7 0 1.3 C0.6 3.3 2.2 3.9 3.5 3.5 Z M3.5 3.5 C4.4 1.2 6.2 0.7 7 1.3 C6.4 3.3 4.8 3.9 3.5 3.5 Z";
+    }
+
+    // Écouteurs du casque, de chaque côté de la tête.
+    if root.big && root.accessory == "headphones": Rectangle {
+        for side in 2: Rectangle {
+            x: side == 0 ? body.x - root.k * 2 : body.x + body.width - root.k * 1.4;
+            y: body.y + root.k * 3.2;
+            width: root.k * 3.4;
+            height: root.k * 6;
+            border-radius: root.k * 1.6;
+            background: root.accent;
+            border-width: root.k * 0.6;
+            border-color: root.eye-color;
+        }
+    }
+
+    // Nœud sur le côté de la tête (sauf sous un chapeau de saison).
+    if root.big && !root.hat && root.accessory == "bow": Rectangle {
+        x: body.x + body.width - root.k * 8.5;
+        y: body.y - root.k * 2.2;
+        width: root.k * 9;
+        height: root.k * 4.6;
+        transform-origin: { x: self.width / 2, y: self.height / 2 };
+        transform-rotation: 14deg + root.gx * 4deg;
+
+        Path {
+            viewbox-width: 9;
+            viewbox-height: 4.6;
+            fill: root.accent;
+            commands: "M4.5 2.3 L0 0 L0.4 4.6 Z M4.5 2.3 L9 0 L8.6 4.6 Z";
+        }
+
+        Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: root.k * 2;
+            height: self.width;
+            border-radius: self.width / 2;
+            background: root.accent.darker(0.25);
+        }
     }
 
     // Chapeaux de saison.
@@ -642,6 +760,18 @@ component Mascot inherits Rectangle {
             color: root.body-color.with-alpha(0.75 * Math.sin(self.p * 180deg));
             font-size: root.k * (4 + self.p * 3);
             font-weight: 800;
+        }
+    }
+
+    // Caresses : des cœurs qui s'envolent.
+    if root.loved && root.big: Rectangle {
+        for i in 3: Text {
+            property <float> p: Math.min(1, (root.t - root.pet-at) * 0.7 + i * 0.12);
+            x: body.x + body.width / 2 + root.k * ((i - 1) * 5 + Math.sin((root.t - root.pet-at) * 2 * 360deg + i * 120deg) * 1.5) - self.width / 2;
+            y: body.y - root.k * (1 + self.p * 10);
+            text: "♥";
+            color: root.accent.with-alpha(Math.sin(self.p * 180deg));
+            font-size: root.k * (4 + self.p * 2.5);
         }
     }
 
@@ -940,9 +1070,9 @@ component UsageRing inherits Rectangle {
     height: 60px;
     border-radius: self.width / 2;
 
-    property <bool> grown;
-    init => { self.grown = true; }
-    property <float> fill: self.grown ? clamp(root.ratio, 0, 1) : 0;
+    // Vrai quand la jauge est à l'écran : elle se remplit à ce moment-là.
+    in property <bool> active;
+    property <float> fill: root.active ? clamp(root.ratio, 0, 1) : 0;
     animate fill { duration: 700ms; delay: 120ms; easing: ease-out-quint; }
     property <angle> end: root.fill * 360deg;
     background: @conic-gradient(root.ink 0deg, root.ink root.end, root.track root.end, root.track 360deg);
@@ -1057,6 +1187,10 @@ export component Island inherits Window {
     // Onglet Claude : consommation estimée et conversations récentes.
     in property <bool> has-claude-tab;
     in-out property <int> tab;
+    // Place de l'onglet choisi dans le contrôle segmenté (Accueil, Notifs,
+    // Claude), et celle de l'onglet Claude (deuxième sans onglet Notifs).
+    property <int> claude-slot: root.has-notif-tab ? 2 : 1;
+    property <int> tab-slot: root.tab == 0 ? 0 : root.tab == 2 ? 1 : root.claude-slot;
     in property <[RecentRow]> recent-rows;
     in property <string> usage-text;
     // Carte de consommation : fenêtre en cours, jetons utilisés, limite et
@@ -1112,6 +1246,11 @@ export component Island inherits Window {
     in property <string> mascot-place;
     // En grand dans l'île ouverte (onglet Accueil).
     in property <bool> mascot-enabled;
+    // Personnalisation : accessoire (en grand) et couleur du corps (sinon `fg`).
+    in property <string> mascot-accessory: "sprout";
+    in property <bool> mascot-custom-color;
+    in property <color> mascot-color;
+    property <color> mascot-body: root.mascot-custom-color ? root.mascot-color : root.fg;
     in property <string> mascot-mood: "idle";
     in property <bool> mascot-animated;
     in property <float> mascot-level;
@@ -1170,6 +1309,23 @@ export component Island inherits Window {
     // du ressort (mêmes valeurs que `OVERSHOOT_X/Y` dans geometry.rs).
     property <length> overshoot-x: 14px;
     property <length> overshoot-y: 12px;
+
+    // Bulle détachée (`bubble` : "" | claude | music) : la deuxième activité en
+    // cours sort de la pilule par sa droite, avec un pont « liquide » qui
+    // s'étire puis cède, et y rentre de même.
+    in property <string> bubble;
+    property <bool> bubble-on: root.bubble != "" && !root.expanded && !root.has-notif;
+    property <float> bubble-out: root.bubble-on ? 1 : 0;
+    animate bubble-out { duration: root.anim * 2.4; easing: spring(0.3); }
+    // Ce qu'elle montre, gardé pendant qu'elle rentre.
+    property <string> bubble-kind;
+    changed bubble => {
+        if self.bubble != "" {
+            self.bubble-kind = self.bubble;
+        }
+    }
+    // Mêmes valeurs que `BUBBLE_GAP` dans geometry.rs.
+    property <length> bubble-gap: 6px;
     // Notifications des applications : celle annoncée, les dernières (onglet),
     // et les couleurs des non lues (points de la pilule au repos).
     in property <bool> has-notif;
@@ -1193,6 +1349,30 @@ export component Island inherits Window {
     // Animation d'arrivée : `popped` repasse à faux un instant à chaque
     // nouvelle notification, puis revient à vrai, ce qui rejoue les transitions.
     property <bool> popped: true;
+
+    // Changement de morceau : pochette précédente, sens (« précédent » : elle
+    // sort à droite) et compteur. `swapped` repasse à faux un instant à chaque
+    // nouveau morceau, ce qui rejoue le carrousel.
+    in property <image> prev-art;
+    in property <bool> prev-has-art;
+    in property <bool> track-back;
+    in property <int> track-seq;
+    property <bool> swapped: true;
+    changed track-seq => {
+        self.swapped = false;
+        swap-timer.running = true;
+    }
+    swap-timer := Timer {
+        interval: 30ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.swapped = true;
+        }
+    }
+    // Teinte de la musique : passe en fondu d'une pochette à l'autre.
+    property <color> media-tint: root.accent;
+    animate media-tint { duration: 700ms; }
     changed notif-seq => {
         self.popped = false;
         pop-timer.running = true;
@@ -1254,7 +1434,7 @@ export component Island inherits Window {
 
         // Le contenu est dans la zone de survol : les boutons reçoivent leurs
         // clics sans faire perdre le survol à l'île.
-        TouchArea {
+        island-ta := TouchArea {
             changed has-hover => {
                 root.hover-changed(self.has-hover);
             }
@@ -1319,7 +1499,7 @@ export component Island inherits Window {
                 opacity: root.expanded && !root.custom-view && root.tab == 0 && root.has-media && !root.has-prompt ? 1 : 0;
                 visible: self.opacity > 0;
                 animate opacity { duration: root.anim * 2; }
-                background: @linear-gradient(160deg, root.accent.with-alpha(0.34) 0%, root.accent.with-alpha(0.1) 45%, transparent 75%);
+                background: @linear-gradient(160deg, root.media-tint.with-alpha(0.34) 0%, root.media-tint.with-alpha(0.1) 45%, transparent 75%);
             }
 
             // Nouvelle notification : la couleur de l'application monte du bas.
@@ -1477,7 +1657,7 @@ export component Island inherits Window {
                 season: root.season;
                 animated: root.mascot-animated && !root.expanded;
                 level: root.mascot-level;
-                body-color: root.fg;
+                body-color: root.mascot-body;
                 eye-color: root.bg.with-alpha(1);
                 accent: root.accent;
                 opacity: !root.expanded && !root.has-notif ? 1 : 0;
@@ -1522,7 +1702,7 @@ export component Island inherits Window {
                     season: root.season;
                     animated: root.mascot-animated && !root.expanded;
                     level: root.mascot-level;
-                    body-color: root.fg;
+                    body-color: root.mascot-body;
                     eye-color: root.bg.with-alpha(1);
                     accent: root.accent;
                 }
@@ -1730,7 +1910,7 @@ export component Island inherits Window {
 
                     // Contrôle segmenté : un indicateur glisse sous l'onglet choisi.
                     if root.has-notif-tab || root.has-claude-tab: Rectangle {
-                        property <int> slot: root.tab == 0 ? 0 : root.tab == 2 ? 1 : root.has-notif-tab ? 2 : 1;
+                        property <int> slot: root.tab-slot;
                         width: tabs.preferred-width;
                         height: 24px;
                         y: (parent.height - self.height) / 2;
@@ -1790,923 +1970,1009 @@ export component Island inherits Window {
                     }
                 }
 
-                // Accueil : musique, Claude, minuteur, étagère, agenda…
-                if root.tab == 0: HorizontalLayout {
-                    spacing: 14px;
+                // Onglets côte à côte, dans l'ordre du contrôle segmenté (Accueil,
+                // Notifs, Claude) : changer d'onglet les fait glisser, avec un ressort.
+                Rectangle {
                     vertical-stretch: 1;
+                    clip: true;
+                    property <float> pos: root.tab-slot;
+                    animate pos { duration: root.anim * 1.6; easing: spring(0.2); }
+                    property <length> step: self.width + 24px;
 
-                    // La mascotte en grand, qui arrive avec un rebond à l'ouverture.
-                    if root.mascot-enabled: Rectangle {
-                        width: 62px;
+                    // Accueil : musique, Claude, minuteur, étagère, agenda…
+                    HorizontalLayout {
+                        property <float> d: 0 - parent.pos;
+                        x: self.d * parent.step;
+                        width: parent.width;
+                        height: parent.height;
+                        opacity: 1 - Math.min(1, Math.abs(self.d)) * 0.7;
+                        visible: Math.abs(self.d) < 0.999;
+                        spacing: 14px;
+                        vertical-stretch: 1;
 
-                        Mascot {
-                            width: 60px;
-                            x: (parent.width - self.width) / 2;
-                            y: (parent.height - self.height) / 2 + 4px;
-                            mood: root.mascot-mood;
-                            season: root.season;
-                            // Île ouverte : on la regarde, elle vit.
-                            animated: root.expanded;
-                            level: root.mascot-level;
-                            body-color: root.fg;
-                            eye-color: root.bg.with-alpha(1);
-                            accent: root.accent;
-                            transform-origin: { x: self.width / 2, y: self.height };
-                            transform-scale-x: root.expanded ? 100% : 40%;
-                            transform-scale-y: root.expanded ? 100% : 40%;
-                            animate transform-scale-x, transform-scale-y {
-                                duration: root.expanded ? root.anim * 2 : 0ms;
-                                delay: root.expanded ? root.anim / 2 : 0ms;
-                                easing: spring(0.45);
+                        // La mascotte en grand, qui arrive avec un rebond à l'ouverture.
+                        if root.mascot-enabled: Rectangle {
+                            width: 62px;
+
+                            // Clic : elle s'écrase et rit. Caresse (allers-retours de la souris
+                            // dessus) : des cœurs.
+                            pet-ta := TouchArea {
+                                property <length> last-x;
+                                property <int> dir;
+                                property <int> strokes;
+                                changed has-hover => {
+                                    self.strokes = 0;
+                                    self.last-x = self.mouse-x;
+                                }
+                                changed mouse-x => {
+                                    let dx = self.mouse-x - self.last-x;
+                                    if self.has-hover && Math.abs(dx) > 5px {
+                                        let d = dx > 0 ? 1 : -1;
+                                        if d != self.dir {
+                                            self.dir = d;
+                                            self.strokes += 1;
+                                            if self.strokes >= 4 {
+                                                self.strokes = 0;
+                                                big-mascot.pet();
+                                            }
+                                        }
+                                        self.last-x = self.mouse-x;
+                                    }
+                                }
+                                clicked => { big-mascot.poke(); }
+                            }
+
+                            big-mascot := Mascot {
+                                width: 60px;
+                                x: (parent.width - self.width) / 2;
+                                y: (parent.height - self.height) / 2 + 4px;
+                                mood: root.mascot-mood;
+                                season: root.season;
+                                // Île ouverte : on la regarde, elle vit.
+                                animated: root.expanded;
+                                level: root.mascot-level;
+                                body-color: root.mascot-body;
+                                eye-color: root.bg.with-alpha(1);
+                                accent: root.accent;
+                                accessory: root.mascot-accessory;
+                                gazing: island-ta.has-hover;
+                                gaze-x: island-ta.absolute-position.x + island-ta.mouse-x - self.absolute-position.x - self.width / 2;
+                                gaze-y: island-ta.absolute-position.y + island-ta.mouse-y - self.absolute-position.y - self.height / 2;
+                                transform-origin: { x: self.width / 2, y: self.height };
+                                transform-scale-x: root.expanded ? 100% : 40%;
+                                transform-scale-y: root.expanded ? 100% : 40%;
+                                animate transform-scale-x, transform-scale-y {
+                                    duration: root.expanded ? root.anim * 2 : 0ms;
+                                    delay: root.expanded ? root.anim / 2 : 0ms;
+                                    easing: spring(0.45);
+                                }
+                            }
+                        }
+
+                        VerticalLayout {
+                            spacing: 8px;
+                            alignment: start;
+                            vertical-stretch: 1;
+
+                            // Lecteur (masqué pendant une demande de permission, prioritaire).
+                            if root.has-media && !root.has-prompt: HorizontalLayout {
+                                height: 58px;
+                                spacing: 12px;
+
+                                Rectangle {
+                                    width: 58px;
+                                    height: 58px;
+                                    border-radius: 12px;
+                                    clip: true;
+                                    // Halo de la couleur de la pochette.
+                                    drop-shadow-blur: 18px;
+                                    drop-shadow-color: root.media.has-art ? root.media-tint.with-alpha(0.5) : transparent;
+                                    background: root.fg.with-alpha(0.08);
+                                    // Carrousel au changement de morceau : l'ancienne pochette
+                                    // sort d'un côté, la nouvelle arrive de l'autre avec un rebond.
+                                    property <float> dir: root.track-back ? -1 : 1;
+
+                                    if root.prev-has-art: Image {
+                                        width: parent.width;
+                                        height: parent.height;
+                                        source: root.prev-art;
+                                        image-fit: cover;
+                                        x: root.swapped ? -parent.dir * parent.width : 0px;
+                                        opacity: root.swapped ? 0 : 1;
+                                        animate x, opacity { duration: root.swapped ? 360ms : 0ms; easing: ease-in-quad; }
+                                    }
+
+                                    if root.media.has-art: Image {
+                                        width: parent.width;
+                                        height: parent.height;
+                                        source: root.media.art;
+                                        image-fit: cover;
+                                        x: root.swapped ? 0px : parent.dir * parent.width;
+                                        transform-origin: { x: self.width / 2, y: self.height / 2 };
+                                        transform-scale-x: root.swapped ? 100% : 75%;
+                                        transform-scale-y: root.swapped ? 100% : 75%;
+                                        animate x, transform-scale-x, transform-scale-y {
+                                            duration: root.swapped ? root.anim * 2 : 0ms;
+                                            delay: root.swapped ? 80ms : 0ms;
+                                            easing: spring(0.35);
+                                        }
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    spacing: 2px;
+                                    alignment: center;
+                                    horizontal-stretch: 1;
+
+                                    // Titre, et le visualiseur à sa droite (désactivé par
+                                    // défaut). Les barres restent en place pendant les
+                                    // silences, estompées : rien ne bouge autour.
+                                    HorizontalLayout {
+                                        spacing: 8px;
+
+                                        Text {
+                                            text: root.media.title;
+                                            color: root.fg;
+                                            font-size: 15px;
+                                            font-weight: 700;
+                                            overflow: elide;
+                                            horizontal-stretch: 1;
+                                            // Nouveau morceau : le titre arrive en fondu, après la pochette.
+                                            opacity: root.swapped ? 1 : 0;
+                                            animate opacity { duration: root.swapped ? 420ms : 0ms; delay: root.swapped ? 140ms : 0ms; }
+                                        }
+
+                                        if root.viz-bars.length > 0: HorizontalLayout {
+                                            spacing: 2px;
+                                            alignment: end;
+                                            height: 14px;
+                                            y: (parent.height - self.height) / 2;
+                                            opacity: root.viz-quiet ? 0 : 1;
+                                            animate opacity { duration: 300ms; }
+
+                                            for level in root.viz-bars: Rectangle {
+                                                width: 3px;
+                                                y: parent.height - self.height;
+                                                height: max(2px, 14px * clamp(level, 0, 1));
+                                                border-radius: 1.5px;
+                                                background: root.accent;
+                                            }
+                                        }
+                                    }
+
+                                    // Artiste, puis la source (cliquable s'il y en a plusieurs).
+                                    HorizontalLayout {
+                                        spacing: 6px;
+
+                                        Text {
+                                            text: root.media.artist;
+                                            color: root.fg.with-alpha(0.55);
+                                            opacity: root.swapped ? 1 : 0;
+                                            animate opacity { duration: root.swapped ? 420ms : 0ms; delay: root.swapped ? 220ms : 0ms; }
+                                            font-size: 12px;
+                                            overflow: elide;
+                                            horizontal-stretch: 1;
+                                        }
+
+                                        Text {
+                                            text: root.media.multi-source ? root.media.source + "  ⇄" : root.media.source;
+                                            color: source-ta.has-hover && root.media.multi-source ? root.fg : root.fg.with-alpha(0.4);
+                                            font-size: 11px;
+                                            overflow: elide;
+                                            max-width: 110px;
+                                            horizontal-alignment: right;
+
+                                            source-ta := TouchArea {
+                                                enabled: root.media.multi-source;
+                                                clicked => { root.media-action("source"); }
+                                            }
+                                        }
+                                    }
+
+                                    if root.media.has-timeline: HorizontalLayout {
+                                        spacing: 6px;
+                                        padding-top: 4px;
+
+                                        Text {
+                                            text: root.media.position;
+                                            color: root.fg.with-alpha(0.5);
+                                            font-size: 10px;
+                                            vertical-alignment: center;
+                                        }
+
+                                        bar := Rectangle {
+                                            height: 12px;
+                                            horizontal-stretch: 1;
+
+                                            property <bool> grab: bar-ta.has-hover && root.media.can-seek;
+
+                                            Rectangle {
+                                                y: (parent.height - self.height) / 2;
+                                                height: bar.grab ? 6px : 4px;
+                                                border-radius: self.height / 2;
+                                                background: root.fg.with-alpha(0.14);
+                                                animate height { duration: 120ms; }
+                                            }
+
+                                            Rectangle {
+                                                x: 0;
+                                                y: (parent.height - self.height) / 2;
+                                                width: parent.width * clamp(root.media.progress, 0, 1);
+                                                height: bar.grab ? 6px : 4px;
+                                                border-radius: self.height / 2;
+                                                background: @linear-gradient(90deg, root.accent.with-alpha(0.7) 0%, root.accent 100%);
+                                                animate height { duration: 120ms; }
+                                            }
+
+                                            // Curseur au survol, là où la lecture en est.
+                                            Rectangle {
+                                                width: bar.grab ? 12px : 0px;
+                                                height: self.width;
+                                                x: parent.width * clamp(root.media.progress, 0, 1) - self.width / 2;
+                                                y: (parent.height - self.height) / 2;
+                                                border-radius: self.width / 2;
+                                                background: root.fg;
+                                                drop-shadow-blur: 4px;
+                                                drop-shadow-color: root.bg.with-alpha(0.5);
+                                                animate width { duration: 120ms; }
+                                            }
+
+                                            bar-ta := TouchArea {
+                                                enabled: root.media.can-seek;
+                                                clicked => { root.media-seek(self.mouse-x / self.width); }
+                                            }
+                                        }
+
+                                        Text {
+                                            text: root.media.duration;
+                                            color: root.fg.with-alpha(0.5);
+                                            font-size: 10px;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    spacing: 2px;
+                                    alignment: center;
+                                    horizontal-stretch: 0;
+
+                                    IconButton {
+                                        y: (parent.height - self.height) / 2;
+                                        icon: "previous";
+                                        ink: root.fg;
+                                        enabled: root.media.can-previous;
+                                        clicked => { root.media-action("prev"); }
+                                    }
+
+                                    IconButton {
+                                        y: (parent.height - self.height) / 2;
+                                        size: 38px;
+                                        filled: true;
+                                        hole: root.bg.with-alpha(1);
+                                        icon: root.media.playing ? "pause" : "play";
+                                        ink: root.fg;
+                                        enabled: root.media.can-toggle;
+                                        clicked => { root.media-action("toggle"); }
+                                    }
+
+                                    IconButton {
+                                        y: (parent.height - self.height) / 2;
+                                        icon: "next";
+                                        ink: root.fg;
+                                        enabled: root.media.can-next;
+                                        clicked => { root.media-action("next"); }
+                                    }
+                                }
+                            }
+
+                            // Demande de permission de Claude Code.
+                            if root.has-prompt: VerticalLayout {
+                                spacing: 6px;
+
+                                Text {
+                                    text: @tr("{} wants to use {}", root.prompt.project, root.prompt.tool);
+                                    color: root.accent;
+                                    font-size: 14px;
+                                    font-weight: 600;
+                                    overflow: elide;
+                                }
+
+                                Text {
+                                    text: root.prompt.detail;
+                                    color: root.fg.with-alpha(0.75);
+                                    font-size: 12px;
+                                    font-family: "Consolas";
+                                    overflow: elide;
+                                }
+
+                                HorizontalLayout {
+                                    spacing: 8px;
+
+                                    PillButton {
+                                        text: @tr("Allow");
+                                        fill: root.accent;
+                                        ink: root.bg;
+                                        clicked => { root.claude-decide(root.prompt.id, "allow"); }
+                                    }
+
+                                    PillButton {
+                                        text: @tr("Deny");
+                                        fill: root.fg.with-alpha(0.09);
+                                        ink: root.fg;
+                                        clicked => { root.claude-decide(root.prompt.id, "deny"); }
+                                    }
+
+                                    PillButton {
+                                        text: @tr("Terminal");
+                                        fill: transparent;
+                                        ink: root.fg.with-alpha(0.8);
+                                        line: root.fg.with-alpha(0.25);
+                                        clicked => { root.claude-decide(root.prompt.id, "ask"); }
+                                    }
+                                }
+                            }
+
+                            // Minuteur : durées prédéfinies, compte à rebours, pause.
+                            if !root.has-prompt && root.has-timer: HorizontalLayout {
+                                height: 30px;
+                                spacing: 6px;
+                                padding-left: 6px;
+
+                                Text {
+                                    text: root.timer.phase == 0 ? @tr("Timer")
+                                        : root.timer.phase == 3 ? @tr("Time's up!") : root.timer.time;
+                                    color: root.timer.phase == 0 ? root.fg.with-alpha(0.7) : root.accent;
+                                    font-size: root.timer.phase == 0 ? 12px : 16px;
+                                    font-weight: 600;
+                                    vertical-alignment: center;
+                                    min-width: 64px;
+                                }
+
+                                if root.timer.phase == 0: HorizontalLayout {
+                                    spacing: 6px;
+                                    alignment: start;
+                                    horizontal-stretch: 1;
+
+                                    for minutes in root.timer.presets: PillButton {
+                                        grow: false;
+                                        min-width: 64px;
+                                        text: @tr("{} min", minutes);
+                                        fill: root.fg.with-alpha(0.09);
+                                        ink: root.fg;
+                                        clicked => { root.timer-action("start:" + minutes); }
+                                    }
+                                }
+
+                                if root.timer.phase == 1 || root.timer.phase == 2: Rectangle {
+                                    horizontal-stretch: 1;
+                                    height: 12px;
+
+                                    Rectangle {
+                                        y: (parent.height - self.height) / 2;
+                                        height: 3px;
+                                        border-radius: 1.5px;
+                                        background: root.fg.with-alpha(0.15);
+                                    }
+
+                                    Rectangle {
+                                        y: (parent.height - self.height) / 2;
+                                        width: parent.width * clamp(root.timer.progress, 0, 1);
+                                        height: 3px;
+                                        border-radius: 1.5px;
+                                        background: root.accent;
+                                    }
+                                }
+
+                                if root.timer.phase == 1: PillButton {
+                                    text: @tr("Pause");
+                                    fill: root.fg.with-alpha(0.09);
+                                    ink: root.fg;
+                                    clicked => { root.timer-action("pause"); }
+                                }
+
+                                if root.timer.phase == 2: PillButton {
+                                    text: @tr("Resume");
+                                    fill: root.accent;
+                                    ink: root.bg;
+                                    clicked => { root.timer-action("resume"); }
+                                }
+
+                                if root.timer.phase == 1 || root.timer.phase == 2: PillButton {
+                                    text: @tr("Reset");
+                                    fill: transparent;
+                                    ink: root.fg.with-alpha(0.8);
+                                    line: root.fg.with-alpha(0.25);
+                                    clicked => { root.timer-action("reset"); }
+                                }
+
+                                if root.timer.phase == 3: PillButton {
+                                    text: @tr("OK");
+                                    fill: root.accent;
+                                    ink: root.bg;
+                                    clicked => { root.timer-action("reset"); }
+                                }
+                            }
+
+                            // Plugins WASM : une ligne de texte par plugin.
+                            if !root.has-prompt && root.plugin-rows.length > 0: VerticalLayout {
+                                spacing: 2px;
+
+                                for plugin in root.plugin-rows: Rectangle {
+                                    height: 22px;
+
+                                    HorizontalLayout {
+                                        padding-left: 6px;
+                                        spacing: 8px;
+
+                                        Text {
+                                            text: plugin.name;
+                                            color: root.fg.with-alpha(0.55);
+                                            font-size: 12px;
+                                            font-weight: 600;
+                                            vertical-alignment: center;
+                                            min-width: 64px;
+                                        }
+
+                                        Text {
+                                            text: plugin.text;
+                                            color: plugin.attention > 0 ? root.accent : root.fg;
+                                            font-size: 12px;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                            horizontal-stretch: 1;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Étagère : fichiers déposés sur l'île, un clic les ouvre.
+                            if !root.has-prompt && root.shelf-rows.length > 0: HorizontalLayout {
+                                height: 28px;
+                                spacing: 6px;
+                                padding-left: 6px;
+
+                                Text {
+                                    text: @tr("Shelf");
+                                    color: root.fg.with-alpha(0.7);
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    vertical-alignment: center;
+                                    min-width: 64px;
+                                }
+
+                                for item[i] in root.shelf-rows: Rectangle {
+                                    horizontal-stretch: 1;
+                                    height: 24px;
+                                    border-radius: 12px;
+                                    background: chip-ta.has-hover ? root.fg.with-alpha(0.2) : root.fg.with-alpha(0.12);
+
+                                    chip-ta := TouchArea {
+                                        clicked => { root.shelf-open(i); }
+                                    }
+
+                                    HorizontalLayout {
+                                        padding-left: 10px;
+                                        padding-right: 2px;
+                                        spacing: 2px;
+
+                                        Text {
+                                            text: item.name;
+                                            color: root.fg;
+                                            font-size: 12px;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                            horizontal-stretch: 1;
+                                        }
+
+                                        Rectangle {
+                                            width: 20px;
+                                            Text {
+                                                text: "×";
+                                                color: root.fg.with-alpha(0.7);
+                                                font-size: 14px;
+                                                horizontal-alignment: center;
+                                                vertical-alignment: center;
+                                            }
+                                            TouchArea {
+                                                clicked => { root.shelf-remove(i); }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if root.shelf-more != "": Text {
+                                    text: root.shelf-more;
+                                    color: root.fg.with-alpha(0.6);
+                                    font-size: 12px;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            // Agenda : prochaines réunions, bouton « Rejoindre ».
+                            if !root.has-prompt && root.agenda-rows.length > 0: VerticalLayout {
+                                spacing: 2px;
+
+                                for item in root.agenda-rows: Rectangle {
+                                    height: 24px;
+
+                                    HorizontalLayout {
+                                        padding-left: 6px;
+                                        padding-right: 2px;
+                                        spacing: 8px;
+
+                                        Dot {
+                                            y: (parent.height - self.height) / 2;
+                                            background: item.soon ? root.accent : root.fg.with-alpha(0.35);
+                                        }
+
+                                        Text {
+                                            text: item.time;
+                                            color: item.soon ? root.accent : root.fg.with-alpha(0.7);
+                                            font-size: 12px;
+                                            font-weight: 600;
+                                            vertical-alignment: center;
+                                        }
+
+                                        if item.location != "": Text {
+                                            text: item.location;
+                                            color: root.fg.with-alpha(0.55);
+                                            font-size: 12px;
+                                            font-weight: 600;
+                                            vertical-alignment: center;
+                                        }
+
+                                        Text {
+                                            text: item.title;
+                                            color: root.fg;
+                                            font-size: 13px;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                            horizontal-stretch: 1;
+                                        }
+
+                                        if item.relative != "": Text {
+                                            text: item.relative;
+                                            color: item.soon ? root.accent : root.fg.with-alpha(0.55);
+                                            font-size: 12px;
+                                            vertical-alignment: center;
+                                        }
+
+                                        if item.has-join: Rectangle {
+                                            width: join-label.preferred-width + 16px;
+                                            height: 20px;
+                                            y: (parent.height - self.height) / 2;
+                                            border-radius: 10px;
+                                            background: join-ta.has-hover ? root.accent.brighter(0.15) : root.accent;
+
+                                            join-label := Text {
+                                                text: @tr("Join");
+                                                color: root.bg;
+                                                font-size: 11px;
+                                                font-weight: 700;
+                                                horizontal-alignment: center;
+                                                vertical-alignment: center;
+                                            }
+
+                                            join-ta := TouchArea {
+                                                clicked => { root.open-url(item.join-url); }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Sessions Claude Code en cours, en pastilles (clic : ramène
+                            // le terminal) ; celle qui t'attend est teintée de l'accent.
+                            if !root.has-prompt && root.claude-rows.length > 0: VerticalLayout {
+                                spacing: 2px;
+
+                                for row in root.claude-rows: Rectangle {
+                                    height: 24px;
+                                    border-radius: 8px;
+                                    background: row.kind == "wait" ? root.accent.with-alpha(row-ta.has-hover ? 0.24 : 0.14)
+                                        : root.fg.with-alpha(row-ta.has-hover ? 0.1 : 0.05);
+                                    animate background { duration: 120ms; }
+
+                                    HorizontalLayout {
+                                        padding-left: 4px;
+                                        padding-right: 8px;
+                                        spacing: 8px;
+
+                                        ClaudeBadge {
+                                            y: (parent.height - self.height) / 2;
+                                            kind: row.kind;
+                                            ink: root.fg;
+                                            accent: root.accent;
+                                            ok: root.ok-color;
+                                            iris: root.iris;
+                                        }
+
+                                        Text {
+                                            text: row.project;
+                                            color: root.fg;
+                                            font-size: 12.5px;
+                                            font-weight: 650;
+                                            vertical-alignment: center;
+                                        }
+
+                                        Text {
+                                            text: row.status;
+                                            color: row.kind == "wait" ? root.accent : root.fg.with-alpha(0.6);
+                                            font-size: 12px;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                            horizontal-stretch: 1;
+                                        }
+
+                                        // Au survol : on peut y aller.
+                                        Text {
+                                            text: "›";
+                                            color: root.fg.with-alpha(0.7);
+                                            font-size: 16px;
+                                            font-weight: 600;
+                                            vertical-alignment: center;
+                                            opacity: row-ta.has-hover ? 1 : 0;
+                                            animate opacity { duration: 120ms; }
+                                        }
+                                    }
+
+                                    row-ta := TouchArea {
+                                        clicked => { root.claude-focus(row.id); }
+                                    }
+                                }
+                            }
+
+                            if !root.has-prompt && !root.has-media && root.claude-rows.length == 0 && root.agenda-rows.length == 0: Text {
+                                text: root.has-attention ? root.attention-label : @tr("All quiet");
+                                color: root.has-attention && root.urgent ? root.accent : root.fg.with-alpha(0.75);
+                                font-size: 14px;
+                                overflow: elide;
                             }
                         }
                     }
 
-                    VerticalLayout {
-                        spacing: 8px;
-                        alignment: start;
+                    // Onglet Claude : carte de consommation (jauge circulaire) et
+                    // conversations récentes en cartes (clic : la reprendre).
+                    if root.has-claude-tab: HorizontalLayout {
+                        property <float> d: root.claude-slot - parent.pos;
+                        x: self.d * parent.step;
+                        width: parent.width;
+                        height: parent.height;
+                        opacity: 1 - Math.min(1, Math.abs(self.d)) * 0.7;
+                        visible: Math.abs(self.d) < 0.999;
+                        spacing: 10px;
                         vertical-stretch: 1;
 
-                        // Lecteur (masqué pendant une demande de permission, prioritaire).
-                        if root.has-media && !root.has-prompt: HorizontalLayout {
-                            height: 58px;
-                            spacing: 12px;
-
-                            Rectangle {
-                                width: 58px;
-                                height: 58px;
-                                border-radius: 12px;
-                                clip: true;
-                                // Halo de la couleur de la pochette.
-                                drop-shadow-blur: 18px;
-                                drop-shadow-color: root.media.has-art ? root.accent.with-alpha(0.5) : transparent;
-                                background: root.fg.with-alpha(0.08);
-
-                                if root.media.has-art: Image {
-                                    width: parent.width;
-                                    height: parent.height;
-                                    source: root.media.art;
-                                    image-fit: cover;
-                                }
-                            }
+                        Rectangle {
+                            width: 128px;
+                            border-radius: 14px;
+                            border-width: 1px;
+                            border-color: root.fg.with-alpha(0.07);
+                            background: @linear-gradient(160deg, root.accent.with-alpha(0.18) 0%, root.fg.with-alpha(0.04) 75%);
 
                             VerticalLayout {
-                                spacing: 2px;
+                                padding: 8px;
+                                spacing: 4px;
                                 alignment: center;
-                                horizontal-stretch: 1;
 
-                                // Titre, et le visualiseur à sa droite (désactivé par
-                                // défaut). Les barres restent en place pendant les
-                                // silences, estompées : rien ne bouge autour.
-                                HorizontalLayout {
-                                    spacing: 8px;
+                                // Avec une limite : la part utilisée, en jauge.
+                                if root.usage-active && root.usage-has-limit: HorizontalLayout {
+                                    alignment: center;
 
-                                    Text {
-                                        text: root.media.title;
-                                        color: root.fg;
-                                        font-size: 15px;
-                                        font-weight: 700;
-                                        overflow: elide;
-                                        horizontal-stretch: 1;
-                                    }
-
-                                    if root.viz-bars.length > 0: HorizontalLayout {
-                                        spacing: 2px;
-                                        alignment: end;
-                                        height: 14px;
-                                        y: (parent.height - self.height) / 2;
-                                        opacity: root.viz-quiet ? 0 : 1;
-                                        animate opacity { duration: 300ms; }
-
-                                        for level in root.viz-bars: Rectangle {
-                                            width: 3px;
-                                            y: parent.height - self.height;
-                                            height: max(2px, 14px * clamp(level, 0, 1));
-                                            border-radius: 1.5px;
-                                            background: root.accent;
-                                        }
+                                    UsageRing {
+                                        ratio: root.usage-ratio;
+                                        active: root.expanded && root.tab == 1;
+                                        ink: root.usage-ratio > 0.85 ? root.alert-color : root.accent;
+                                        track: root.fg.with-alpha(0.12);
+                                        hole: root.bg.with-alpha(1);
+                                        label: Math.round(clamp(root.usage-ratio, 0, 9.99) * 100) + "%";
+                                        label-color: root.fg;
                                     }
                                 }
 
-                                // Artiste, puis la source (cliquable s'il y en a plusieurs).
-                                HorizontalLayout {
-                                    spacing: 6px;
-
-                                    Text {
-                                        text: root.media.artist;
-                                        color: root.fg.with-alpha(0.55);
-                                        font-size: 12px;
-                                        overflow: elide;
-                                        horizontal-stretch: 1;
-                                    }
-
-                                    Text {
-                                        text: root.media.multi-source ? root.media.source + "  ⇄" : root.media.source;
-                                        color: source-ta.has-hover && root.media.multi-source ? root.fg : root.fg.with-alpha(0.4);
-                                        font-size: 11px;
-                                        overflow: elide;
-                                        max-width: 110px;
-                                        horizontal-alignment: right;
-
-                                        source-ta := TouchArea {
-                                            enabled: root.media.multi-source;
-                                            clicked => { root.media-action("source"); }
-                                        }
-                                    }
+                                // Sans limite : les jetons en grand.
+                                if root.usage-active && !root.usage-has-limit: Text {
+                                    text: root.usage-used;
+                                    color: root.fg;
+                                    font-size: 26px;
+                                    font-weight: 800;
+                                    horizontal-alignment: center;
                                 }
 
-                                if root.media.has-timeline: HorizontalLayout {
-                                    spacing: 6px;
-                                    padding-top: 4px;
-
-                                    Text {
-                                        text: root.media.position;
-                                        color: root.fg.with-alpha(0.5);
-                                        font-size: 10px;
-                                        vertical-alignment: center;
-                                    }
-
-                                    bar := Rectangle {
-                                        height: 12px;
-                                        horizontal-stretch: 1;
-
-                                        property <bool> grab: bar-ta.has-hover && root.media.can-seek;
-
-                                        Rectangle {
-                                            y: (parent.height - self.height) / 2;
-                                            height: bar.grab ? 6px : 4px;
-                                            border-radius: self.height / 2;
-                                            background: root.fg.with-alpha(0.14);
-                                            animate height { duration: 120ms; }
-                                        }
-
-                                        Rectangle {
-                                            x: 0;
-                                            y: (parent.height - self.height) / 2;
-                                            width: parent.width * clamp(root.media.progress, 0, 1);
-                                            height: bar.grab ? 6px : 4px;
-                                            border-radius: self.height / 2;
-                                            background: @linear-gradient(90deg, root.accent.with-alpha(0.7) 0%, root.accent 100%);
-                                            animate height { duration: 120ms; }
-                                        }
-
-                                        // Curseur au survol, là où la lecture en est.
-                                        Rectangle {
-                                            width: bar.grab ? 12px : 0px;
-                                            height: self.width;
-                                            x: parent.width * clamp(root.media.progress, 0, 1) - self.width / 2;
-                                            y: (parent.height - self.height) / 2;
-                                            border-radius: self.width / 2;
-                                            background: root.fg;
-                                            drop-shadow-blur: 4px;
-                                            drop-shadow-color: root.bg.with-alpha(0.5);
-                                            animate width { duration: 120ms; }
-                                        }
-
-                                        bar-ta := TouchArea {
-                                            enabled: root.media.can-seek;
-                                            clicked => { root.media-seek(self.mouse-x / self.width); }
-                                        }
-                                    }
-
-                                    Text {
-                                        text: root.media.duration;
-                                        color: root.fg.with-alpha(0.5);
-                                        font-size: 10px;
-                                        vertical-alignment: center;
-                                    }
-                                }
-                            }
-
-                            HorizontalLayout {
-                                spacing: 2px;
-                                alignment: center;
-                                horizontal-stretch: 0;
-
-                                IconButton {
-                                    y: (parent.height - self.height) / 2;
-                                    icon: "previous";
-                                    ink: root.fg;
-                                    enabled: root.media.can-previous;
-                                    clicked => { root.media-action("prev"); }
+                                if root.usage-active: Text {
+                                    text: root.usage-has-limit ? root.usage-used + " / " + root.usage-limit : @tr("tokens");
+                                    color: root.fg.with-alpha(0.8);
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    horizontal-alignment: center;
+                                    overflow: elide;
                                 }
 
-                                IconButton {
-                                    y: (parent.height - self.height) / 2;
-                                    size: 38px;
-                                    filled: true;
-                                    hole: root.bg.with-alpha(1);
-                                    icon: root.media.playing ? "pause" : "play";
-                                    ink: root.fg;
-                                    enabled: root.media.can-toggle;
-                                    clicked => { root.media-action("toggle"); }
+                                if root.usage-active: Text {
+                                    text: @tr("resets in {}", root.usage-reset);
+                                    color: root.fg.with-alpha(0.5);
+                                    font-size: 10.5px;
+                                    horizontal-alignment: center;
+                                    overflow: elide;
                                 }
 
-                                IconButton {
-                                    y: (parent.height - self.height) / 2;
-                                    icon: "next";
-                                    ink: root.fg;
-                                    enabled: root.media.can-next;
-                                    clicked => { root.media-action("next"); }
+                                if !root.usage-active: Text {
+                                    text: @tr("No active usage window");
+                                    color: root.fg.with-alpha(0.55);
+                                    font-size: 11px;
+                                    wrap: word-wrap;
+                                    horizontal-alignment: center;
                                 }
                             }
                         }
 
-                        // Demande de permission de Claude Code.
-                        if root.has-prompt: VerticalLayout {
-                            spacing: 6px;
+                        // Deux colonnes de cartes, qui arrivent l'une après l'autre.
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            property <length> gap: 8px;
+                            property <length> cw: (self.width - self.gap) / 2;
+                            property <length> ch: (self.height - self.gap) / 2;
 
-                            Text {
-                                text: @tr("{} wants to use {}", root.prompt.project, root.prompt.tool);
-                                color: root.accent;
-                                font-size: 14px;
-                                font-weight: 600;
-                                overflow: elide;
-                            }
-
-                            Text {
-                                text: root.prompt.detail;
-                                color: root.fg.with-alpha(0.75);
-                                font-size: 12px;
-                                font-family: "Consolas";
-                                overflow: elide;
-                            }
-
-                            HorizontalLayout {
-                                spacing: 8px;
-
-                                PillButton {
-                                    text: @tr("Allow");
-                                    fill: root.accent;
-                                    ink: root.bg;
-                                    clicked => { root.claude-decide(root.prompt.id, "allow"); }
-                                }
-
-                                PillButton {
-                                    text: @tr("Deny");
-                                    fill: root.fg.with-alpha(0.09);
-                                    ink: root.fg;
-                                    clicked => { root.claude-decide(root.prompt.id, "deny"); }
-                                }
-
-                                PillButton {
-                                    text: @tr("Terminal");
-                                    fill: transparent;
-                                    ink: root.fg.with-alpha(0.8);
-                                    line: root.fg.with-alpha(0.25);
-                                    clicked => { root.claude-decide(root.prompt.id, "ask"); }
-                                }
-                            }
-                        }
-
-                        // Minuteur : durées prédéfinies, compte à rebours, pause.
-                        if !root.has-prompt && root.has-timer: HorizontalLayout {
-                            height: 30px;
-                            spacing: 6px;
-                            padding-left: 6px;
-
-                            Text {
-                                text: root.timer.phase == 0 ? @tr("Timer")
-                                    : root.timer.phase == 3 ? @tr("Time's up!") : root.timer.time;
-                                color: root.timer.phase == 0 ? root.fg.with-alpha(0.7) : root.accent;
-                                font-size: root.timer.phase == 0 ? 12px : 16px;
-                                font-weight: 600;
-                                vertical-alignment: center;
-                                min-width: 64px;
-                            }
-
-                            if root.timer.phase == 0: HorizontalLayout {
-                                spacing: 6px;
-                                alignment: start;
-                                horizontal-stretch: 1;
-
-                                for minutes in root.timer.presets: PillButton {
-                                    grow: false;
-                                    min-width: 64px;
-                                    text: @tr("{} min", minutes);
-                                    fill: root.fg.with-alpha(0.09);
-                                    ink: root.fg;
-                                    clicked => { root.timer-action("start:" + minutes); }
-                                }
-                            }
-
-                            if root.timer.phase == 1 || root.timer.phase == 2: Rectangle {
-                                horizontal-stretch: 1;
-                                height: 12px;
-
-                                Rectangle {
-                                    y: (parent.height - self.height) / 2;
-                                    height: 3px;
-                                    border-radius: 1.5px;
-                                    background: root.fg.with-alpha(0.15);
-                                }
-
-                                Rectangle {
-                                    y: (parent.height - self.height) / 2;
-                                    width: parent.width * clamp(root.timer.progress, 0, 1);
-                                    height: 3px;
-                                    border-radius: 1.5px;
-                                    background: root.accent;
-                                }
-                            }
-
-                            if root.timer.phase == 1: PillButton {
-                                text: @tr("Pause");
-                                fill: root.fg.with-alpha(0.09);
-                                ink: root.fg;
-                                clicked => { root.timer-action("pause"); }
-                            }
-
-                            if root.timer.phase == 2: PillButton {
-                                text: @tr("Resume");
-                                fill: root.accent;
-                                ink: root.bg;
-                                clicked => { root.timer-action("resume"); }
-                            }
-
-                            if root.timer.phase == 1 || root.timer.phase == 2: PillButton {
-                                text: @tr("Reset");
-                                fill: transparent;
-                                ink: root.fg.with-alpha(0.8);
-                                line: root.fg.with-alpha(0.25);
-                                clicked => { root.timer-action("reset"); }
-                            }
-
-                            if root.timer.phase == 3: PillButton {
-                                text: @tr("OK");
-                                fill: root.accent;
-                                ink: root.bg;
-                                clicked => { root.timer-action("reset"); }
-                            }
-                        }
-
-                        // Plugins WASM : une ligne de texte par plugin.
-                        if !root.has-prompt && root.plugin-rows.length > 0: VerticalLayout {
-                            spacing: 2px;
-
-                            for plugin in root.plugin-rows: Rectangle {
-                                height: 22px;
-
-                                HorizontalLayout {
-                                    padding-left: 6px;
-                                    spacing: 8px;
-
-                                    Text {
-                                        text: plugin.name;
-                                        color: root.fg.with-alpha(0.55);
-                                        font-size: 12px;
-                                        font-weight: 600;
-                                        vertical-alignment: center;
-                                        min-width: 64px;
-                                    }
-
-                                    Text {
-                                        text: plugin.text;
-                                        color: plugin.attention > 0 ? root.accent : root.fg;
-                                        font-size: 12px;
-                                        vertical-alignment: center;
-                                        overflow: elide;
-                                        horizontal-stretch: 1;
-                                    }
-                                }
-                            }
-                        }
-
-                        // Étagère : fichiers déposés sur l'île, un clic les ouvre.
-                        if !root.has-prompt && root.shelf-rows.length > 0: HorizontalLayout {
-                            height: 28px;
-                            spacing: 6px;
-                            padding-left: 6px;
-
-                            Text {
-                                text: @tr("Shelf");
-                                color: root.fg.with-alpha(0.7);
-                                font-size: 12px;
-                                font-weight: 600;
-                                vertical-alignment: center;
-                                min-width: 64px;
-                            }
-
-                            for item[i] in root.shelf-rows: Rectangle {
-                                horizontal-stretch: 1;
-                                height: 24px;
+                            for item[i] in root.recent-rows: Rectangle {
+                                property <bool> shown: root.expanded && root.tab == 1;
+                                x: Math.mod(i, 2) * (parent.cw + parent.gap);
+                                y: Math.floor(i / 2) * (parent.ch + parent.gap) + (self.shown ? 0px : 8px);
+                                width: parent.cw;
+                                height: parent.ch;
+                                opacity: self.shown ? 1 : 0;
+                                animate opacity, y { duration: 280ms; delay: self.shown ? i * 50ms + 120ms : 0ms; easing: ease-out-quint; }
                                 border-radius: 12px;
-                                background: chip-ta.has-hover ? root.fg.with-alpha(0.2) : root.fg.with-alpha(0.12);
+                                border-width: 1px;
+                                border-color: recent-ta.has-hover ? root.accent.with-alpha(0.55) : root.fg.with-alpha(0.06);
+                                background: root.fg.with-alpha(recent-ta.has-hover ? 0.1 : 0.05);
+                                animate border-color, background { duration: 150ms; }
 
-                                chip-ta := TouchArea {
-                                    clicked => { root.shelf-open(i); }
+                                recent-ta := TouchArea {
+                                    clicked => { root.recent-open(item.id); }
                                 }
 
-                                HorizontalLayout {
+                                VerticalLayout {
+                                    padding: 7px;
                                     padding-left: 10px;
-                                    padding-right: 2px;
+                                    padding-right: 10px;
                                     spacing: 2px;
 
-                                    Text {
-                                        text: item.name;
-                                        color: root.fg;
-                                        font-size: 12px;
-                                        vertical-alignment: center;
-                                        overflow: elide;
-                                        horizontal-stretch: 1;
-                                    }
+                                    HorizontalLayout {
+                                        spacing: 5px;
 
-                                    Rectangle {
-                                        width: 20px;
+                                        Rectangle {
+                                            width: 6px;
+                                            height: 6px;
+                                            y: (parent.height - self.height) / 2;
+                                            border-radius: 3px;
+                                            background: root.accent;
+                                        }
+
                                         Text {
-                                            text: "×";
-                                            color: root.fg.with-alpha(0.7);
-                                            font-size: 14px;
-                                            horizontal-alignment: center;
-                                            vertical-alignment: center;
+                                            text: item.project;
+                                            color: root.fg.with-alpha(0.6);
+                                            font-size: 10.5px;
+                                            font-weight: 600;
+                                            overflow: elide;
+                                            horizontal-stretch: 1;
                                         }
-                                        TouchArea {
-                                            clicked => { root.shelf-remove(i); }
+
+                                        Text {
+                                            text: item.ago;
+                                            color: root.fg.with-alpha(0.4);
+                                            font-size: 10.5px;
                                         }
-                                    }
-                                }
-                            }
-
-                            if root.shelf-more != "": Text {
-                                text: root.shelf-more;
-                                color: root.fg.with-alpha(0.6);
-                                font-size: 12px;
-                                vertical-alignment: center;
-                            }
-                        }
-
-                        // Agenda : prochaines réunions, bouton « Rejoindre ».
-                        if !root.has-prompt && root.agenda-rows.length > 0: VerticalLayout {
-                            spacing: 2px;
-
-                            for item in root.agenda-rows: Rectangle {
-                                height: 24px;
-
-                                HorizontalLayout {
-                                    padding-left: 6px;
-                                    padding-right: 2px;
-                                    spacing: 8px;
-
-                                    Dot {
-                                        y: (parent.height - self.height) / 2;
-                                        background: item.soon ? root.accent : root.fg.with-alpha(0.35);
-                                    }
-
-                                    Text {
-                                        text: item.time;
-                                        color: item.soon ? root.accent : root.fg.with-alpha(0.7);
-                                        font-size: 12px;
-                                        font-weight: 600;
-                                        vertical-alignment: center;
-                                    }
-
-                                    if item.location != "": Text {
-                                        text: item.location;
-                                        color: root.fg.with-alpha(0.55);
-                                        font-size: 12px;
-                                        font-weight: 600;
-                                        vertical-alignment: center;
                                     }
 
                                     Text {
                                         text: item.title;
                                         color: root.fg;
-                                        font-size: 13px;
-                                        vertical-alignment: center;
-                                        overflow: elide;
-                                        horizontal-stretch: 1;
-                                    }
-
-                                    if item.relative != "": Text {
-                                        text: item.relative;
-                                        color: item.soon ? root.accent : root.fg.with-alpha(0.55);
                                         font-size: 12px;
-                                        vertical-alignment: center;
-                                    }
-
-                                    if item.has-join: Rectangle {
-                                        width: join-label.preferred-width + 16px;
-                                        height: 20px;
-                                        y: (parent.height - self.height) / 2;
-                                        border-radius: 10px;
-                                        background: join-ta.has-hover ? root.accent.brighter(0.15) : root.accent;
-
-                                        join-label := Text {
-                                            text: @tr("Join");
-                                            color: root.bg;
-                                            font-size: 11px;
-                                            font-weight: 700;
-                                            horizontal-alignment: center;
-                                            vertical-alignment: center;
-                                        }
-
-                                        join-ta := TouchArea {
-                                            clicked => { root.open-url(item.join-url); }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Sessions Claude Code en cours, en pastilles (clic : ramène
-                        // le terminal) ; celle qui t'attend est teintée de l'accent.
-                        if !root.has-prompt && root.claude-rows.length > 0: VerticalLayout {
-                            spacing: 2px;
-
-                            for row in root.claude-rows: Rectangle {
-                                height: 24px;
-                                border-radius: 8px;
-                                background: row.kind == "wait" ? root.accent.with-alpha(row-ta.has-hover ? 0.24 : 0.14)
-                                    : root.fg.with-alpha(row-ta.has-hover ? 0.1 : 0.05);
-                                animate background { duration: 120ms; }
-
-                                HorizontalLayout {
-                                    padding-left: 4px;
-                                    padding-right: 8px;
-                                    spacing: 8px;
-
-                                    ClaudeBadge {
-                                        y: (parent.height - self.height) / 2;
-                                        kind: row.kind;
-                                        ink: root.fg;
-                                        accent: root.accent;
-                                        ok: root.ok-color;
-                                        iris: root.iris;
-                                    }
-
-                                    Text {
-                                        text: row.project;
-                                        color: root.fg;
-                                        font-size: 12.5px;
-                                        font-weight: 650;
-                                        vertical-alignment: center;
-                                    }
-
-                                    Text {
-                                        text: row.status;
-                                        color: row.kind == "wait" ? root.accent : root.fg.with-alpha(0.6);
-                                        font-size: 12px;
-                                        vertical-alignment: center;
-                                        overflow: elide;
-                                        horizontal-stretch: 1;
-                                    }
-
-                                    // Au survol : on peut y aller.
-                                    Text {
-                                        text: "›";
-                                        color: root.fg.with-alpha(0.7);
-                                        font-size: 16px;
                                         font-weight: 600;
-                                        vertical-alignment: center;
-                                        opacity: row-ta.has-hover ? 1 : 0;
-                                        animate opacity { duration: 120ms; }
+                                        wrap: word-wrap;
+                                        overflow: elide;
+                                        vertical-stretch: 1;
                                     }
                                 }
 
-                                row-ta := TouchArea {
-                                    clicked => { root.claude-focus(row.id); }
-                                }
-                            }
-                        }
+                                // Reprendre : un bouton lecture au survol.
+                                Rectangle {
+                                    x: parent.width - self.width - 6px;
+                                    y: parent.height - self.height - 6px;
+                                    width: 20px;
+                                    height: 20px;
+                                    border-radius: 10px;
+                                    background: root.accent;
+                                    opacity: recent-ta.has-hover ? 1 : 0;
+                                    animate opacity { duration: 150ms; }
 
-                        if !root.has-prompt && !root.has-media && root.claude-rows.length == 0 && root.agenda-rows.length == 0: Text {
-                            text: root.has-attention ? root.attention-label : @tr("All quiet");
-                            color: root.has-attention && root.urgent ? root.accent : root.fg.with-alpha(0.75);
-                            font-size: 14px;
-                            overflow: elide;
-                        }
-                    }
-                }
-
-                // Onglet Claude : carte de consommation (jauge circulaire) et
-                // conversations récentes en cartes (clic : la reprendre).
-                if root.tab == 1: HorizontalLayout {
-                    spacing: 10px;
-                    vertical-stretch: 1;
-
-                    Rectangle {
-                        width: 128px;
-                        border-radius: 14px;
-                        border-width: 1px;
-                        border-color: root.fg.with-alpha(0.07);
-                        background: @linear-gradient(160deg, root.accent.with-alpha(0.18) 0%, root.fg.with-alpha(0.04) 75%);
-
-                        VerticalLayout {
-                            padding: 8px;
-                            spacing: 4px;
-                            alignment: center;
-
-                            // Avec une limite : la part utilisée, en jauge.
-                            if root.usage-active && root.usage-has-limit: HorizontalLayout {
-                                alignment: center;
-
-                                UsageRing {
-                                    ratio: root.usage-ratio;
-                                    ink: root.usage-ratio > 0.85 ? root.alert-color : root.accent;
-                                    track: root.fg.with-alpha(0.12);
-                                    hole: root.bg.with-alpha(1);
-                                    label: Math.round(clamp(root.usage-ratio, 0, 9.99) * 100) + "%";
-                                    label-color: root.fg;
+                                    Path {
+                                        x: 7px;
+                                        y: 5.5px;
+                                        width: 8px;
+                                        height: 9px;
+                                        viewbox-width: 8;
+                                        viewbox-height: 9;
+                                        fill: white;
+                                        commands: "M0 0 L8 4.5 L0 9 Z";
+                                    }
                                 }
                             }
 
-                            // Sans limite : les jetons en grand.
-                            if root.usage-active && !root.usage-has-limit: Text {
-                                text: root.usage-used;
-                                color: root.fg;
-                                font-size: 26px;
-                                font-weight: 800;
-                                horizontal-alignment: center;
-                            }
-
-                            if root.usage-active: Text {
-                                text: root.usage-has-limit ? root.usage-used + " / " + root.usage-limit : @tr("tokens");
-                                color: root.fg.with-alpha(0.8);
-                                font-size: 11px;
-                                font-weight: 600;
-                                horizontal-alignment: center;
-                                overflow: elide;
-                            }
-
-                            if root.usage-active: Text {
-                                text: @tr("resets in {}", root.usage-reset);
+                            if root.recent-rows.length == 0: Text {
+                                width: parent.width;
+                                height: parent.height;
+                                text: @tr("No conversation found");
                                 color: root.fg.with-alpha(0.5);
-                                font-size: 10.5px;
+                                font-size: 12px;
                                 horizontal-alignment: center;
-                                overflow: elide;
-                            }
-
-                            if !root.usage-active: Text {
-                                text: @tr("No active usage window");
-                                color: root.fg.with-alpha(0.55);
-                                font-size: 11px;
-                                wrap: word-wrap;
-                                horizontal-alignment: center;
+                                vertical-alignment: center;
                             }
                         }
                     }
 
-                    // Deux colonnes de cartes, qui arrivent l'une après l'autre.
-                    Rectangle {
-                        horizontal-stretch: 1;
+                    // Onglet des notifications : des cartes sur deux colonnes, à la
+                    // couleur de l'application. Un clic ouvre l'application, × la retire.
+                    if root.has-notif-tab: Rectangle {
+                        property <float> d: 1 - parent.pos;
+                        x: self.d * parent.step;
+                        width: parent.width;
+                        height: parent.height;
+                        opacity: 1 - Math.min(1, Math.abs(self.d)) * 0.7;
+                        visible: Math.abs(self.d) < 0.999;
+                        vertical-stretch: 1;
                         property <length> gap: 8px;
                         property <length> cw: (self.width - self.gap) / 2;
                         property <length> ch: (self.height - self.gap) / 2;
 
-                        for item[i] in root.recent-rows: Rectangle {
-                            property <bool> shown;
-                            init => { self.shown = true; }
+                        for item[i] in root.notif-rows: Rectangle {
+                            property <bool> shown: root.expanded && root.tab == 2;
+                            property <bool> hover: notif-ta.has-hover || close-ta.has-hover;
                             x: Math.mod(i, 2) * (parent.cw + parent.gap);
                             y: Math.floor(i / 2) * (parent.ch + parent.gap) + (self.shown ? 0px : 8px);
                             width: parent.cw;
                             height: parent.ch;
                             opacity: self.shown ? 1 : 0;
-                            animate opacity, y { duration: 280ms; delay: i * 50ms; easing: ease-out-quint; }
-                            border-radius: 12px;
+                            animate opacity, y { duration: 280ms; delay: self.shown ? i * 50ms + 120ms : 0ms; easing: ease-out-quint; }
+                            border-radius: 14px;
                             border-width: 1px;
-                            border-color: recent-ta.has-hover ? root.accent.with-alpha(0.55) : root.fg.with-alpha(0.06);
-                            background: root.fg.with-alpha(recent-ta.has-hover ? 0.1 : 0.05);
-                            animate border-color, background { duration: 150ms; }
+                            border-color: item.tint.with-alpha(self.hover ? 0.6 : 0.25);
+                            background: @linear-gradient(120deg, item.tint.with-alpha(self.hover ? 0.32 : 0.2) 0%, root.fg.with-alpha(0.04) 75%);
+                            clip: true;
 
-                            recent-ta := TouchArea {
-                                clicked => { root.recent-open(item.id); }
+                            notif-ta := TouchArea {
+                                clicked => { root.notif-action("open:" + item.id); }
                             }
 
-                            VerticalLayout {
-                                padding: 7px;
-                                padding-left: 10px;
+                            HorizontalLayout {
+                                padding: 8px;
+                                padding-left: 9px;
                                 padding-right: 10px;
-                                spacing: 2px;
+                                spacing: 9px;
 
-                                HorizontalLayout {
-                                    spacing: 5px;
+                                Avatar {
+                                    size: 30px;
+                                    y: (parent.height - self.height) / 2;
+                                    initial: item.initial;
+                                    tint: item.tint;
+                                    has-icon: item.has-icon;
+                                    icon: item.icon;
+                                }
 
-                                    Rectangle {
-                                        width: 6px;
-                                        height: 6px;
-                                        y: (parent.height - self.height) / 2;
-                                        border-radius: 3px;
-                                        background: root.accent;
+                                VerticalLayout {
+                                    alignment: center;
+                                    spacing: 1px;
+                                    horizontal-stretch: 1;
+
+                                    HorizontalLayout {
+                                        spacing: 6px;
+
+                                        Text {
+                                            text: item.app;
+                                            color: item.tint.brighter(0.25);
+                                            font-size: 10.5px;
+                                            font-weight: 700;
+                                            overflow: elide;
+                                            horizontal-stretch: 1;
+                                        }
+
+                                        Text {
+                                            text: item.ago;
+                                            color: root.fg.with-alpha(0.45);
+                                            font-size: 10px;
+                                        }
                                     }
 
                                     Text {
-                                        text: item.project;
-                                        color: root.fg.with-alpha(0.6);
-                                        font-size: 10.5px;
+                                        text: item.title != "" ? item.title : item.body;
+                                        color: root.fg;
+                                        font-size: 12px;
                                         font-weight: 600;
                                         overflow: elide;
-                                        horizontal-stretch: 1;
                                     }
 
-                                    Text {
-                                        text: item.ago;
-                                        color: root.fg.with-alpha(0.4);
-                                        font-size: 10.5px;
+                                    if item.title != "" && item.body != "": Text {
+                                        text: item.body;
+                                        color: root.fg.with-alpha(0.65);
+                                        font-size: 11px;
+                                        overflow: elide;
                                     }
-                                }
-
-                                Text {
-                                    text: item.title;
-                                    color: root.fg;
-                                    font-size: 12px;
-                                    font-weight: 600;
-                                    wrap: word-wrap;
-                                    overflow: elide;
-                                    vertical-stretch: 1;
                                 }
                             }
 
-                            // Reprendre : un bouton lecture au survol.
+                            // × : retirer la notification (au survol).
                             Rectangle {
-                                x: parent.width - self.width - 6px;
-                                y: parent.height - self.height - 6px;
-                                width: 20px;
-                                height: 20px;
-                                border-radius: 10px;
-                                background: root.accent;
-                                opacity: recent-ta.has-hover ? 1 : 0;
-                                animate opacity { duration: 150ms; }
+                                x: parent.width - self.width - 5px;
+                                y: 5px;
+                                width: 18px;
+                                height: 18px;
+                                border-radius: 9px;
+                                background: close-ta.has-hover ? root.fg.with-alpha(0.3) : root.bg.with-alpha(0.7);
+                                opacity: parent.hover ? 1 : 0;
+                                animate opacity { duration: 120ms; }
 
-                                Path {
-                                    x: 7px;
-                                    y: 5.5px;
-                                    width: 8px;
-                                    height: 9px;
-                                    viewbox-width: 8;
-                                    viewbox-height: 9;
-                                    fill: white;
-                                    commands: "M0 0 L8 4.5 L0 9 Z";
+                                Text {
+                                    text: "×";
+                                    color: root.fg;
+                                    font-size: 13px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+
+                                close-ta := TouchArea {
+                                    clicked => { root.notif-action("remove:" + item.id); }
                                 }
                             }
                         }
 
-                        if root.recent-rows.length == 0: Text {
+                        // Ne pas déranger : une carte de plus, à la suite des autres.
+                        if root.dnd: Rectangle {
+                            property <int> i: root.notif-rows.length;
+                            x: Math.mod(self.i, 2) * (parent.cw + parent.gap);
+                            y: Math.floor(self.i / 2) * (parent.ch + parent.gap);
+                            width: parent.cw;
+                            height: parent.ch;
+                            border-radius: 14px;
+                            border-width: 1px;
+                            border-color: root.accent.with-alpha(0.3);
+                            background: root.accent.with-alpha(0.1);
+
+                            HorizontalLayout {
+                                padding: 10px;
+                                spacing: 10px;
+
+                                Path {
+                                    width: 20px;
+                                    height: 20px;
+                                    y: (parent.height - self.height) / 2;
+                                    viewbox-width: 24;
+                                    viewbox-height: 24;
+                                    fill: root.accent;
+                                    commands: "M 20.5 14.5 A 9 9 0 1 1 9.5 3.5 A 7 7 0 0 0 20.5 14.5 Z";
+                                }
+
+                                Text {
+                                    text: @tr("Do not disturb: notifications arrive here without popping up");
+                                    color: root.accent;
+                                    font-size: 11.5px;
+                                    wrap: word-wrap;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                    horizontal-stretch: 1;
+                                }
+                            }
+                        }
+
+                        if root.notif-rows.length == 0 && !root.dnd: Text {
                             width: parent.width;
                             height: parent.height;
-                            text: @tr("No conversation found");
+                            text: @tr("No notifications");
                             color: root.fg.with-alpha(0.5);
                             font-size: 12px;
                             horizontal-alignment: center;
                             vertical-alignment: center;
                         }
-                    }
-                }
-
-                // Onglet des notifications : des cartes sur deux colonnes, à la
-                // couleur de l'application. Un clic ouvre l'application, × la retire.
-                if root.tab == 2: Rectangle {
-                    vertical-stretch: 1;
-                    property <length> gap: 8px;
-                    property <length> cw: (self.width - self.gap) / 2;
-                    property <length> ch: (self.height - self.gap) / 2;
-
-                    for item[i] in root.notif-rows: Rectangle {
-                        property <bool> shown;
-                        property <bool> hover: notif-ta.has-hover || close-ta.has-hover;
-                        init => { self.shown = true; }
-                        x: Math.mod(i, 2) * (parent.cw + parent.gap);
-                        y: Math.floor(i / 2) * (parent.ch + parent.gap) + (self.shown ? 0px : 8px);
-                        width: parent.cw;
-                        height: parent.ch;
-                        opacity: self.shown ? 1 : 0;
-                        animate opacity, y { duration: 280ms; delay: i * 50ms; easing: ease-out-quint; }
-                        border-radius: 14px;
-                        border-width: 1px;
-                        border-color: item.tint.with-alpha(self.hover ? 0.6 : 0.25);
-                        background: @linear-gradient(120deg, item.tint.with-alpha(self.hover ? 0.32 : 0.2) 0%, root.fg.with-alpha(0.04) 75%);
-                        clip: true;
-
-                        notif-ta := TouchArea {
-                            clicked => { root.notif-action("open:" + item.id); }
-                        }
-
-                        HorizontalLayout {
-                            padding: 8px;
-                            padding-left: 9px;
-                            padding-right: 10px;
-                            spacing: 9px;
-
-                            Avatar {
-                                size: 30px;
-                                y: (parent.height - self.height) / 2;
-                                initial: item.initial;
-                                tint: item.tint;
-                                has-icon: item.has-icon;
-                                icon: item.icon;
-                            }
-
-                            VerticalLayout {
-                                alignment: center;
-                                spacing: 1px;
-                                horizontal-stretch: 1;
-
-                                HorizontalLayout {
-                                    spacing: 6px;
-
-                                    Text {
-                                        text: item.app;
-                                        color: item.tint.brighter(0.25);
-                                        font-size: 10.5px;
-                                        font-weight: 700;
-                                        overflow: elide;
-                                        horizontal-stretch: 1;
-                                    }
-
-                                    Text {
-                                        text: item.ago;
-                                        color: root.fg.with-alpha(0.45);
-                                        font-size: 10px;
-                                    }
-                                }
-
-                                Text {
-                                    text: item.title != "" ? item.title : item.body;
-                                    color: root.fg;
-                                    font-size: 12px;
-                                    font-weight: 600;
-                                    overflow: elide;
-                                }
-
-                                if item.title != "" && item.body != "": Text {
-                                    text: item.body;
-                                    color: root.fg.with-alpha(0.65);
-                                    font-size: 11px;
-                                    overflow: elide;
-                                }
-                            }
-                        }
-
-                        // × : retirer la notification (au survol).
-                        Rectangle {
-                            x: parent.width - self.width - 5px;
-                            y: 5px;
-                            width: 18px;
-                            height: 18px;
-                            border-radius: 9px;
-                            background: close-ta.has-hover ? root.fg.with-alpha(0.3) : root.bg.with-alpha(0.7);
-                            opacity: parent.hover ? 1 : 0;
-                            animate opacity { duration: 120ms; }
-
-                            Text {
-                                text: "×";
-                                color: root.fg;
-                                font-size: 13px;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-
-                            close-ta := TouchArea {
-                                clicked => { root.notif-action("remove:" + item.id); }
-                            }
-                        }
-                    }
-
-                    // Ne pas déranger : une carte de plus, à la suite des autres.
-                    if root.dnd: Rectangle {
-                        property <int> i: root.notif-rows.length;
-                        x: Math.mod(self.i, 2) * (parent.cw + parent.gap);
-                        y: Math.floor(self.i / 2) * (parent.ch + parent.gap);
-                        width: parent.cw;
-                        height: parent.ch;
-                        border-radius: 14px;
-                        border-width: 1px;
-                        border-color: root.accent.with-alpha(0.3);
-                        background: root.accent.with-alpha(0.1);
-
-                        HorizontalLayout {
-                            padding: 10px;
-                            spacing: 10px;
-
-                            Path {
-                                width: 20px;
-                                height: 20px;
-                                y: (parent.height - self.height) / 2;
-                                viewbox-width: 24;
-                                viewbox-height: 24;
-                                fill: root.accent;
-                                commands: "M 20.5 14.5 A 9 9 0 1 1 9.5 3.5 A 7 7 0 0 0 20.5 14.5 Z";
-                            }
-
-                            Text {
-                                text: @tr("Do not disturb: notifications arrive here without popping up");
-                                color: root.accent;
-                                font-size: 11.5px;
-                                wrap: word-wrap;
-                                vertical-alignment: center;
-                                overflow: elide;
-                                horizontal-stretch: 1;
-                            }
-                        }
-                    }
-
-                    if root.notif-rows.length == 0 && !root.dnd: Text {
-                        width: parent.width;
-                        height: parent.height;
-                        text: @tr("No notifications");
-                        color: root.fg.with-alpha(0.5);
-                        font-size: 12px;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
                     }
                 }
             }
@@ -2739,6 +3005,78 @@ export component Island inherits Window {
                 border-bottom-left-radius: pill.radius;
                 border-bottom-right-radius: pill.radius;
             }
+        }
+    }
+
+    // Pont entre la pilule et la bulle : épais au départ, il s'affine et cède
+    // quand la bulle s'éloigne.
+    if root.bubble-out > 0.01: Rectangle {
+        property <float> neck: Math.max(0, 1 - root.bubble-out * 1.3);
+        x: pill.x + pill.width - pill.height / 2;
+        y: pill.y + (pill.height - self.height) / 2;
+        width: Math.max(0px, bubble.x + bubble.width / 2 - self.x);
+        height: pill.height * (0.3 + 0.6 * self.neck);
+        border-radius: self.height / 2;
+        background: root.bg;
+        visible: self.neck > 0;
+    }
+
+    bubble := Rectangle {
+        property <length> size: pill.height;
+        x: pill.x + pill.width - self.size + root.bubble-out * (self.size + root.bubble-gap);
+        y: pill.y;
+        width: self.size;
+        height: self.size;
+        visible: root.bubble-out > 0.01;
+        border-radius: self.size / 2;
+        background: root.bg;
+        border-width: root.border.alpha > 0 ? 1px : 0px;
+        border-color: root.border;
+        transform-origin: { x: 0px, y: self.height / 2 };
+        transform-scale-x: (60 + 40 * Math.min(1, root.bubble-out)) * 1%;
+        transform-scale-y: (60 + 40 * Math.min(1, root.bubble-out)) * 1%;
+
+        // Claude : sa pastille d'état (irisée, « ! », coche).
+        if root.bubble-kind == "claude": ClaudeBadge {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            opacity: Math.min(1, root.bubble-out);
+            kind: root.claude-glow == "" ? "idle" : root.claude-glow;
+            ink: root.fg;
+            accent: root.accent;
+            ok: root.ok-color;
+            iris: root.iris;
+        }
+
+        // Musique : la pochette en rond (une note sans pochette).
+        if root.bubble-kind == "music": Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: parent.width - 8px;
+            height: self.width;
+            border-radius: self.width / 2;
+            clip: true;
+            opacity: Math.min(1, root.bubble-out);
+            background: root.media-tint.with-alpha(0.35);
+
+            if root.media.has-art: Image {
+                width: parent.width;
+                height: parent.height;
+                source: root.media.art;
+                image-fit: cover;
+            }
+
+            if !root.media.has-art: Text {
+                text: "♪";
+                color: root.fg;
+                font-size: parent.height * 0.6;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        TouchArea {
+            clicked => { root.clicked(); }
         }
     }
 }

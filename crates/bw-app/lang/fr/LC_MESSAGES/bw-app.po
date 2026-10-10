@@ -575,3 +575,30 @@ msgstr "reset dans {}"
 
 msgid "No active usage window"
 msgstr "Aucune fenêtre de consommation en cours"
+
+msgid "Accessory"
+msgstr "Accessoire"
+
+msgid "Worn by the big mascot of the open island."
+msgstr "Porté par la grande mascotte de l'île ouverte."
+
+msgid "Sprout"
+msgstr "Pousse"
+
+msgid "Glasses"
+msgstr "Lunettes"
+
+msgid "Headphones"
+msgstr "Casque"
+
+msgid "Bow"
+msgstr "Nœud"
+
+msgid "None"
+msgstr "Aucun"
+
+msgid "Color"
+msgstr "Couleur"
+
+msgid "The first one follows the theme."
+msgstr "La première suit le thème."

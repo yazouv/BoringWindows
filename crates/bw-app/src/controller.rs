@@ -127,6 +127,7 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         update_state: Cell::new(update::UpdateState::Idle),
         update_timer: Timer::default(),
         artwork: RefCell::new(None),
+        last_skip: Cell::new(None),
         progress_timer: Timer::default(),
         remind_timer: Timer::default(),
         timer: RefCell::new(None),
@@ -191,6 +192,9 @@ pub struct Controller {
     media: RefCell<Option<(&'static str, Arc<MediaSnapshot>)>>,
     /// Pochette convertie pour Slint, gardée tant que le morceau ne change pas.
     artwork: RefCell<Option<(Arc<Vec<u8>>, Image)>>,
+    /// Dernier « précédent » (-1) ou « suivant » (1) demandé : sens du carrousel
+    /// des pochettes au changement de morceau.
+    last_skip: Cell<Option<(i32, std::time::Instant)>>,
     progress_timer: Timer,
     remind_timer: Timer,
     /// Dernier état du minuteur (absent si le module est désactivé).
@@ -591,7 +595,14 @@ impl Controller {
         // nouvelle forme, plus le dépassement du ressort ; elle est ajustée à
         // la fin.
         let scale = self.ui.window().scale_factor();
-        let during = geometry::transition_rect(&theme, old, new, scale);
+        let mut during = geometry::transition_rect(&theme, old, new, scale);
+        if !self.ui.get_bubble().is_empty() {
+            for shape in [old, new] {
+                if matches!(shape, Shape::Compact | Shape::Attention) {
+                    during = during.union(geometry::bubble_rect(&theme, shape, scale));
+                }
+            }
+        }
         self.with_platform(|p| p.set_hit_region(during));
         self.schedule_region_sync(animation);
     }
@@ -608,12 +619,34 @@ impl Controller {
         if self.blur.get() {
             return self.sync_round_region();
         }
-        let rect = geometry::pill_rect(
-            &self.theme(),
-            self.shape.get(),
-            self.ui.window().scale_factor(),
-        );
+        let scale = self.ui.window().scale_factor();
+        let mut rect = geometry::pill_rect(&self.theme(), self.shape.get(), scale);
+        if let Some(bubble) = self.bubble_rect(scale) {
+            rect = rect.union(bubble);
+        }
         self.with_platform(|p| p.set_hit_region(rect));
+    }
+
+    /// Place de la bulle détachée, si elle est sortie (pilule fermée seulement,
+    /// comme dans `island.slint`).
+    fn bubble_rect(&self, scale: f32) -> Option<geometry::PhysRect> {
+        let shape = self.shape.get();
+        (!self.ui.get_bubble().is_empty() && matches!(shape, Shape::Compact | Shape::Attention))
+            .then(|| geometry::bubble_rect(&self.theme(), shape, scale))
+    }
+
+    /// La bulle sort ou rentre : la zone cliquable la couvre tout de suite
+    /// (elle sort) ou jusqu'à la fin de l'animation (elle rentre).
+    fn bubble_changed(&self) {
+        let settle = spring_settle(self.theme().animation_ms) * 2;
+        if self.blur.get() {
+            self.sync_round_region();
+        } else if let Some(bubble) = self.bubble_rect(self.ui.window().scale_factor()) {
+            let scale = self.ui.window().scale_factor();
+            let pill = geometry::pill_rect(&self.theme(), self.shape.get(), scale);
+            self.with_platform(|p| p.set_hit_region(pill.union(bubble)));
+        }
+        self.schedule_region_sync(settle);
     }
 
     /// Région à la forme exacte de la pilule, telle qu'elle est dessinée.
@@ -630,6 +663,10 @@ impl Controller {
             ui.get_pill_flat_top(),
             ui.window().scale_factor(),
         );
+        let shape = geometry::RoundRect {
+            bubble: self.bubble_rect(ui.window().scale_factor()),
+            ..shape
+        };
         self.with_platform(|p| p.set_round_region(shape));
     }
 
@@ -1543,6 +1580,23 @@ impl Controller {
             *self.artwork.borrow_mut() = None;
         }
 
+        // Nouveau morceau : l'île fait sortir l'ancienne pochette (carrousel),
+        // vers la droite après un « précédent » récent, vers la gauche sinon.
+        let old = self.ui.get_media();
+        if self.ui.get_has_media()
+            && np.is_some_and(|n| n.title != old.title.as_str() || n.artist != old.artist.as_str())
+        {
+            let back = self
+                .last_skip
+                .get()
+                .is_some_and(|(dir, at)| dir < 0 && at.elapsed() < Duration::from_secs(4));
+            self.ui.set_prev_art(old.art.clone());
+            self.ui.set_prev_has_art(old.has_art);
+            self.ui.set_track_back(back);
+            self.ui
+                .set_track_seq(self.ui.get_track_seq().wrapping_add(1));
+        }
+
         self.ui.set_has_media(np.is_some());
         if let Some(n) = np {
             self.ui.set_media(MediaInfo {
@@ -1627,6 +1681,11 @@ impl Controller {
     }
 
     fn media_action(&self, action: String) {
+        match action.as_str() {
+            "prev" => self.last_skip.set(Some((-1, std::time::Instant::now()))),
+            "next" => self.last_skip.set(Some((1, std::time::Instant::now()))),
+            _ => {}
+        }
         let owner = self.media.borrow().as_ref().map(|(owner, _)| *owner);
         if let (Some(owner), Some(host)) = (owner, self.host.borrow().as_ref()) {
             host.send_action(Action {
@@ -1850,7 +1909,32 @@ impl Controller {
             }
             .into(),
         );
+        // Bulle détachée : la deuxième activité en cours, à côté de la pilule
+        // (Claude pendant la musique, la musique pendant Claude).
+        let winner_module = self.arbiter.borrow().winner().map(|w| w.module);
+        let media_owner = self.media.borrow().as_ref().map(|(owner, _)| *owner);
+        let bubble = match winner_module.as_deref() {
+            Some(m) if m == bw_claude::MODULE_ID && self.music_playing() => "music",
+            Some(m) if Some(m) == media_owner && claude.is_some() => "claude",
+            _ => "",
+        };
+        if self.ui.get_bubble() != bubble {
+            let toggled = self.ui.get_bubble().is_empty() != bubble.is_empty();
+            self.ui.set_bubble(bubble.into());
+            if toggled {
+                self.bubble_changed();
+            }
+        }
         self.ui.set_mascot_enabled(config.enabled);
+        self.ui
+            .set_mascot_accessory(config.accessory.as_str().into());
+        match config.body_color() {
+            Some(c) => {
+                self.ui.set_mascot_custom_color(true);
+                self.ui.set_mascot_color(color(c));
+            }
+            None => self.ui.set_mascot_custom_color(false),
+        }
         if !config.enabled {
             self.ui.set_mascot_place("".into());
             self.ui.set_mascot_animated(false);

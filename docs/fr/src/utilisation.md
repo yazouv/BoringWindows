@@ -18,6 +18,11 @@ question de Claude passe avant une réunion qui commence, qui passe avant la
 musique. L'ordre à importance égale se règle avec
 [`layout.compact`](configuration.md#layout).
 
+Quand la musique et Claude tournent en même temps, une **bulle** se détache à
+droite de la pilule pour celui qui n'a pas la main : la pastille de Claude
+(irisée quand il travaille, « ! » quand il attend, coche quand il a fini) ou
+la pochette du morceau. Un clic dessus ouvre l'île.
+
 ## Les onglets
 
 L'île ouverte a des onglets, en haut à droite :
@@ -29,7 +34,7 @@ L'île ouverte a des onglets, en haut à droite :
 - **Claude** : la consommation et les
   [conversations récentes](claude-code.md#conversations-récentes-et-consommation).
 
-Un onglet n'apparaît que si son module est actif. L'île revient sur l'accueil
+Changer d'onglet fait glisser le contenu. Un onglet n'apparaît que si son module est actif. L'île revient sur l'accueil
 quand elle se referme.
 
 ## Ouvrir et fermer

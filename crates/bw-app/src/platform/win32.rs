@@ -14,9 +14,9 @@ use windows::Win32::Foundation::{
     LRESULT, POINT, RECT, WPARAM,
 };
 use windows::Win32::Graphics::Gdi::{
-    CombineRgn, CreateRectRgn, CreateRoundRectRgn, DeleteObject, GetMonitorInfoW, HMONITOR,
-    MONITOR_DEFAULTTONEAREST, MONITOR_DEFAULTTOPRIMARY, MONITORINFO, MonitorFromPoint,
-    MonitorFromRect, MonitorFromWindow, RGN_OR, SetWindowRgn,
+    CombineRgn, CreateEllipticRgn, CreateRectRgn, CreateRoundRectRgn, DeleteObject,
+    GetMonitorInfoW, HMONITOR, MONITOR_DEFAULTTONEAREST, MONITOR_DEFAULTTOPRIMARY, MONITORINFO,
+    MonitorFromPoint, MonitorFromRect, MonitorFromWindow, RGN_OR, SetWindowRgn,
 };
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Registry::{
@@ -1166,6 +1166,16 @@ fn round_region(shape: RoundRect) -> windows::Win32::Graphics::Gdi::HRGN {
             let top = CreateRectRgn(x, y, x + width, y + height / 2);
             CombineRgn(Some(rgn), Some(rgn), Some(top), RGN_OR);
             let _ = DeleteObject(top.into());
+        }
+        // Bulle détachée : un cercle de la hauteur de la pilule, au bout de
+        // la zone qui lui est réservée.
+        if let Some(b) = shape.bubble {
+            let d = height.min(b.width);
+            // Moins la marge d'anticrénelage (2 px) ajoutée par `bubble_rect`.
+            let left = b.x + b.width - 2 - d;
+            let circle = CreateEllipticRgn(left, y, left + d + 1, y + d + 1);
+            CombineRgn(Some(rgn), Some(rgn), Some(circle), RGN_OR);
+            let _ = DeleteObject(circle.into());
         }
         rgn
     }

@@ -194,6 +194,13 @@ impl Controller {
         ui.set_mascot_always_animated(mascot.always_animated);
         ui.set_mascot_music(mascot.music);
         ui.set_mascot_seasonal(mascot.seasonal);
+        ui.set_mascot_accessory_index(
+            crate::mascot::ACCESSORIES
+                .iter()
+                .position(|a| *a == mascot.accessory)
+                .unwrap_or(0) as i32,
+        );
+        ui.set_mascot_color(mascot.color.as_str().into());
         let weather =
             bw_weather::WeatherConfig::from_table(config.modules.get(bw_weather::MODULE_ID))
                 .unwrap_or_default();
@@ -828,6 +835,19 @@ impl Controller {
             "modules.mascot.seasonal" => Some((
                 vec!["modules", "mascot", "seasonal"],
                 Value::Bool(ui.get_mascot_seasonal()),
+            )),
+            "modules.mascot.accessory" => Some((
+                vec!["modules", "mascot", "accessory"],
+                Value::Str(
+                    crate::mascot::ACCESSORIES
+                        .get(ui.get_mascot_accessory_index() as usize)
+                        .unwrap_or(&"sprout")
+                        .to_string(),
+                ),
+            )),
+            "modules.mascot.color" => Some((
+                vec!["modules", "mascot", "color"],
+                Value::Str(ui.get_mascot_color().to_string()),
             )),
             "theme.blur" => Some((vec!["theme", "blur"], Value::Bool(ui.get_blur()))),
             "theme.glow" => Some((vec!["theme", "glow"], Value::Bool(ui.get_glow()))),

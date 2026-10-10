@@ -347,6 +347,9 @@ export component SettingsWindow inherits Window {
     in-out property <bool> mascot-always-animated;
     in-out property <bool> mascot-music;
     in-out property <bool> mascot-seasonal;
+    // Accessoire (index dans la liste) et couleur (« #RRGGBB », vide : thème).
+    in-out property <int> mascot-accessory-index;
+    in-out property <string> mascot-color;
     in-out property <bool> notifications-enabled;
     in-out property <bool> notifications-content;
     in-out property <bool> notifications-original;
@@ -1563,6 +1566,53 @@ export component SettingsWindow inherits Window {
                         Toggle {
                             checked <=> root.mascot-seasonal;
                             toggled => { root.changed("modules.mascot.seasonal"); }
+                        }
+                    }
+                }
+
+                Card {
+                    Setting {
+                        enabled: root.mascot-enabled;
+                        title: @tr("Accessory");
+                        description: @tr("Worn by the big mascot of the open island.");
+                        ComboBox {
+                            width: 180px;
+                            enabled: root.mascot-enabled;
+                            model: [@tr("Sprout"), @tr("Glasses"), @tr("Headphones"), @tr("Bow"), @tr("None")];
+                            current-index <=> root.mascot-accessory-index;
+                            selected => { root.changed("modules.mascot.accessory"); }
+                        }
+                    }
+
+                    Setting {
+                        enabled: root.mascot-enabled;
+                        title: @tr("Color");
+                        description: @tr("The first one follows the theme.");
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 16px;
+                        padding-right: 16px;
+                        padding-bottom: 14px;
+                        spacing: 6px;
+                        alignment: start;
+
+                        Swatch {
+                            swatch: Ui.text;
+                            current: root.mascot-color == "";
+                            picked => {
+                                root.mascot-color = "";
+                                root.changed("modules.mascot.color");
+                            }
+                        }
+
+                        for c[i] in [#FFF1DC, #FFB3C7, #FF9E7A, #FFD66B, #9FE8C2, #8FD3FF, #C3B1FF, #B0B0B8]: Swatch {
+                            swatch: c;
+                            current: root.mascot-color == ["#FFF1DC", "#FFB3C7", "#FF9E7A", "#FFD66B", "#9FE8C2", "#8FD3FF", "#C3B1FF", "#B0B0B8"][i];
+                            picked => {
+                                root.mascot-color = ["#FFF1DC", "#FFB3C7", "#FF9E7A", "#FFD66B", "#9FE8C2", "#8FD3FF", "#C3B1FF", "#B0B0B8"][i];
+                                root.changed("modules.mascot.color");
+                            }
                         }
                     }
                 }

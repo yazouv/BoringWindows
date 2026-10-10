@@ -19,6 +19,11 @@ from Claude comes before a meeting that is starting, which comes before music.
 The order between items of equal importance is set with
 [`layout.compact`](configuration.md#layout).
 
+When music and Claude run at the same time, a **bubble** splits off to the
+right of the pill for the one that does not have it: Claude's badge
+(iridescent while it works, "!" when it is waiting, a check mark when it is
+done) or the track's artwork. Click it to open the island.
+
 ## Tabs
 
 The open island has tabs, top right:
@@ -29,7 +34,7 @@ The open island has tabs, top right:
 - **Claude**: usage and
   [recent conversations](claude-code.md#recent-conversations-and-usage).
 
-A tab only shows when its module is on. The island goes back to Home when it
+Switching tabs slides the content. A tab only shows when its module is on. The island goes back to Home when it
 closes.
 
 ## Open and close

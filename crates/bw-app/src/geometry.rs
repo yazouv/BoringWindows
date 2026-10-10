@@ -97,14 +97,44 @@ pub fn transition_rect(theme: &Theme, old: Shape, new: Shape, scale: f32) -> Phy
     }
 }
 
-/// Zone occupée par la pilule pour `shape`, à l'échelle `scale`.
-pub fn pill_rect(theme: &Theme, shape: Shape, scale: f32) -> PhysRect {
-    let size = match shape {
+fn shape_size(theme: &Theme, shape: Shape) -> Size {
+    match shape {
         Shape::Compact => theme.compact,
         Shape::Attention => theme.attention,
         Shape::Notification => notification_size(theme),
         Shape::Expanded => theme.expanded,
-    };
+    }
+}
+
+/// Écart entre la pilule et la bulle détachée (logique), comme `bubble-gap`
+/// dans `island.slint`.
+pub const BUBBLE_GAP: f32 = 6.0;
+
+/// Bulle détachée à droite de la pilule `shape` (un cercle de sa hauteur),
+/// avec l'écart qui l'en sépare : la zone cliquable doit couvrir les deux,
+/// et le pont « liquide » passe dans l'écart.
+pub fn bubble_rect(theme: &Theme, shape: Shape, scale: f32) -> PhysRect {
+    let size = shape_size(theme, shape);
+    let (win_w, win_h) = window_size(theme);
+    let pill_right = (win_w + size.width) / 2.0;
+    // La pilule se resserre un peu sur les basses : marge de quelques pixels.
+    let left = ((pill_right - 6.0) * scale).floor() as i32;
+    let top = (theme.top_offset * scale).floor() as i32 - AA_PAD;
+    let right = ((pill_right + BUBBLE_GAP + size.height) * scale).ceil() as i32 + AA_PAD;
+    let bottom = ((theme.top_offset + size.height) * scale).ceil() as i32 + AA_PAD;
+    let (max_w, max_h) = ((win_w * scale).ceil() as i32, (win_h * scale).ceil() as i32);
+    let (x, y) = (left.max(0), top.max(0));
+    PhysRect {
+        x,
+        y,
+        width: right.min(max_w) - x,
+        height: bottom.min(max_h) - y,
+    }
+}
+
+/// Zone occupée par la pilule pour `shape`, à l'échelle `scale`.
+pub fn pill_rect(theme: &Theme, shape: Shape, scale: f32) -> PhysRect {
+    let size = shape_size(theme, shape);
     let (win_w, win_h) = window_size(theme);
 
     let left = ((win_w - size.width) / 2.0 * scale).floor() as i32 - AA_PAD;
@@ -132,6 +162,8 @@ pub struct RoundRect {
     pub radius: i32,
     /// Coins du haut carrés : pilule collée en haut de l'écran.
     pub flat_top: bool,
+    /// Bulle détachée à côté de la pilule (bornes du cercle et de l'écart).
+    pub bubble: Option<PhysRect>,
 }
 
 /// Pilule telle que l'île la dessine en ce moment (valeurs logiques, animées
@@ -155,6 +187,7 @@ pub fn pill_round_rect(
         },
         radius: (radius * scale).round().max(0.0) as i32,
         flat_top,
+        bubble: None,
     }
 }
 
@@ -175,7 +208,8 @@ mod tests {
                     height: 48
                 },
                 radius: 24,
-                flat_top: true
+                flat_top: true,
+                bubble: None
             }
         );
     }
@@ -204,6 +238,22 @@ mod tests {
                 y: 0,
                 width: 584,
                 height: 172
+            }
+        );
+    }
+
+    #[test]
+    fn bubble_sits_right_of_the_pill() {
+        let theme = Theme::default();
+        // Pilule fermée : bord droit à (608 + 190) / 2 = 399, écart 6, cercle de 32.
+        let r = bubble_rect(&theme, Shape::Compact, 1.0);
+        assert_eq!(
+            r,
+            PhysRect {
+                x: 393,
+                y: 0,
+                width: 46,
+                height: 34
             }
         );
     }

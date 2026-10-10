@@ -174,6 +174,11 @@ music = true
 seasonal = true
 # Minutes sans clavier ni souris avant qu'elle s'endorme.
 sleep_after_minutes = 10
+# Accessoire de la grande mascotte (île ouverte) : "sprout" (pousse), "glasses"
+# (lunettes), "headphones" (casque), "bow" (nœud) ou "none".
+accessory = "sprout"
+# Couleur du corps, comme "#FFB3C7" ; vide : celle du texte du thème.
+color = ""
 
 [modules.gestures]
 # Gestes sur l'île : molette pour le volume, glisser (pavé tactile, Maj + molette
