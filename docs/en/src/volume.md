@@ -4,8 +4,7 @@ Every change of the system volume (keyboard keys, Windows mixer, an
 application) shows for a moment in the pill: "Volume 45 %" or "Muted". It is off
 by default, since Windows already shows its own indicator.
 
-Turn it on in Settings › **General** › "Show volume changes in the island", or
-in `config.toml`:
+Turn it on in Settings › **Notifications** › "Volume", or in `config.toml`:
 
 ```toml
 [modules.volume]
@@ -27,8 +26,8 @@ What it does, and does not do:
 Same idea for the screen brightness: "Brightness 70 %" shows on every change
 (keyboard keys, notification center, battery saver). It is off by default too.
 
-Turn it on in Settings › **General** › "Show brightness changes in the island
-(laptops)", or in `config.toml`:
+Turn it on in Settings › **Notifications** › "Brightness", or in
+`config.toml`:
 
 ```toml
 [modules.brightness]

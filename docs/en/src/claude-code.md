@@ -10,7 +10,7 @@ and lets you **allow or deny a command without going back to the terminal**.
 
 1. Start BoringWindows.
 2. Right-click its icon › **Claude Code: install hooks…**, or **Settings…** ›
-   **Claude Code** tab › **Install hooks**.
+   **Claude Code** › **Install hooks**.
 3. The dialog lists exactly what will be added to `~/.claude/settings.json`.
    Answer **Yes**.
 4. **Restart your Claude Code sessions**: they only read their hooks at start

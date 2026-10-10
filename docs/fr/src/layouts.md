@@ -9,7 +9,7 @@ tu l'enregistres, sans recompiler BoringWindows.
 1. Réglages › **Apparence** › **Dossier des vues** (ou crée
    `%APPDATA%\BoringWindows\layouts\` à la main).
 2. Écris `layouts\ma-vue.slint` (exemple plus bas).
-3. Réglages › **Vue personnelle de l'île ouverte** › `ma-vue`, ou dans
+3. Réglages › **Apparence** › **Vue personnelle de l'île ouverte** › `ma-vue`, ou dans
    `config.toml` :
 
 ```toml

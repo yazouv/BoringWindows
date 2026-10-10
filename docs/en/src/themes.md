@@ -46,7 +46,7 @@ not part of themes: they are always set in `[theme]` (see the
   (`system_accent = true`): the accent follows the one chosen in Windows
   settings, in a lighter shade on dark themes and a darker one on light
   themes. It changes along with Windows. Album art still takes over while
-  music plays (Music tab).
+  music plays (Music page).
 - **"Blur what is behind the island"** (`blur = true`, on in `glass`): what is
   behind the island is blurred, like Windows 11 menus. The blur takes the
   exact shape of the pill, animations included. It only shows through a

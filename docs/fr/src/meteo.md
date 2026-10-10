@@ -7,8 +7,8 @@ pictogramme (soleil, nuages, pluie, neige, orage…) et la température.
 
 Désactivé par défaut : il faut une ville.
 
-Réglages › **Météo** : coche « Afficher la météo à côté de la date dans l'île
-ouverte », écris ta ville et choisis l'unité. Ou dans `config.toml` :
+Réglages › **Météo** : active « Afficher la météo », écris ta ville et choisis
+l'unité. Ou dans `config.toml` :
 
 ```toml
 [modules.weather]

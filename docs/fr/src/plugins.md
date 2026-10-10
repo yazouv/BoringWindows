@@ -7,7 +7,7 @@ sable** : aucun accès aux fichiers, au réseau ni au système, seulement les
 quelques fonctions ci-dessous.
 
 Les plugins sont **désactivés par défaut** : on n'exécute du code tiers que si tu
-le demandes (Réglages › Général › « Lancer les plugins WASM », ou
+le demandes (Réglages › Général › « Plugins WASM », ou
 `[modules.plugins] enabled = true`).
 
 ## Installer un plugin

@@ -15,7 +15,7 @@ l'en-tête si elle est ouverte, dans la pilule sinon. Si le module
 [volume](volume.md) est activé, c'est son propre affichage qui montre le
 volume.
 
-Réglages › **Général** › « Gestes sur l'île… », ou dans `config.toml` :
+Réglages › **Général** › « Gestes », ou dans `config.toml` :
 
 ```toml
 [modules.gestures]

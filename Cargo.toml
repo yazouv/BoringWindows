@@ -49,7 +49,10 @@ debug = false
 
 [profile.release]
 opt-level = 3
-lto = "fat"
-codegen-units = 1
+# LTO « thin » et codegen-units par défaut : mesuré sur 4 cœurs, compilation
+# 334 s au lieu de 544 s (172 s au lieu de 353 s avec les dépendances en
+# cache), pour un binaire compressé 10 % plus gros (14,6 Mo au lieu de 13,2).
+# Les minutes de la CI de release coûtent plus cher que ces 1,4 Mo.
+lto = "thin"
 panic = "abort"
 strip = true
