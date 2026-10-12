@@ -603,6 +603,48 @@ msgstr "Couleur"
 msgid "The first one follows the theme."
 msgstr "La première suit le thème."
 
+msgid "Network"
+msgstr "Réseau"
+
+msgid "Show the network"
+msgstr "Afficher le réseau"
+
+msgid "An icon next to the time in the open island: Wi-Fi, wired, VPN or offline. Hover it for the network and the speeds."
+msgstr "Une icône à côté de l'heure dans l'île ouverte : Wi-Fi, filaire, VPN ou hors ligne. Survolez-la pour le réseau et les débits."
+
+msgid "Speed in the collapsed island"
+msgstr "Débit dans l'île repliée"
+
+msgid "Music and Claude take precedence over the speed."
+msgstr "La musique et Claude passent avant le débit."
+
+msgid "when data moves"
+msgstr "quand ça circule"
+
+msgid "always"
+msgstr "toujours"
+
+msgid "Speed unit"
+msgstr "Unité des débits"
+
+msgid "Bytes (MB/s)"
+msgstr "Octets (Mo/s)"
+
+msgid "Bits (Mb/s)"
+msgstr "Bits (Mb/s)"
+
+msgid "Announce lost and restored connection"
+msgstr "Annoncer la perte et le retour de la connexion"
+
+msgid "Announce VPN connected or disconnected"
+msgstr "Annoncer le VPN connecté ou déconnecté"
+
+msgid "Announce a new Wi-Fi network"
+msgstr "Annoncer un nouveau réseau Wi-Fi"
+
+msgid "The VPN is detected from Windows connections of the tunnel type: the Windows VPN client and WireGuard are recognized, some other clients may not be."
+msgstr "Le VPN est repéré parmi les connexions Windows de type tunnel : le client VPN de Windows et WireGuard sont reconnus, d'autres clients peuvent ne pas l'être."
+
 msgid "Only during calls and screen sharing"
 msgstr "Seulement pendant les appels et partages d'écran"
 

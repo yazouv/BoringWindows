@@ -214,6 +214,19 @@ impl Controller {
         ui.set_system_refresh(system.refresh_secs as i32);
         ui.set_cpu_alert_index(alert_index(system.cpu_alert_percent));
         ui.set_ram_alert_index(alert_index(system.ram_alert_percent));
+        let network =
+            bw_network::NetworkConfig::from_table(config.modules.get(bw_network::MODULE_ID))
+                .unwrap_or_default();
+        ui.set_network_enabled(config.module_enabled(bw_network::MODULE_ID, true));
+        ui.set_network_compact_index(match network.compact_speed {
+            bw_network::CompactSpeed::Off => 0,
+            bw_network::CompactSpeed::Active => 1,
+            bw_network::CompactSpeed::Always => 2,
+        });
+        ui.set_network_unit_index(i32::from(network.unit == bw_network::Unit::Bits));
+        ui.set_network_announce_connection(network.announce_connection);
+        ui.set_network_announce_vpn(network.announce_vpn);
+        ui.set_network_announce_wifi(network.announce_wifi);
         let hotkeys = &config.hotkeys;
         ui.set_hotkey_toggle(hotkeys.toggle.as_str().into());
         ui.set_hotkey_play_pause(hotkeys.play_pause.as_str().into());
@@ -894,6 +907,44 @@ impl Controller {
             "modules.system.ram_alert_percent" => Some((
                 vec!["modules", "system", "ram_alert_percent"],
                 Value::Int(alert_percent(ui.get_ram_alert_index())),
+            )),
+            "modules.network.enabled" => Some((
+                vec!["modules", "network", "enabled"],
+                Value::Bool(ui.get_network_enabled()),
+            )),
+            "modules.network.compact_speed" => Some((
+                vec!["modules", "network", "compact_speed"],
+                Value::Str(
+                    match ui.get_network_compact_index() {
+                        1 => "active",
+                        2 => "always",
+                        _ => "off",
+                    }
+                    .into(),
+                ),
+            )),
+            "modules.network.unit" => Some((
+                vec!["modules", "network", "unit"],
+                Value::Str(
+                    if ui.get_network_unit_index() == 1 {
+                        "bits"
+                    } else {
+                        "bytes"
+                    }
+                    .into(),
+                ),
+            )),
+            "modules.network.announce_connection" => Some((
+                vec!["modules", "network", "announce_connection"],
+                Value::Bool(ui.get_network_announce_connection()),
+            )),
+            "modules.network.announce_vpn" => Some((
+                vec!["modules", "network", "announce_vpn"],
+                Value::Bool(ui.get_network_announce_vpn()),
+            )),
+            "modules.network.announce_wifi" => Some((
+                vec!["modules", "network", "announce_wifi"],
+                Value::Bool(ui.get_network_announce_wifi()),
             )),
             "hotkeys.toggle" => Some((
                 vec!["hotkeys", "toggle"],

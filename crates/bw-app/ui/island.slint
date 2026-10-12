@@ -116,6 +116,16 @@ export struct SystemInfo {
     ram-hot: bool,
 }
 
+// Réseau dans l'en-tête : une icône de largeur fixe ; au survol, le détail
+// (réseau, débits) remplace la date.
+export struct NetworkInfo {
+    /// wifi | wifi-off | ethernet | shield | globe
+    icon: string,
+    detail: string,
+    // Hors ligne : en couleur d'alerte.
+    offline: bool,
+}
+
 // Pictogrammes au trait, viewbox 24x24 (tracés d'après Lucide, licence ISC).
 component Glyph inherits Path {
     in property <string> name;
@@ -139,6 +149,11 @@ component Glyph inherits Path {
         : root.name == "bolt" ? "M13 2L4.5 13.5H11L10 22l8.5-11.5H12Z"
         : root.name == "cpu" ? "M12 20v2 M12 2v2 M17 20v2 M17 2v2 M2 12h2 M2 17h2 M2 7h2 M20 12h2 M20 17h2 M20 7h2 M7 20v2 M7 2v2 M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z M9 8h6a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"
         : root.name == "memory" ? "M6 19v-3 M10 19v-3 M14 19v-3 M18 19v-3 M8 11V9 M16 11V9 M12 11V9 M2 15h20 M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v1.1a2 2 0 0 0 0 3.837V17a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5.1a2 2 0 0 0 0-3.837Z"
+        : root.name == "wifi" ? "M12 20h.01 M2 8.82a15 15 0 0 1 20 0 M5 12.859a10 10 0 0 1 14 0 M8.5 16.429a5 5 0 0 1 7 0"
+        : root.name == "wifi-off" ? "M12 20h.01 M8.5 16.429a5 5 0 0 1 7 0 M5 12.859a10 10 0 0 1 5.17-2.69 M19 12.859a10 10 0 0 0-2.007-1.523 M2 8.82a15 15 0 0 1 4.177-2.643 M22 8.82a15 15 0 0 0-11.288-3.764 M2 2l20 20"
+        : root.name == "ethernet" ? "M15 20l3-3h2a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h2l3 3z M6 8v1 M10 8v1 M14 8v1 M18 8v1"
+        : root.name == "shield" ? "M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z M9 12l2 2 4-4"
+        : root.name == "globe" ? "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M2 12h20 M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
         : root.name == "battery" ? "M16 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z M22 11v2"
         : "M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z";
 }
@@ -1232,6 +1247,9 @@ export component Island inherits Window {
     in property <bool> has-system;
     in property <SystemInfo> system;
     property <bool> system-hover;
+    in property <bool> has-network;
+    in property <NetworkInfo> network;
+    property <bool> network-hover;
     // Pilule telle qu'elle est dessinée (animations comprises) : avec le
     // flou, la région de la fenêtre la suit image par image.
     out property <length> pill-x: pill.x;
@@ -1887,8 +1905,25 @@ export component Island inherits Window {
                         }
                     }
 
+                    // Réseau : l'état en une icône ; le survol donne le détail.
+                    if root.has-network: TouchArea {
+                        width: 15px;
+                        changed has-hover => {
+                            root.network-hover = self.has-hover;
+                        }
+
+                        Glyph {
+                            width: 15px;
+                            height: 15px;
+                            y: (parent.height - self.height) / 2;
+                            name: root.network.icon;
+                            ink: root.network.offline ? root.alert-color : root.fg.with-alpha(0.7);
+                        }
+                    }
+
                     Text {
                         text: root.toast != "" ? root.toast : root.weather-hover ? root.weather.detail
+                            : root.network-hover ? root.network.detail
                             : root.system-hover ? root.system.detail : root.date-text;
                         color: root.toast != "" ? root.fg : root.fg.with-alpha(0.5);
                         font-size: 12px;

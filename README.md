@@ -171,6 +171,7 @@ démarrage, masquer l'île, quitter.
 | `bw-weather` | météo du moment (open-meteo, sans clé) |
 | `bw-presence` | mode présentation : appels et partages d'écran en cours (registre de confidentialité de Windows) |
 | `bw-system` | processeur et mémoire (mesurés île ouverte), alertes de surcharge |
+| `bw-network` | Wi-Fi, VPN, débit (jusque dans la pilule repliée), annonces de connexion |
 | `bw-update` | mises à jour depuis les releases GitHub (empreinte vérifiée) |
 | `bw-app` | binaire : île Slint (`ui/island.slint`), intégration Win32, icône de notification |
 

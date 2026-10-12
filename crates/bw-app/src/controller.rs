@@ -31,8 +31,8 @@ use crate::mascot::{self, ClaudeState, MascotConfig};
 use crate::platform::{self, Platform, PlatformEvent, Tray, TrayCommand};
 use crate::shelf::{Shelf, ShelfConfig};
 use crate::{
-    AgendaRow, ClaudePrompt, ClaudeRow, GaugeInfo, Island, MediaInfo, NotifInfo, PluginRow,
-    RecentRow, ShelfRow, SystemInfo, TimerInfo, WeatherInfo, clock, demo,
+    AgendaRow, ClaudePrompt, ClaudeRow, GaugeInfo, Island, MediaInfo, NetworkInfo, NotifInfo,
+    PluginRow, RecentRow, ShelfRow, SystemInfo, TimerInfo, WeatherInfo, clock, demo,
 };
 
 /// Pseudo-module utilisé pour signaler une config invalide dans l'île.
@@ -483,10 +483,9 @@ impl Controller {
             if expanded {
                 self.refresh_activity();
             }
-            self.send_action(
-                bw_system::MODULE_ID,
-                if expanded { "open" } else { "close" },
-            );
+            for module in [bw_system::MODULE_ID, bw_network::MODULE_ID] {
+                self.send_action(module, if expanded { "open" } else { "close" });
+            }
             self.update_progress();
             self.update_viz_activity();
             self.update_timer_ui();
@@ -900,6 +899,7 @@ impl Controller {
         self.ui.set_has_timer(false);
         self.ui.set_has_weather(false);
         self.ui.set_has_system(false);
+        self.ui.set_has_network(false);
         self.live.set(false);
         self.ui.set_live(false);
         self.gauges.borrow_mut().clear();
@@ -927,6 +927,7 @@ impl Controller {
         }
         if self.expanded.get() {
             self.send_action(bw_system::MODULE_ID, "open");
+            self.send_action(bw_network::MODULE_ID, "open");
         }
         self.refresh_shape();
     }
@@ -980,6 +981,13 @@ impl Controller {
                         detail: system.detail().into(),
                         cpu_hot: system.cpu >= HOT_PERCENT,
                         ram_hot: system.ram_percent() >= HOT_PERCENT,
+                    });
+                } else if let Some(network) = state.downcast_ref::<bw_network::NetworkSnapshot>() {
+                    self.ui.set_has_network(true);
+                    self.ui.set_network(NetworkInfo {
+                        icon: network.icon().into(),
+                        detail: network.detail().into(),
+                        offline: network.offline(),
                     });
                 } else if let Ok(snapshot) = state.clone().downcast::<CalendarSnapshot>() {
                     *self.calendar.borrow_mut() = Some(snapshot);
@@ -2397,6 +2405,12 @@ fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
         match bw_system::SystemConfig::from_table(config.modules.get(bw_system::MODULE_ID)) {
             Ok(c) => modules.push(Box::new(bw_system::SystemModule::new(c))),
             Err(e) => errors.push(format!("modules.system : {e:#}")),
+        }
+    }
+    if config.module_enabled(bw_network::MODULE_ID, true) {
+        match bw_network::NetworkConfig::from_table(config.modules.get(bw_network::MODULE_ID)) {
+            Ok(c) => modules.push(Box::new(bw_network::NetworkModule::new(c))),
+            Err(e) => errors.push(format!("modules.network : {e:#}")),
         }
     }
     if config.module_enabled("demo", false) {

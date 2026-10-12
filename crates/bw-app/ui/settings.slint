@@ -420,6 +420,12 @@ export component SettingsWindow inherits Window {
     in-out property <int> system-refresh;
     in-out property <int> cpu-alert-index;
     in-out property <int> ram-alert-index;
+    in-out property <bool> network-enabled;
+    in-out property <int> network-compact-index;
+    in-out property <int> network-unit-index;
+    in-out property <bool> network-announce-connection;
+    in-out property <bool> network-announce-vpn;
+    in-out property <bool> network-announce-wifi;
     in-out property <string> hotkey-toggle;
     in-out property <string> hotkey-play-pause;
     in-out property <string> hotkey-next;
@@ -1691,6 +1697,85 @@ export component SettingsWindow inherits Window {
 
                 Hint {
                     text: @tr("With an alert, a measure is also taken every 5 seconds, and the pill names the app responsible after 30 seconds above the threshold.");
+                }
+            }
+
+            Section {
+                title: @tr("Network");
+
+                Card {
+                    Setting {
+                        title: @tr("Show the network");
+                        description: @tr("An icon next to the time in the open island: Wi-Fi, wired, VPN or offline. Hover it for the network and the speeds.");
+                        Toggle {
+                            checked <=> root.network-enabled;
+                            toggled => { root.changed("modules.network.enabled"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.network-enabled;
+                        title: @tr("Speed in the collapsed island");
+                        description: @tr("Music and Claude take precedence over the speed.");
+                        ComboBox {
+                            width: 150px;
+                            enabled: root.network-enabled;
+                            model: [@tr("never"), @tr("when data moves"), @tr("always")];
+                            current-index <=> root.network-compact-index;
+                            selected => { root.changed("modules.network.compact_speed"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.network-enabled;
+                        title: @tr("Speed unit");
+                        ComboBox {
+                            width: 150px;
+                            enabled: root.network-enabled;
+                            model: [@tr("Bytes (MB/s)"), @tr("Bits (Mb/s)")];
+                            current-index <=> root.network-unit-index;
+                            selected => { root.changed("modules.network.unit"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.network-enabled;
+                        title: @tr("Announce lost and restored connection");
+                        Toggle {
+                            enabled: root.network-enabled;
+                            checked <=> root.network-announce-connection;
+                            toggled => { root.changed("modules.network.announce_connection"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.network-enabled;
+                        title: @tr("Announce VPN connected or disconnected");
+                        Toggle {
+                            enabled: root.network-enabled;
+                            checked <=> root.network-announce-vpn;
+                            toggled => { root.changed("modules.network.announce_vpn"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.network-enabled;
+                        title: @tr("Announce a new Wi-Fi network");
+                        Toggle {
+                            enabled: root.network-enabled;
+                            checked <=> root.network-announce-wifi;
+                            toggled => { root.changed("modules.network.announce_wifi"); }
+                        }
+                    }
+                }
+
+                Hint {
+                    text: @tr("The VPN is detected from Windows connections of the tunnel type: the Windows VPN client and WireGuard are recognized, some other clients may not be.");
                 }
             }
 

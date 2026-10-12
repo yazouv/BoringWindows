@@ -206,6 +206,20 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 | `ram_alert_percent` | `0` | 0, or 50 to 100 | alert when the memory stays above it (%); 0: never |
 | `alert_after_secs` | `30` | 5 to 600 | time above the threshold before the alert (s) |
 
+## `[modules.network]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `true` | | show the [network](reseau.md) (open island icon, announcements) |
+| `compact_speed` | `"off"` | `off`, `active`, `always` | speed in the collapsed pill: never, only while data moves, or always |
+| `unit` | `"bytes"` | `bytes`, `bits` | speed unit (MB/s or Mb/s) |
+| `refresh_secs` | `1` | 1 to 10 | speed refresh interval (s) |
+| `active_kb_per_sec` | `50` | 1 to 1000000 | `active` mode: speed from which it shows (KB/s) |
+| `announce_connection` | `true` | | announce the connection lost and restored |
+| `announce_vpn` | `true` | | announce a VPN connected or disconnected |
+| `announce_wifi` | `false` | | announce a Wi-Fi network change |
+| `show_secs` | `5` | 2 to 30 | how long an announcement stays (s) |
+
 ## `[modules.mascot]`
 
 | Option | Default | Range | Purpose |

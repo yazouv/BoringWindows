@@ -207,6 +207,20 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 | `ram_alert_percent` | `0` | 0, ou 50 à 100 | alerte quand la mémoire reste au-dessus (%) ; 0 : jamais |
 | `alert_after_secs` | `30` | 5 à 600 | durée au-dessus du seuil avant l'alerte (s) |
 
+## `[modules.network]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `true` | | afficher le [réseau](reseau.md) (icône de l'île ouverte, annonces) |
+| `compact_speed` | `"off"` | `off`, `active`, `always` | débit dans la pilule repliée : jamais, seulement quand ça circule, ou tout le temps |
+| `unit` | `"bytes"` | `bytes`, `bits` | unité des débits (Mo/s ou Mb/s) |
+| `refresh_secs` | `1` | 1 à 10 | rafraîchissement du débit (s) |
+| `active_kb_per_sec` | `50` | 1 à 1000000 | mode `active` : débit à partir duquel il s'affiche (Ko/s) |
+| `announce_connection` | `true` | | annoncer la perte et le retour de la connexion |
+| `announce_vpn` | `true` | | annoncer un VPN connecté ou déconnecté |
+| `announce_wifi` | `false` | | annoncer un changement de réseau Wi-Fi |
+| `show_secs` | `5` | 2 à 30 | durée d'affichage d'une annonce (s) |
+
 ## `[modules.mascot]`
 
 | Option | Défaut | Plage | Rôle |

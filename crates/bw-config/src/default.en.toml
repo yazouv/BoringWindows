@@ -161,6 +161,28 @@ ram_alert_percent = 0
 # Time above the threshold before the alert (s).
 alert_after_secs = 30
 
+[modules.network]
+# Network: an icon next to the time in the open island (Wi-Fi, wired, VPN,
+# offline); hovering it shows the network and the speeds.
+enabled = true
+# Speed in the collapsed pill: "off" (never), "active" (only while data is
+# moving) or "always". Music and Claude take precedence.
+compact_speed = "off"
+# Speed unit: "bytes" (MB/s) or "bits" (Mb/s).
+unit = "bytes"
+# Speed refresh (s, 1 to 10). While the island is closed nothing is measured
+# as long as compact_speed is "off".
+refresh_secs = 1
+# "active" mode: speed (KB/s) from which it shows.
+active_kb_per_sec = 50
+# Announcements in the pill: connection lost and back, VPN connected or
+# disconnected, Wi-Fi network change.
+announce_connection = true
+announce_vpn = true
+announce_wifi = false
+# How long an announcement stays (s, 2 to 30).
+show_secs = 5
+
 [modules.mascot]
 # The mascot: a little blob in the pill that reacts to Claude Code, dances to
 # the music, falls asleep when you are away and dresses up for the season.
