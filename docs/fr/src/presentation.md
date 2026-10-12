@@ -10,7 +10,12 @@ Pendant un appel ou un partage d'écran, l'île se fait discrète :
 Et, que tu sois en appel ou non, **l'île n'apparaît jamais dans les partages
 d'écran, enregistrements et captures** : tes notifications ne fuient pas
 pendant une démo. Attention, ça vaut aussi pour tes propres captures
-(Win + Maj + S) : décoche l'option si tu veux faire une capture de l'île.
+(Win + Maj + S) : décoche l'option, ou coche « Seulement pendant les appels et
+partages d'écran », si tu veux faire une capture de l'île.
+
+Quand un outil de capture (Outil Capture d'écran, Win + Maj + S, ShareX…) est
+au premier plan, l'île reste affichée mais **laisse passer les clics** : tu
+cadres ta capture sans déclencher l'île par erreur.
 
 ## Comment c'est détecté
 
@@ -38,6 +43,7 @@ captures », ou dans `config.toml` :
 [modules.presentation]
 enabled = true            # détection des appels et partages d'écran
 hide_from_capture = true  # l'île n'apparaît pas dans les captures
+hide_only_when_live = false  # true : cachée seulement en appel ou en partage
 call_apps = ["teams", "discord", "zoom", "slack", "webex", "skype", "chrome", "msedge", "firefox", "brave", "opera", "obs"]
 ```
 

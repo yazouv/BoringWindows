@@ -9,6 +9,9 @@ pub struct PresentationConfig {
     /// L'île n'apparaît jamais dans les partages d'écran, enregistrements et
     /// captures (y compris les tiennes).
     pub hide_from_capture: bool,
+    /// Ne cacher l'île que pendant un appel ou un partage d'écran : le reste du
+    /// temps, tes captures la montrent.
+    pub hide_only_when_live: bool,
     /// Applications dont l'usage du micro veut dire « en appel » (morceau de
     /// nom). La capture d'écran compte quelle que soit l'application.
     pub call_apps: Vec<String>,
@@ -19,6 +22,7 @@ impl Default for PresentationConfig {
         Self {
             enabled: true,
             hide_from_capture: true,
+            hide_only_when_live: false,
             call_apps: [
                 "teams", "discord", "zoom", "slack", "webex", "skype", "chrome", "msedge",
                 "firefox", "brave", "opera", "obs",
@@ -45,7 +49,7 @@ mod tests {
     #[test]
     fn defaults_and_unknown_keys() {
         let c = PresentationConfig::from_table(None).unwrap();
-        assert!(c.enabled && c.hide_from_capture);
+        assert!(c.enabled && c.hide_from_capture && !c.hide_only_when_live);
         assert!(c.call_apps.iter().any(|a| a == "discord"));
         let t: toml::Table = toml::from_str("cacher = true").unwrap();
         assert!(PresentationConfig::from_table(Some(&t)).is_err());

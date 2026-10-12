@@ -230,6 +230,7 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 |---|---|---|---|
 | `enabled` | `true` | | [mode présentation](presentation.md) : rien ne s'annonce pendant un appel ou un partage d'écran |
 | `hide_from_capture` | `true` | | l'île n'apparaît pas dans les partages d'écran, enregistrements et captures |
+| `hide_only_when_live` | `false` | | avec `hide_from_capture` : l'île n'est cachée que pendant un appel ou un partage d'écran |
 | `call_apps` | Teams, Discord, Zoom… | | applications dont l'usage du micro veut dire « en appel » (morceau de nom) |
 
 ## `[modules.visualizer]`

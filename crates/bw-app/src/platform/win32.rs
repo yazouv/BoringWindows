@@ -401,6 +401,25 @@ impl Platform {
         self.capture_excluded.set(excluded);
     }
 
+    /// Laisse passer les clics à travers l'île (et son fond de flou) : un
+    /// outil de capture prêt à cadrer ne doit pas les voir.
+    pub fn set_click_through(&self, on: bool) {
+        use windows::Win32::UI::WindowsAndMessaging::WS_EX_TRANSPARENT;
+        let mut windows = vec![self.hwnd];
+        windows.extend(self.backdrop.borrow().as_ref().map(|b| b.hwnd));
+        for hwnd in windows {
+            // SAFETY: fenêtres vivantes de ce thread.
+            unsafe {
+                let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+                let flag = WS_EX_TRANSPARENT.0 as isize;
+                let wanted = if on { ex | flag } else { ex & !flag };
+                if wanted != ex {
+                    SetWindowLongPtrW(hwnd, GWL_EXSTYLE, wanted);
+                }
+            }
+        }
+    }
+
     /// Prévient (`PlatformEvent::UserReturned`) à la prochaine saisie au
     /// clavier ou à la souris, une seule fois.
     pub fn watch_user_return(&self) {

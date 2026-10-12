@@ -229,6 +229,7 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 |---|---|---|---|
 | `enabled` | `true` | | [presentation mode](presentation.md): nothing pops up during a call or screen sharing |
 | `hide_from_capture` | `true` | | the island doesn't appear in screen sharing, recordings and screenshots |
+| `hide_only_when_live` | `false` | | with `hide_from_capture`: the island is hidden only during a call or screen sharing |
 | `call_apps` | Teams, Discord, Zoom… | | apps whose use of the microphone means "in a call" (part of a name) |
 
 ## `[modules.visualizer]`

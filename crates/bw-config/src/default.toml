@@ -194,6 +194,9 @@ enabled = true
 # L'île n'apparaît pas dans les partages d'écran, enregistrements et captures
 # (les tiennes comprises).
 hide_from_capture = true
+# true : l'île n'est cachée que pendant un appel ou un partage d'écran ; le reste
+# du temps, tes captures la montrent.
+hide_only_when_live = false
 # Applications dont l'usage du micro veut dire « en appel » (morceau de nom).
 call_apps = ["teams", "discord", "zoom", "slack", "webex", "skype", "chrome", "msedge", "firefox", "brave", "opera", "obs"]
 

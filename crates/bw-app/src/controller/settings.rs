@@ -188,6 +188,7 @@ impl Controller {
                 .unwrap_or_default();
         ui.set_presentation_enabled(presentation.enabled);
         ui.set_hide_from_capture(presentation.hide_from_capture);
+        ui.set_hide_only_when_live(presentation.hide_only_when_live);
         let mascot = crate::mascot::MascotConfig::from_table(config.modules.get("mascot"))
             .unwrap_or_default();
         ui.set_mascot_enabled(mascot.enabled);
@@ -815,6 +816,10 @@ impl Controller {
             "modules.presentation.enabled" => Some((
                 vec!["modules", "presentation", "enabled"],
                 Value::Bool(ui.get_presentation_enabled()),
+            )),
+            "modules.presentation.hide_only_when_live" => Some((
+                vec!["modules", "presentation", "hide_only_when_live"],
+                Value::Bool(ui.get_hide_only_when_live()),
             )),
             "modules.presentation.hide_from_capture" => Some((
                 vec!["modules", "presentation", "hide_from_capture"],

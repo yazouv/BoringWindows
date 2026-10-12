@@ -602,3 +602,9 @@ msgstr "Couleur"
 
 msgid "The first one follows the theme."
 msgstr "La première suit le thème."
+
+msgid "Only during calls and screen sharing"
+msgstr "Seulement pendant les appels et partages d'écran"
+
+msgid "The rest of the time, your own screenshots show the island"
+msgstr "Le reste du temps, tes propres captures montrent l'île"

@@ -44,6 +44,8 @@ impl Platform {
 
     pub fn set_capture_excluded(&self, _excluded: bool) {}
 
+    pub fn set_click_through(&self, _on: bool) {}
+
     pub fn watch_user_return(&self) {}
 
     pub fn set_visible(&self, _visible: bool) {}

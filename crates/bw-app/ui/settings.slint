@@ -342,6 +342,7 @@ export component SettingsWindow inherits Window {
     in-out property <bool> gestures-enabled;
     in-out property <bool> presentation-enabled;
     in-out property <bool> hide-from-capture;
+    in-out property <bool> hide-only-when-live;
     // --- Mascotte ---
     in-out property <bool> mascot-enabled;
     in-out property <bool> mascot-always-animated;
@@ -1030,6 +1031,18 @@ export component SettingsWindow inherits Window {
                         Toggle {
                             checked <=> root.hide-from-capture;
                             toggled => { root.changed("modules.presentation.hide_from_capture"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.hide-from-capture;
+                        title: @tr("Only during calls and screen sharing");
+                        description: @tr("The rest of the time, your own screenshots show the island");
+                        Toggle {
+                            enabled: root.hide-from-capture;
+                            checked <=> root.hide-only-when-live;
+                            toggled => { root.changed("modules.presentation.hide_only_when_live"); }
                         }
                     }
                 }

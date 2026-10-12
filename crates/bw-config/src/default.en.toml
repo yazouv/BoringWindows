@@ -194,6 +194,9 @@ enabled = true
 # The island doesn't appear in screen sharing, recordings and screenshots
 # (including yours).
 hide_from_capture = true
+# true: the island is hidden only during a call or screen sharing; the rest of
+# the time, your screenshots show it.
+hide_only_when_live = false
 # Apps whose use of the microphone means "in a call" (part of a name).
 call_apps = ["teams", "discord", "zoom", "slack", "webex", "skype", "chrome", "msedge", "firefox", "brave", "opera", "obs"]
 

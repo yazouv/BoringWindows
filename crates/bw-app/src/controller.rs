@@ -154,6 +154,8 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         away_timer: Timer::default(),
         wheel: RefCell::new(gestures::Wheel::default()),
         live: Cell::new(false),
+        capturing: Cell::new(false),
+        capture_timer: Timer::default(),
         toast_timer: Timer::default(),
         hotkeys: RefCell::new(None),
     });
@@ -241,6 +243,10 @@ pub struct Controller {
     wheel: RefCell<gestures::Wheel>,
     /// En appel ou en partage d'écran (`bw-presence`).
     live: Cell<bool>,
+    /// Un outil de capture d'écran est au premier plan : l'île laisse passer les clics.
+    capturing: Cell<bool>,
+    /// Revérifie le premier plan une fois l'ouverture de l'outil de capture posée.
+    capture_timer: Timer,
     toast_timer: Timer,
     /// Raccourcis clavier globaux (absents si le système les refuse).
     hotkeys: RefCell<Option<crate::hotkeys::Hotkeys>>,
@@ -2108,12 +2114,14 @@ impl Controller {
 
     /// L'île hors des captures et partages d'écran, si demandé.
     fn apply_capture_exclusion(&self) {
-        let hide = self.presentation_config().hide_from_capture;
+        let config = self.presentation_config();
+        let hide = config.hide_from_capture && (!config.hide_only_when_live || self.live.get());
         self.with_platform(|p| p.set_capture_excluded(hide));
     }
 
     fn apply_live(&self, snapshot: &bw_presence::LiveSnapshot) {
         self.live.set(snapshot.live());
+        self.apply_capture_exclusion();
         self.ui.set_live(snapshot.live());
         self.refresh_shape();
     }
@@ -2195,6 +2203,26 @@ impl Controller {
 
     // --- Système -----------------------------------------------------------
 
+    /// Un outil de capture est-il au premier plan ? L'île reste alors affichée
+    /// mais ne reçoit plus les clics : on cadre une capture, on ne manipule pas
+    /// l'île.
+    fn update_capturing(&self) {
+        let capturing = self
+            .platform
+            .borrow()
+            .as_ref()
+            .is_some_and(Platform::foreground_is_capture_tool);
+        if self.capturing.replace(capturing) != capturing {
+            self.with_platform(|p| p.set_click_through(capturing));
+        }
+        // Le calque de capture peut prendre le premier plan après l'annonce
+        // du plein écran : l'île réapparaît alors.
+        if capturing && self.fullscreen.get() {
+            self.fullscreen.set(false);
+            self.update_visibility();
+        }
+    }
+
     fn on_platform_event(&self, event: PlatformEvent) {
         match event {
             PlatformEvent::Fullscreen(entering) => {
@@ -2207,16 +2235,13 @@ impl Controller {
             // Le calque de capture peut prendre le premier plan après
             // l'annonce du plein écran : l'île réapparaît alors.
             PlatformEvent::Foreground => {
-                if self.fullscreen.get()
-                    && self
-                        .platform
-                        .borrow()
-                        .as_ref()
-                        .is_some_and(Platform::foreground_is_capture_tool)
-                {
-                    self.fullscreen.set(false);
-                    self.update_visibility();
-                }
+                self.update_capturing();
+                // À l'ouverture d'un outil de capture, le premier plan passe
+                // par plusieurs fenêtres : on relit une fois la rafale posée.
+                self.capture_timer
+                    .start(TimerMode::SingleShot, Duration::from_millis(300), || {
+                        post(|c| c.update_capturing());
+                    });
             }
             PlatformEvent::TaskbarChanged => self.update_taskbar(),
             PlatformEvent::PointerLeft => {

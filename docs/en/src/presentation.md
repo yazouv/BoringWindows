@@ -8,7 +8,12 @@ During a call or screen sharing, the island keeps quiet:
 And, in a call or not, **the island never appears in screen sharing,
 recordings and screenshots**: your notifications don't leak during a demo.
 Note that this also applies to your own screenshots (Win + Shift + S): untick
-the option if you want to capture the island.
+the option, or tick "Only during calls and screen sharing", if you want to
+capture the island.
+
+While a capture tool (Snipping Tool, Win + Shift + S, ShareX…) is in the
+foreground, the island stays visible but **lets clicks through**: you frame
+your capture without triggering the island by mistake.
 
 ## How it is detected
 
@@ -34,6 +39,7 @@ capture", or in `config.toml`:
 [modules.presentation]
 enabled = true            # detect calls and screen sharing
 hide_from_capture = true  # the island doesn't appear in captures
+hide_only_when_live = false  # true: hidden only in a call or screen sharing
 call_apps = ["teams", "discord", "zoom", "slack", "webex", "skype", "chrome", "msedge", "firefox", "brave", "opera", "obs"]
 ```
 

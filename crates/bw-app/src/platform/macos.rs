@@ -312,6 +312,10 @@ impl Platform {
         });
     }
 
+    /// Sans objet ici : les outils de capture de macOS ne passent pas par
+    /// la fenêtre de l'île (voir `ignoresMouseEvents` pour son click-through).
+    pub fn set_click_through(&self, _on: bool) {}
+
     /// Prévient (`PlatformEvent::UserReturned`) au prochain mouvement de la
     /// souris ou clic, une seule fois. (Le clavier demanderait l'autorisation
     /// « Accessibilité ».)
