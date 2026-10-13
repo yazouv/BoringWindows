@@ -188,6 +188,7 @@ impl Controller {
                 .unwrap_or_default();
         ui.set_presentation_enabled(presentation.enabled);
         ui.set_hide_from_capture(presentation.hide_from_capture);
+        ui.set_hide_only_when_live(presentation.hide_only_when_live);
         let mascot = crate::mascot::MascotConfig::from_table(config.modules.get("mascot"))
             .unwrap_or_default();
         ui.set_mascot_enabled(mascot.enabled);
@@ -213,12 +214,42 @@ impl Controller {
         ui.set_system_refresh(system.refresh_secs as i32);
         ui.set_cpu_alert_index(alert_index(system.cpu_alert_percent));
         ui.set_ram_alert_index(alert_index(system.ram_alert_percent));
+        let network =
+            bw_network::NetworkConfig::from_table(config.modules.get(bw_network::MODULE_ID))
+                .unwrap_or_default();
+        ui.set_network_enabled(config.module_enabled(bw_network::MODULE_ID, true));
+        ui.set_network_compact_index(match network.compact_speed {
+            bw_network::CompactSpeed::Off => 0,
+            bw_network::CompactSpeed::Active => 1,
+            bw_network::CompactSpeed::Always => 2,
+        });
+        ui.set_network_unit_index(i32::from(network.unit == bw_network::Unit::Bits));
+        ui.set_network_announce_connection(network.announce_connection);
+        ui.set_network_announce_vpn(network.announce_vpn);
+        ui.set_network_announce_wifi(network.announce_wifi);
+        let transfers =
+            bw_transfers::TransfersConfig::from_table(config.modules.get(bw_transfers::MODULE_ID))
+                .unwrap_or_default();
+        ui.set_transfers_enabled(config.module_enabled(bw_transfers::MODULE_ID, true));
+        ui.set_transfers_copies(transfers.copies);
+        ui.set_transfers_downloads(transfers.downloads);
+        ui.set_transfers_announce(transfers.announce_done);
+        let github = bw_github::GithubConfig::from_table(config.modules.get(bw_github::MODULE_ID))
+            .unwrap_or_default();
+        ui.set_github_enabled(config.module_enabled(bw_github::MODULE_ID, false));
+        ui.set_github_use_gh(github.use_gh_cli);
+        ui.set_github_token_saved(!github.token.trim().is_empty());
+        ui.set_github_refresh_index(github_refresh_index(github.refresh_secs));
+        ui.set_github_announce_ci(github.announce_ci);
+        ui.set_github_announce_reviews(github.announce_reviews);
         let hotkeys = &config.hotkeys;
         ui.set_hotkey_toggle(hotkeys.toggle.as_str().into());
         ui.set_hotkey_play_pause(hotkeys.play_pause.as_str().into());
         ui.set_hotkey_next(hotkeys.next_track.as_str().into());
         ui.set_hotkey_previous(hotkeys.previous_track.as_str().into());
         ui.set_hotkey_dnd(hotkeys.do_not_disturb.as_str().into());
+        ui.set_hotkey_quick_add(hotkeys.quick_add.as_str().into());
+        ui.set_tasks_enabled(self.tasks_config().enabled);
         ui.set_notifications_enabled(config.module_enabled(bw_notify::MODULE_ID, true));
         let notify = bw_notify::NotifyConfig::from_table(config.modules.get(bw_notify::MODULE_ID))
             .unwrap_or_default();
@@ -816,6 +847,10 @@ impl Controller {
                 vec!["modules", "presentation", "enabled"],
                 Value::Bool(ui.get_presentation_enabled()),
             )),
+            "modules.presentation.hide_only_when_live" => Some((
+                vec!["modules", "presentation", "hide_only_when_live"],
+                Value::Bool(ui.get_hide_only_when_live()),
+            )),
             "modules.presentation.hide_from_capture" => Some((
                 vec!["modules", "presentation", "hide_from_capture"],
                 Value::Bool(ui.get_hide_from_capture()),
@@ -890,6 +925,104 @@ impl Controller {
                 vec!["modules", "system", "ram_alert_percent"],
                 Value::Int(alert_percent(ui.get_ram_alert_index())),
             )),
+            "modules.network.enabled" => Some((
+                vec!["modules", "network", "enabled"],
+                Value::Bool(ui.get_network_enabled()),
+            )),
+            "modules.network.compact_speed" => Some((
+                vec!["modules", "network", "compact_speed"],
+                Value::Str(
+                    match ui.get_network_compact_index() {
+                        1 => "active",
+                        2 => "always",
+                        _ => "off",
+                    }
+                    .into(),
+                ),
+            )),
+            "modules.network.unit" => Some((
+                vec!["modules", "network", "unit"],
+                Value::Str(
+                    if ui.get_network_unit_index() == 1 {
+                        "bits"
+                    } else {
+                        "bytes"
+                    }
+                    .into(),
+                ),
+            )),
+            "modules.network.announce_connection" => Some((
+                vec!["modules", "network", "announce_connection"],
+                Value::Bool(ui.get_network_announce_connection()),
+            )),
+            "modules.network.announce_vpn" => Some((
+                vec!["modules", "network", "announce_vpn"],
+                Value::Bool(ui.get_network_announce_vpn()),
+            )),
+            "modules.network.announce_wifi" => Some((
+                vec!["modules", "network", "announce_wifi"],
+                Value::Bool(ui.get_network_announce_wifi()),
+            )),
+            "modules.transfers.enabled" => Some((
+                vec!["modules", "transfers", "enabled"],
+                Value::Bool(ui.get_transfers_enabled()),
+            )),
+            "modules.transfers.copies" => Some((
+                vec!["modules", "transfers", "copies"],
+                Value::Bool(ui.get_transfers_copies()),
+            )),
+            "modules.transfers.downloads" => Some((
+                vec!["modules", "transfers", "downloads"],
+                Value::Bool(ui.get_transfers_downloads()),
+            )),
+            "modules.transfers.announce_done" => Some((
+                vec!["modules", "transfers", "announce_done"],
+                Value::Bool(ui.get_transfers_announce()),
+            )),
+            "modules.github.enabled" => Some((
+                vec!["modules", "github", "enabled"],
+                Value::Bool(ui.get_github_enabled()),
+            )),
+            "modules.github.use_gh_cli" => Some((
+                vec!["modules", "github", "use_gh_cli"],
+                Value::Bool(ui.get_github_use_gh()),
+            )),
+            "modules.github.refresh_secs" => Some((
+                vec!["modules", "github", "refresh_secs"],
+                Value::Int(GITHUB_REFRESH_SECS[ui.get_github_refresh_index().clamp(0, 4) as usize]),
+            )),
+            "modules.github.announce_ci" => Some((
+                vec!["modules", "github", "announce_ci"],
+                Value::Bool(ui.get_github_announce_ci()),
+            )),
+            "modules.github.announce_reviews" => Some((
+                vec!["modules", "github", "announce_reviews"],
+                Value::Bool(ui.get_github_announce_reviews()),
+            )),
+            "modules.github.token" => {
+                // Le jeton saisi va dans le coffre de l'OS ; la config n'en garde
+                // que la référence. Le champ est vidé aussitôt.
+                let typed = ui.get_github_token().trim().to_owned();
+                ui.set_github_token("".into());
+                if typed.is_empty() {
+                    None
+                } else {
+                    forget_github_token(&self.config.borrow());
+                    ui.set_github_token_saved(true);
+                    Some((
+                        vec!["modules", "github", "token"],
+                        Value::Str(protect("github", &typed)),
+                    ))
+                }
+            }
+            "modules.github.token_clear" => {
+                forget_github_token(&self.config.borrow());
+                ui.set_github_token_saved(false);
+                Some((
+                    vec!["modules", "github", "token"],
+                    Value::Str(String::new()),
+                ))
+            }
             "hotkeys.toggle" => Some((
                 vec!["hotkeys", "toggle"],
                 Value::Str(ui.get_hotkey_toggle().trim().to_owned()),
@@ -906,6 +1039,23 @@ impl Controller {
                 vec!["hotkeys", "previous_track"],
                 Value::Str(ui.get_hotkey_previous().trim().to_owned()),
             )),
+            "modules.tasks.enabled" => Some((
+                vec!["modules", "tasks", "enabled"],
+                Value::Bool(ui.get_tasks_enabled()),
+            )),
+            "hotkeys.quick_add" => Some((
+                vec!["hotkeys", "quick_add"],
+                Value::Str(ui.get_hotkey_quick_add().trim().to_owned()),
+            )),
+            "tasks.open_file" => {
+                // Crée le fichier s'il n'existe pas encore : l'éditeur s'ouvre dessus.
+                let path = self.tasks_path.borrow().clone();
+                if !path.exists() {
+                    let _ = crate::tasks::Tasks::default().save(&path);
+                }
+                platform::open_path(&path);
+                None
+            }
             "hotkeys.do_not_disturb" => Some((
                 vec!["hotkeys", "do_not_disturb"],
                 Value::Str(ui.get_hotkey_dnd().trim().to_owned()),
@@ -1062,6 +1212,29 @@ impl Controller {
 
 /// Seuils d'alerte proposés (processeur, mémoire) ; 0 : jamais.
 const ALERT_STEPS: [u8; 5] = [0, 70, 80, 90, 95];
+
+/// Intervalles proposés pour le relevé GitHub (secondes).
+const GITHUB_REFRESH_SECS: [i64; 5] = [60, 120, 300, 600, 1800];
+
+/// Entrée de la liste la plus proche de `secs` (config écrite à la main).
+fn github_refresh_index(secs: u32) -> i32 {
+    (0..GITHUB_REFRESH_SECS.len())
+        .min_by_key(|&i| GITHUB_REFRESH_SECS[i].abs_diff(i64::from(secs)))
+        .unwrap_or(1) as i32
+}
+
+/// Retire du coffre le jeton GitHub que la config référence, s'il y en a un.
+fn forget_github_token(config: &bw_config::Config) {
+    let token = config
+        .modules
+        .get(bw_github::MODULE_ID)
+        .and_then(|t| t.get("token"))
+        .and_then(toml::Value::as_str)
+        .and_then(bw_secrets::reference_id);
+    if let Some(id) = token {
+        let _ = bw_secrets::delete(id);
+    }
+}
 
 /// Entrée de la liste pour un seuil : la plus proche (config écrite à la main).
 fn alert_index(percent: u8) -> i32 {

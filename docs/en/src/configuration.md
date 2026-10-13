@@ -85,6 +85,7 @@ for example `"Ctrl+Alt+B"`; `""`: none.
 | `next_track` | `""` | music: next track |
 | `previous_track` | `""` | music: previous track |
 | `do_not_disturb` | `""` | turn "do not disturb" on or off |
+| `quick_add` | `"Ctrl+Alt+N"` | add a [task](taches.md) (when tasks are enabled) |
 
 ## `[modules.claude]`
 
@@ -206,6 +207,50 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 | `ram_alert_percent` | `0` | 0, or 50 to 100 | alert when the memory stays above it (%); 0: never |
 | `alert_after_secs` | `30` | 5 to 600 | time above the threshold before the alert (s) |
 
+## `[modules.network]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `true` | | show the [network](reseau.md) (open island icon, announcements) |
+| `compact_speed` | `"off"` | `off`, `active`, `always` | speed in the collapsed pill: never, only while data moves, or always |
+| `unit` | `"bytes"` | `bytes`, `bits` | speed unit (MB/s or Mb/s) |
+| `refresh_secs` | `1` | 1 to 10 | speed refresh interval (s) |
+| `active_kb_per_sec` | `50` | 1 to 1000000 | `active` mode: speed from which it shows (KB/s) |
+| `announce_connection` | `true` | | announce the connection lost and restored |
+| `announce_vpn` | `true` | | announce a VPN connected or disconnected |
+| `announce_wifi` | `false` | | announce a Wi-Fi network change |
+| `show_secs` | `5` | 2 to 30 | how long an announcement stays (s) |
+
+## `[modules.transfers]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `true` | | show the [transfer progress](transferts.md) in the collapsed pill |
+| `copies` | `true` | | follow File Explorer copies, moves and deletions (Windows) |
+| `downloads` | `true` | | follow browser downloads |
+| `downloads_folder` | `""` | | watched folder; empty: the system Downloads folder |
+| `announce_done` | `true` | | announce when a transfer finishes |
+| `show_secs` | `5` | 2 to 30 | how long the announcement stays (s) |
+
+## `[modules.github]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `false` | | show the [GitHub status](github.md): CI of your pull requests, review requests |
+| `token` | `""` | | access token: `secret:<id>` (OS vault, what the settings do) or the token; empty: the GitHub CLI session |
+| `use_gh_cli` | `true` | | without a token, ask `gh auth token` for one |
+| `refresh_secs` | `120` | 30 to 3600 | interval between two reads (s) |
+| `announce_ci` | `true` | | announce CI success or failure |
+| `announce_reviews` | `true` | | announce a review request |
+| `show_secs` | `6` | 2 to 30 | how long an announcement stays (s) |
+
+## `[modules.tasks]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `false` | | show the [quick tasks](taches.md) tab |
+| `file` | `""` | | Markdown tasks file, relative to the config.toml folder; empty: `tasks.md` |
+
 ## `[modules.mascot]`
 
 | Option | Default | Range | Purpose |
@@ -229,6 +274,7 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 |---|---|---|---|
 | `enabled` | `true` | | [presentation mode](presentation.md): nothing pops up during a call or screen sharing |
 | `hide_from_capture` | `true` | | the island doesn't appear in screen sharing, recordings and screenshots |
+| `hide_only_when_live` | `false` | | with `hide_from_capture`: the island is hidden only during a call or screen sharing |
 | `call_apps` | Teams, Discord, Zoom… | | apps whose use of the microphone means "in a call" (part of a name) |
 
 ## `[modules.visualizer]`

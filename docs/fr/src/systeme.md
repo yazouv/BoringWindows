@@ -3,8 +3,8 @@
 ## Processeur et mémoire
 
 Dans l'île ouverte, à côté de l'heure (et de la météo), deux petits compteurs
-donnent l'usage du **processeur** et de la **mémoire**. **Survole-les** : la
-date laisse la place à la mémoire utilisée, par exemple « Mémoire 8,4 /
+donnent l'usage du **processeur** et de la **mémoire**. **Survole-les** : une
+bulle sous l'en-tête donne la mémoire utilisée, par exemple « Mémoire 8,4 /
 16,0 Go ». Une valeur au-dessus de 90 % passe en rouge.
 
 Rien n'est mesuré quand l'île est fermée : la mesure tourne seulement pendant
@@ -42,6 +42,7 @@ Des raccourcis valables dans toutes les applications :
 | Morceau suivant | `next_track` | aucun |
 | Morceau précédent | `previous_track` | aucun |
 | Ne pas déranger | `do_not_disturb` | aucun |
+| Ajouter une [tâche](taches.md) | `quick_add` | `Ctrl+Alt+N` (si les tâches sont activées) |
 
 Ouverte au clavier, l'île se referme seule au bout de 6 secondes si la souris
 ne vient pas dessus (ou au prochain appui sur le raccourci).
@@ -55,6 +56,7 @@ play_pause = "Ctrl+Alt+P"
 next_track = "Ctrl+Alt+Right"
 previous_track = "Ctrl+Alt+Left"
 do_not_disturb = ""          # vide : pas de raccourci
+quick_add = "Ctrl+Alt+N"     # ajouter une tâche
 ```
 
 Un raccourci s'écrit avec ses modificateurs d'abord, séparés par `+` :

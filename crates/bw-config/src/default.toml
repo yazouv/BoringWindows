@@ -67,6 +67,8 @@ next_track = ""
 previous_track = ""
 # Activer ou couper « ne pas déranger ».
 do_not_disturb = ""
+# Ajouter une tâche (quand les tâches sont activées).
+quick_add = "Ctrl+Alt+N"
 
 # Chaque module se configure dans sa section [modules.<nom>].
 # Un module avec enabled = false n'est même pas démarré.
@@ -161,6 +163,69 @@ ram_alert_percent = 0
 # Durée au-dessus du seuil avant l'alerte (s).
 alert_after_secs = 30
 
+[modules.network]
+# Réseau : une icône à côté de l'heure dans l'île ouverte (Wi-Fi, filaire, VPN,
+# hors ligne) ; le survol donne le réseau et les débits.
+enabled = true
+# Débit dans la pilule repliée : "off" (jamais), "active" (seulement quand ça
+# circule) ou "always" (tout le temps). La musique et Claude passent avant.
+compact_speed = "off"
+# Unité des débits : "bytes" (Mo/s) ou "bits" (Mb/s).
+unit = "bytes"
+# Rafraîchissement du débit (s, de 1 à 10). Rien n'est mesuré île fermée tant
+# que compact_speed vaut "off".
+refresh_secs = 1
+# Mode "active" : débit (Ko/s) à partir duquel il s'affiche.
+active_kb_per_sec = 50
+# Annonces dans la pilule : perte et retour de la connexion, VPN connecté ou
+# déconnecté, changement de réseau Wi-Fi.
+announce_connection = true
+announce_vpn = true
+announce_wifi = false
+# Durée d'affichage d'une annonce (s, de 2 à 30).
+show_secs = 5
+
+[modules.transfers]
+# Transferts : une barre de progression au bord bas de la pilule repliée pendant
+# une copie de fichiers ou un téléchargement.
+enabled = true
+# Copies, déplacements et suppressions de l'Explorateur (Windows).
+copies = true
+# Téléchargements des navigateurs (Chrome, Edge, Firefox…). Les navigateurs ne
+# donnent pas la taille finale : la barre va et vient, avec la taille reçue et la
+# vitesse.
+downloads = true
+# Dossier surveillé ; vide : le dossier Téléchargements du système.
+downloads_folder = ""
+# Annoncer la fin d'une copie ou d'un téléchargement.
+announce_done = true
+# Durée d'affichage de l'annonce (s, de 2 à 30).
+show_secs = 5
+
+[modules.github]
+# GitHub : une icône à côté de l'heure (couleur = état de la CI de tes pull
+# requests ouvertes, point = revue demandée), et des annonces dans la pilule.
+enabled = false
+# Jeton d'accès : "secret:<id>" (rempli par les réglages, coffre de l'OS) ou le
+# jeton lui-même. Vide : la session du GitHub CLI, si use_gh_cli = true.
+token = ""
+# Sans jeton, demander le sien à `gh auth token`.
+use_gh_cli = true
+# Intervalle entre deux relevés (s, de 30 à 3600).
+refresh_secs = 120
+# Annoncer le résultat de la CI de tes pull requests, et les revues demandées.
+announce_ci = true
+announce_reviews = true
+# Durée d'affichage d'une annonce (s, de 2 à 30).
+show_secs = 6
+
+[modules.tasks]
+# Tâches rapides : un onglet « Tâches » dans l'île ouverte, alimenté par le
+# raccourci hotkeys.quick_add.
+enabled = false
+# Fichier Markdown (cases « - [ ] »), à côté de config.toml ; vide : tasks.md.
+file = ""
+
 [modules.mascot]
 # La mascotte : un petit blob dans la pilule qui réagit à Claude Code, danse sur
 # la musique, s'endort quand tu t'absentes et se déguise selon la saison.
@@ -194,6 +259,9 @@ enabled = true
 # L'île n'apparaît pas dans les partages d'écran, enregistrements et captures
 # (les tiennes comprises).
 hide_from_capture = true
+# true : l'île n'est cachée que pendant un appel ou un partage d'écran ; le reste
+# du temps, tes captures la montrent.
+hide_only_when_live = false
 # Applications dont l'usage du micro veut dire « en appel » (morceau de nom).
 call_apps = ["teams", "discord", "zoom", "slack", "webex", "skype", "chrome", "msedge", "firefox", "brave", "opera", "obs"]
 

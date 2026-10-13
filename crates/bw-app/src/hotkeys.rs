@@ -14,6 +14,7 @@ pub enum HotkeyAction {
     Next,
     Previous,
     DoNotDisturb,
+    QuickAdd,
 }
 
 impl HotkeyAction {
@@ -24,6 +25,7 @@ impl HotkeyAction {
             "next_track" => Self::Next,
             "previous_track" => Self::Previous,
             "do_not_disturb" => Self::DoNotDisturb,
+            "quick_add" => Self::QuickAdd,
             _ => return None,
         })
     }
@@ -183,11 +185,16 @@ mod tests {
             next_track: "Ctrl+Alt+Right".into(),
             previous_track: "nope".into(),
             do_not_disturb: String::new(),
+            quick_add: "Ctrl+Alt+N".into(),
         };
         let (found, errors) = bindings(&config);
         assert_eq!(
             found.iter().map(|(_, a)| *a).collect::<Vec<_>>(),
-            [HotkeyAction::Toggle, HotkeyAction::Next]
+            [
+                HotkeyAction::Toggle,
+                HotkeyAction::Next,
+                HotkeyAction::QuickAdd
+            ]
         );
         assert_eq!(errors.len(), 2, "{errors:?}");
         assert!(bindings(&bw_config::Hotkeys::default()).1.is_empty());

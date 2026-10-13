@@ -312,6 +312,10 @@ impl Platform {
         });
     }
 
+    /// Sans objet ici : les outils de capture de macOS ne passent pas par
+    /// la fenêtre de l'île (voir `ignoresMouseEvents` pour son click-through).
+    pub fn set_click_through(&self, _on: bool) {}
+
     /// Prévient (`PlatformEvent::UserReturned`) au prochain mouvement de la
     /// souris ou clic, une seule fois. (Le clavier demanderait l'autorisation
     /// « Accessibilité ».)
@@ -586,6 +590,11 @@ pub fn confirm(title: &str, text: &str) -> bool {
 fn bring_app_forward(mtm: MainThreadMarker) {
     #[allow(deprecated)]
     NSApplication::sharedApplication(mtm).activateIgnoringOtherApps(true);
+}
+
+/// Met la fenêtre d'ajout rapide au premier plan, avec le clavier.
+pub fn focus_tool_window(_window: &slint::Window) {
+    activate_app();
 }
 
 /// Passe l'app au premier plan (fenêtre de réglages).

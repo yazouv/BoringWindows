@@ -602,3 +602,162 @@ msgstr "Couleur"
 
 msgid "The first one follows the theme."
 msgstr "La première suit le thème."
+
+msgid "Network"
+msgstr "Réseau"
+
+msgid "Show the network"
+msgstr "Afficher le réseau"
+
+msgid "An icon next to the time in the open island: Wi-Fi, wired, VPN or offline. Hover it for the network and the speeds."
+msgstr "Une icône à côté de l'heure dans l'île ouverte : Wi-Fi, filaire, VPN ou hors ligne. Survolez-la pour le réseau et les débits."
+
+msgid "Speed in the collapsed island"
+msgstr "Débit dans l'île repliée"
+
+msgid "Music and Claude take precedence over the speed."
+msgstr "La musique et Claude passent avant le débit."
+
+msgid "when data moves"
+msgstr "quand ça circule"
+
+msgid "always"
+msgstr "toujours"
+
+msgid "Speed unit"
+msgstr "Unité des débits"
+
+msgid "Bytes (MB/s)"
+msgstr "Octets (Mo/s)"
+
+msgid "Bits (Mb/s)"
+msgstr "Bits (Mb/s)"
+
+msgid "Announce lost and restored connection"
+msgstr "Annoncer la perte et le retour de la connexion"
+
+msgid "Announce VPN connected or disconnected"
+msgstr "Annoncer le VPN connecté ou déconnecté"
+
+msgid "Announce a new Wi-Fi network"
+msgstr "Annoncer un nouveau réseau Wi-Fi"
+
+msgid "The VPN is detected from a network adapter that is up and has a VPN name or the tunnel type (OpenVPN, WireGuard, FortiClient, Windows VPN…): a client that names its adapter differently may not be recognized."
+msgstr "Le VPN est repéré à un adaptateur réseau en service dont le nom est celui d'un VPN ou dont le type est tunnel (OpenVPN, WireGuard, FortiClient, VPN de Windows…) : un client qui nomme sa carte autrement peut ne pas être reconnu."
+
+msgid "Only during calls and screen sharing"
+msgstr "Seulement pendant les appels et partages d'écran"
+
+msgid "The rest of the time, your own screenshots show the island"
+msgstr "Le reste du temps, tes propres captures montrent l'île"
+
+msgid "Transfers"
+msgstr "Transferts"
+
+msgid "Show file transfers"
+msgstr "Afficher les transferts de fichiers"
+
+msgid "A progress bar at the bottom of the collapsed island while files are copied or downloaded."
+msgstr "Une barre de progression au bas de l'île repliée pendant une copie ou un téléchargement de fichiers."
+
+msgid "Copies and moves in File Explorer"
+msgstr "Copies et déplacements de l'Explorateur"
+
+msgid "Browser downloads"
+msgstr "Téléchargements des navigateurs"
+
+msgid "Announce when a transfer finishes"
+msgstr "Annoncer la fin d'un transfert"
+
+msgid "Browsers do not tell the final size of a download: its bar moves back and forth, and the island shows the size received and the speed."
+msgstr "Les navigateurs ne donnent pas la taille finale d'un téléchargement : sa barre va et vient, et l'île montre la taille reçue et la vitesse."
+
+msgid "Show GitHub status"
+msgstr "Afficher le statut GitHub"
+
+msgid "An icon next to the time: the CI of your open pull requests, and a dot when a review is requested. Click it to open the page that needs you."
+msgstr "Une icône à côté de l'heure : la CI de tes pull requests ouvertes, et un point quand une revue est demandée. Un clic ouvre la page qui a besoin de toi."
+
+msgid "Use the GitHub CLI session"
+msgstr "Utiliser la session du GitHub CLI"
+
+msgid "Without a saved token, ask `gh auth token`. Nothing to type if you are already logged in with gh."
+msgstr "Sans jeton enregistré, interroge `gh auth token`. Rien à saisir si tu es déjà connecté avec gh."
+
+msgid "Access token"
+msgstr "Jeton d'accès"
+
+msgid "A token is saved in the Windows Credential Manager."
+msgstr "Un jeton est enregistré dans le Gestionnaire d'identifiants de Windows."
+
+msgid "Paste a token (scopes: repo, read:org) and press Enter. It goes to the Windows Credential Manager."
+msgstr "Colle un jeton (droits : repo, read:org) puis Entrée. Il va dans le Gestionnaire d'identifiants de Windows."
+
+msgid "Forget"
+msgstr "Oublier"
+
+msgid "Refresh"
+msgstr "Rafraîchissement"
+
+msgid "every minute"
+msgstr "toutes les minutes"
+
+msgid "every 2 minutes"
+msgstr "toutes les 2 minutes"
+
+msgid "every 5 minutes"
+msgstr "toutes les 5 minutes"
+
+msgid "every 10 minutes"
+msgstr "toutes les 10 minutes"
+
+msgid "every 30 minutes"
+msgstr "toutes les 30 minutes"
+
+msgid "Announce CI results"
+msgstr "Annoncer les résultats de la CI"
+
+msgid "Announce review requests"
+msgstr "Annoncer les revues demandées"
+
+msgid "GitHub has no event to listen to: the island asks once per interval, in a single request."
+msgstr "GitHub n'a pas d'événement à écouter : l'île interroge une fois par intervalle, en une seule requête."
+
+msgid "Tasks"
+msgstr "Tâches"
+
+msgid "Nothing to do"
+msgstr "Rien à faire"
+
+msgid "+ Add a task"
+msgstr "+ Ajouter une tâche"
+
+msgid "Clear done"
+msgstr "Vider les faites"
+
+msgid "New task"
+msgstr "Nouvelle tâche"
+
+msgid "What needs doing?"
+msgstr "Qu'y a-t-il à faire ?"
+
+msgid "Show quick tasks"
+msgstr "Afficher les tâches rapides"
+
+msgid "A Tasks tab in the open island: check tasks off with a click. They live in a Markdown file you can also edit by hand."
+msgstr "Un onglet Tâches dans l'île ouverte : coche les tâches d'un clic. Elles vivent dans un fichier Markdown que tu peux aussi modifier à la main."
+
+msgid "Add a task"
+msgstr "Ajouter une tâche"
+
+msgid "Shortcut that opens a small box under the island."
+msgstr "Raccourci qui ouvre une petite boîte sous l'île."
+
+msgid "Tasks file"
+msgstr "Fichier des tâches"
+
+msgid "tasks.md next to config.toml: one \"- [ ] task\" line per task."
+msgstr "tasks.md à côté de config.toml : une ligne \"- [ ] tâche\" par tâche."
+
+msgid "Open"
+msgstr "Ouvrir"

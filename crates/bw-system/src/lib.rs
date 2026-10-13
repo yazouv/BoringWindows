@@ -40,8 +40,8 @@ impl SystemSnapshot {
         percent(self.ram_percent())
     }
 
-    /// « Memory 8.4 / 16.0 GB » : détail montré au survol, à la place de la
-    /// date (le processeur est déjà sur son compteur).
+    /// « Memory 8.4 / 16.0 GB » : détail montré au survol, dans la bulle
+    /// sous l'en-tête (le processeur est déjà sur son compteur).
     pub fn detail(&self) -> String {
         let used = gigabytes(self.memory_used);
         let total = gigabytes(self.memory_total);

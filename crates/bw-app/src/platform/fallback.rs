@@ -44,6 +44,8 @@ impl Platform {
 
     pub fn set_capture_excluded(&self, _excluded: bool) {}
 
+    pub fn set_click_through(&self, _on: bool) {}
+
     pub fn watch_user_return(&self) {}
 
     pub fn set_visible(&self, _visible: bool) {}
@@ -105,6 +107,9 @@ pub fn confirm(title: &str, text: &str) -> bool {
 }
 
 pub fn activate_app() {}
+
+/// Fenêtre d'ajout rapide au premier plan : Windows et macOS seulement.
+pub fn focus_tool_window(_window: &slint::Window) {}
 
 /// Ramener le terminal d'une session au premier plan : Windows uniquement.
 pub fn focus_terminal(_ancestors: &[u32], _console_window: Option<i64>) -> bool {

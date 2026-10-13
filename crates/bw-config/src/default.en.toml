@@ -67,6 +67,8 @@ next_track = ""
 previous_track = ""
 # Turn "do not disturb" on or off.
 do_not_disturb = ""
+# Add a task (when tasks are enabled).
+quick_add = "Ctrl+Alt+N"
 
 # Each module is configured in its [modules.<name>] section.
 # A module with enabled = false is not even started.
@@ -161,6 +163,69 @@ ram_alert_percent = 0
 # Time above the threshold before the alert (s).
 alert_after_secs = 30
 
+[modules.network]
+# Network: an icon next to the time in the open island (Wi-Fi, wired, VPN,
+# offline); hovering it shows the network and the speeds.
+enabled = true
+# Speed in the collapsed pill: "off" (never), "active" (only while data is
+# moving) or "always". Music and Claude take precedence.
+compact_speed = "off"
+# Speed unit: "bytes" (MB/s) or "bits" (Mb/s).
+unit = "bytes"
+# Speed refresh (s, 1 to 10). While the island is closed nothing is measured
+# as long as compact_speed is "off".
+refresh_secs = 1
+# "active" mode: speed (KB/s) from which it shows.
+active_kb_per_sec = 50
+# Announcements in the pill: connection lost and back, VPN connected or
+# disconnected, Wi-Fi network change.
+announce_connection = true
+announce_vpn = true
+announce_wifi = false
+# How long an announcement stays (s, 2 to 30).
+show_secs = 5
+
+[modules.transfers]
+# Transfers: a progress bar at the bottom of the collapsed pill while files are
+# copied or downloaded.
+enabled = true
+# File Explorer copies, moves and deletions (Windows).
+copies = true
+# Browser downloads (Chrome, Edge, Firefox…). Browsers do not tell the final
+# size: the bar moves back and forth, with the size received and the
+# speed.
+downloads = true
+# Watched folder; empty: the system Downloads folder.
+downloads_folder = ""
+# Announce when a copy or a download finishes.
+announce_done = true
+# How long the announcement stays (s, 2 to 30).
+show_secs = 5
+
+[modules.github]
+# GitHub: an icon next to the time (color = CI state of your open pull
+# requests, dot = review requested), and announcements in the pill.
+enabled = false
+# Access token: "secret:<id>" (filled in by the settings, OS vault) or the token
+# itself. Empty: the GitHub CLI session, if use_gh_cli = true.
+token = ""
+# Without a token, ask `gh auth token` for one.
+use_gh_cli = true
+# Interval between two reads (s, 30 to 3600).
+refresh_secs = 120
+# Announce the CI result of your pull requests, and review requests.
+announce_ci = true
+announce_reviews = true
+# How long an announcement stays (s, 2 to 30).
+show_secs = 6
+
+[modules.tasks]
+# Quick tasks: a "Tasks" tab in the open island, fed by the
+# hotkeys.quick_add shortcut.
+enabled = false
+# Markdown file ("- [ ]" checkboxes), next to config.toml; empty: tasks.md.
+file = ""
+
 [modules.mascot]
 # The mascot: a little blob in the pill that reacts to Claude Code, dances to
 # the music, falls asleep when you are away and dresses up for the season.
@@ -194,6 +259,9 @@ enabled = true
 # The island doesn't appear in screen sharing, recordings and screenshots
 # (including yours).
 hide_from_capture = true
+# true: the island is hidden only during a call or screen sharing; the rest of
+# the time, your screenshots show it.
+hide_only_when_live = false
 # Apps whose use of the microphone means "in a call" (part of a name).
 call_apps = ["teams", "discord", "zoom", "slack", "webex", "skype", "chrome", "msedge", "firefox", "brave", "opera", "obs"]
 

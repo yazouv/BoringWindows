@@ -34,14 +34,14 @@ use windows::Win32::UI::Shell::{
     QUNS_RUNNING_D3D_FULL_SCREEN, SHAppBarMessage, SHQueryUserNotificationState, ShellExecuteW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, EVENT_SYSTEM_FOREGROUND, GWL_EXSTYLE,
-    GWL_STYLE, GetCursorPos, GetForegroundWindow, GetWindowLongPtrW, GetWindowRect,
-    GetWindowThreadProcessId, HWND_TOPMOST, IsWindowVisible, RegisterClassW,
-    RegisterWindowMessageW, SW_HIDE, SW_SHOWNOACTIVATE, SW_SHOWNORMAL, SWP_FRAMECHANGED,
-    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetWindowLongPtrW, SetWindowPos,
-    ShowWindow, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WM_APP, WM_DISPLAYCHANGE, WM_INPUT,
-    WNDCLASSW, WS_CAPTION, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_MAXIMIZEBOX, WS_MINIMIZEBOX,
-    WS_POPUP, WS_SYSMENU,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, EVENT_SYSTEM_CAPTUREEND,
+    EVENT_SYSTEM_FOREGROUND, GWL_EXSTYLE, GWL_STYLE, GetCursorPos, GetForegroundWindow,
+    GetWindowLongPtrW, GetWindowRect, GetWindowThreadProcessId, HWND_TOPMOST, IsWindowVisible,
+    KillTimer, RegisterClassW, RegisterWindowMessageW, SW_HIDE, SW_SHOWNOACTIVATE, SW_SHOWNORMAL,
+    SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetTimer,
+    SetWindowLongPtrW, SetWindowPos, ShowWindow, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS,
+    WM_APP, WM_DISPLAYCHANGE, WM_INPUT, WM_TIMER, WNDCLASSW, WS_CAPTION, WS_EX_NOACTIVATE,
+    WS_EX_TOOLWINDOW, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP, WS_SYSMENU,
 };
 use windows::core::{BOOL, HSTRING, PCWSTR, w};
 use windows_numerics::Vector2;
@@ -177,6 +177,62 @@ thread_local! {
     static ON_EVENT: RefCell<Option<EventCallback>> = const { RefCell::new(None) };
     /// Fenêtre de l'île, pour la remettre au premier plan depuis le hook.
     static ISLAND: std::cell::Cell<Option<HWND>> = const { std::cell::Cell::new(None) };
+    /// Fenêtre auxiliaire : porte la minuterie des remontées différées.
+    static HELPER: std::cell::Cell<Option<HWND>> = const { std::cell::Cell::new(None) };
+    /// Fond du flou, quand il existe : il doit rester juste sous l'île.
+    static BACKDROP: std::cell::Cell<Option<HWND>> = const { std::cell::Cell::new(None) };
+    /// Remontées différées restantes (voir `schedule_raise`).
+    static RAISE_LEFT: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
+/// Identifiant de la minuterie des remontées différées.
+const RAISE_TIMER: usize = 1;
+/// Délai entre deux remontées différées.
+const RAISE_INTERVAL_MS: u32 = 150;
+
+/// Remet l'île (et son fond de flou) au sommet des fenêtres « topmost ».
+fn raise_island() {
+    let Some(island) = ISLAND.get() else { return };
+    // SAFETY: fenêtre vivante tant que `ISLAND` est renseigné ; sans
+    // SWP_SHOWWINDOW, une île masquée le reste.
+    unsafe {
+        let _ = SetWindowPos(
+            island,
+            Some(HWND_TOPMOST),
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+        );
+        if let Some(backdrop) = BACKDROP.get()
+            && IsWindowVisible(backdrop).as_bool()
+        {
+            let _ = SetWindowPos(
+                backdrop,
+                Some(island),
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+            );
+        }
+    }
+}
+
+/// Remonte l'île tout de suite, puis `passes` fois à `RAISE_INTERVAL_MS`.
+///
+/// La barre des tâches se replace au-dessus des autres fenêtres un instant
+/// *après* l'événement qui l'annonce (et au démarrage, quand l'Explorateur
+/// termine de s'installer) : une seule remontée immédiate arrive trop tôt.
+fn schedule_raise(passes: u32) {
+    raise_island();
+    let Some(helper) = HELPER.get() else { return };
+    RAISE_LEFT.set(passes);
+    // SAFETY: fenêtre auxiliaire vivante, sur ce thread ; relancer la
+    // minuterie existante remet simplement son compte à zéro.
+    unsafe { SetTimer(Some(helper), RAISE_TIMER, RAISE_INTERVAL_MS, None) };
 }
 
 /// Outils de capture d'écran : leur calque couvre tout l'écran et le shell
@@ -236,12 +292,18 @@ impl Platform {
         ON_EVENT.with(|cb| *cb.borrow_mut() = Some(Box::new(on_event)));
         ISLAND.set(Some(hwnd));
         let helper = create_helper_window()?;
+        HELPER.set(Some(helper));
+        // Au lancement, l'Explorateur peut encore replacer la barre des tâches
+        // au-dessus de l'île : quelques remontées pendant les premières secondes.
+        schedule_raise(12);
         // SAFETY: `foreground_proc` est une fonction `extern "system"` valide ;
         // hors contexte, elle est appelée sur ce thread via sa boucle de messages.
         let foreground_hook = unsafe {
+            // De FOREGROUND à CAPTUREEND : menus et capture de la souris
+            // comprises (voir `foreground_proc`).
             SetWinEventHook(
                 EVENT_SYSTEM_FOREGROUND,
-                EVENT_SYSTEM_FOREGROUND,
+                EVENT_SYSTEM_CAPTUREEND,
                 None,
                 Some(foreground_proc),
                 0,
@@ -337,6 +399,25 @@ impl Platform {
             }
         }
         self.capture_excluded.set(excluded);
+    }
+
+    /// Laisse passer les clics à travers l'île (et son fond de flou) : un
+    /// outil de capture prêt à cadrer ne doit pas les voir.
+    pub fn set_click_through(&self, on: bool) {
+        use windows::Win32::UI::WindowsAndMessaging::WS_EX_TRANSPARENT;
+        let mut windows = vec![self.hwnd];
+        windows.extend(self.backdrop.borrow().as_ref().map(|b| b.hwnd));
+        for hwnd in windows {
+            // SAFETY: fenêtres vivantes de ce thread.
+            unsafe {
+                let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+                let flag = WS_EX_TRANSPARENT.0 as isize;
+                let wanted = if on { ex | flag } else { ex & !flag };
+                if wanted != ex {
+                    SetWindowLongPtrW(hwnd, GWL_EXSTYLE, wanted);
+                }
+            }
+        }
     }
 
     /// Prévient (`PlatformEvent::UserReturned`) à la prochaine saisie au
@@ -453,33 +534,37 @@ fn process_name(hwnd: HWND) -> Option<String> {
     }
 }
 
+/// `hwnd` est-elle la barre des tâches (principale ou d'un autre écran) ?
+fn is_taskbar(hwnd: HWND) -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::GetClassNameW;
+    let mut buffer = [0u16; 32];
+    // SAFETY: tampon local, longueur renvoyée par Windows.
+    let len = unsafe { GetClassNameW(hwnd, &mut buffer) };
+    let class = String::from_utf16_lossy(&buffer[..len.max(0) as usize]);
+    matches!(class.as_str(), "Shell_TrayWnd" | "Shell_SecondaryTrayWnd")
+}
+
 /// Changement de fenêtre au premier plan. La barre des tâches, une fois
 /// activée, repasse au-dessus des autres fenêtres « topmost » : on remet
 /// l'île au sommet de cette pile.
 unsafe extern "system" fn foreground_proc(
     _hook: HWINEVENTHOOK,
-    _event: u32,
-    _hwnd: HWND,
+    event: u32,
+    hwnd: HWND,
     _id_object: i32,
     _id_child: i32,
     _thread: u32,
     _time: u32,
 ) {
-    if let Some(island) = ISLAND.get() {
-        // SAFETY: fenêtre vivante tant que `ISLAND` est renseigné ; sans
-        // SWP_SHOWWINDOW, une île masquée le reste.
-        unsafe {
-            let _ = SetWindowPos(
-                island,
-                Some(HWND_TOPMOST),
-                0,
-                0,
-                0,
-                0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
-            );
+    // Cliquer une barre des tâches déjà active ne change pas le premier plan :
+    // elle ne signale alors que la capture de la souris ou l'ouverture d'un menu.
+    if event != EVENT_SYSTEM_FOREGROUND {
+        if is_taskbar(hwnd) {
+            schedule_raise(3);
         }
+        return;
     }
+    schedule_raise(3);
     ON_EVENT.with(|cb| {
         if let Some(cb) = cb.borrow().as_ref() {
             cb(PlatformEvent::Foreground);
@@ -628,6 +713,16 @@ unsafe extern "system" fn helper_proc(
         }
         APPBAR_CALLBACK if wparam.0 as u32 == ABN_POSCHANGED => Some(PlatformEvent::TaskbarChanged),
         WM_DISPLAYCHANGE => Some(PlatformEvent::DisplayChanged),
+        WM_TIMER if wparam.0 == RAISE_TIMER => {
+            raise_island();
+            let left = RAISE_LEFT.get().saturating_sub(1);
+            RAISE_LEFT.set(left);
+            if left == 0 {
+                // SAFETY: minuterie posée sur cette même fenêtre.
+                let _ = unsafe { KillTimer(Some(hwnd), RAISE_TIMER) };
+            }
+            None
+        }
         // Première saisie après une absence : on se désinscrit aussitôt pour
         // ne pas recevoir chaque mouvement de souris.
         WM_INPUT => {
@@ -859,6 +954,17 @@ fn activate(hwnd: HWND) -> bool {
 /// Windows met déjà au premier plan une fenêtre ouverte depuis l'icône.
 pub fn activate_app() {}
 
+/// Met une petite fenêtre ordinaire (l'ajout rapide) au premier plan, avec le
+/// clavier, sans bouton dans la barre des tâches.
+pub fn focus_tool_window(window: &slint::Window) {
+    use slint::winit_030::WinitWindowAccessor;
+    use slint::winit_030::winit::platform::windows::WindowExtWindows;
+    window.with_winit_window(|w| {
+        w.set_skip_taskbar(true);
+        w.focus_window();
+    });
+}
+
 pub fn attach_parent_console() {
     use windows::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
     // SAFETY: appel sans pointeur ; échoue sans effet si une console existe déjà.
@@ -996,6 +1102,7 @@ impl Backdrop {
                 // toujours au-dessus de sa propriétaire.
                 // SAFETY: les deux fenêtres sont vivantes, sur ce thread.
                 unsafe { SetWindowLongPtrW(island, GWLP_HWNDPARENT, hwnd.0 as isize) };
+                BACKDROP.set(Some(hwnd));
                 Ok(Self {
                     hwnd,
                     island,
@@ -1129,6 +1236,7 @@ impl Backdrop {
 impl Drop for Backdrop {
     fn drop(&mut self) {
         use windows::Win32::UI::WindowsAndMessaging::GWLP_HWNDPARENT;
+        BACKDROP.set(None);
         // SAFETY: rend l'île indépendante avant de détruire sa propriétaire.
         unsafe {
             SetWindowLongPtrW(self.island, GWLP_HWNDPARENT, 0);

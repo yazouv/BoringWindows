@@ -473,8 +473,10 @@ dependencies = [
  "bw-claude",
  "bw-config",
  "bw-core",
+ "bw-github",
  "bw-i18n",
  "bw-media",
+ "bw-network",
  "bw-notify",
  "bw-plugins",
  "bw-power",
@@ -482,6 +484,7 @@ dependencies = [
  "bw-secrets",
  "bw-system",
  "bw-timer",
+ "bw-transfers",
  "bw-update",
  "bw-viz",
  "bw-volume",
@@ -498,6 +501,7 @@ dependencies = [
  "slint",
  "slint-build",
  "slint-interpreter",
+ "tempfile",
  "tokio",
  "toml",
  "tray-icon",
@@ -568,6 +572,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "bw-github"
+version = "0.6.0"
+dependencies = [
+ "anyhow",
+ "bw-core",
+ "bw-i18n",
+ "bw-net",
+ "bw-secrets",
+ "log",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml",
+]
+
+[[package]]
 name = "bw-i18n"
 version = "0.6.0"
 dependencies = [
@@ -600,6 +620,22 @@ version = "0.6.0"
 dependencies = [
  "anyhow",
  "windows",
+]
+
+[[package]]
+name = "bw-network"
+version = "0.6.0"
+dependencies = [
+ "anyhow",
+ "bw-core",
+ "bw-i18n",
+ "log",
+ "serde",
+ "sysinfo",
+ "tokio",
+ "toml",
+ "windows",
+ "windows-core",
 ]
 
 [[package]]
@@ -694,6 +730,23 @@ dependencies = [
  "serde",
  "tokio",
  "toml",
+]
+
+[[package]]
+name = "bw-transfers"
+version = "0.6.0"
+dependencies = [
+ "anyhow",
+ "bw-core",
+ "bw-i18n",
+ "dirs",
+ "log",
+ "notify-debouncer-mini",
+ "serde",
+ "tempfile",
+ "tokio",
+ "toml",
+ "windows",
 ]
 
 [[package]]

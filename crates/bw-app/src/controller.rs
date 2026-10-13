@@ -30,9 +30,11 @@ use crate::gestures::{self, Gesture, GesturesConfig};
 use crate::mascot::{self, ClaudeState, MascotConfig};
 use crate::platform::{self, Platform, PlatformEvent, Tray, TrayCommand};
 use crate::shelf::{Shelf, ShelfConfig};
+use crate::tasks::{Tasks, TasksConfig};
 use crate::{
-    AgendaRow, ClaudePrompt, ClaudeRow, GaugeInfo, Island, MediaInfo, NotifInfo, PluginRow,
-    RecentRow, ShelfRow, SystemInfo, TimerInfo, WeatherInfo, clock, demo,
+    AgendaRow, ClaudePrompt, ClaudeRow, GaugeInfo, GithubInfo, Island, MediaInfo, NetworkInfo,
+    NotifInfo, PluginRow, QuickAddWindow, RecentRow, ShelfRow, SystemInfo, TaskRow, TimerInfo,
+    WeatherInfo, clock, demo,
 };
 
 /// Pseudo-module utilisé pour signaler une config invalide dans l'île.
@@ -47,6 +49,10 @@ const MAX_ROWS_WITH_MEDIA: usize = 2;
 const NOTIF_ROWS: usize = 4;
 /// Onglets de l'île ouverte (propriété `tab` de `island.slint`).
 const TAB_NOTIFICATIONS: i32 = 2;
+/// Valeur de `tab` pour l'onglet Tâches.
+const TAB_TASKS: i32 = 3;
+/// Tâches transmises à l'interface (l'onglet en montre autant qu'il en tient).
+const MAX_TASK_ROWS: usize = 30;
 /// Avec le flou : cadence de suivi de la pilule pendant une animation, et
 /// marge après sa fin.
 const BLUR_FRAME: Duration = Duration::from_millis(16);
@@ -154,6 +160,13 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         away_timer: Timer::default(),
         wheel: RefCell::new(gestures::Wheel::default()),
         live: Cell::new(false),
+        capturing: Cell::new(false),
+        github_url: RefCell::new(String::new()),
+        tasks: RefCell::new(Tasks::default()),
+        tasks_path: RefCell::new(PathBuf::new()),
+        tasks_stamp: Cell::new(None),
+        quick_add: RefCell::new(None),
+        capture_timer: Timer::default(),
         toast_timer: Timer::default(),
         hotkeys: RefCell::new(None),
     });
@@ -241,6 +254,18 @@ pub struct Controller {
     wheel: RefCell<gestures::Wheel>,
     /// En appel ou en partage d'écran (`bw-presence`).
     live: Cell<bool>,
+    /// Un outil de capture d'écran est au premier plan : l'île laisse passer les clics.
+    capturing: Cell<bool>,
+    /// Page à ouvrir au clic sur l'icône GitHub.
+    github_url: RefCell<String>,
+    /// Tâches rapides (fichier Markdown), son chemin et sa date de modification.
+    tasks: RefCell<Tasks>,
+    tasks_path: RefCell<PathBuf>,
+    tasks_stamp: Cell<Option<std::time::SystemTime>>,
+    /// Fenêtre d'ajout d'une tâche (créée à la première demande).
+    quick_add: RefCell<Option<QuickAddWindow>>,
+    /// Revérifie le premier plan une fois l'ouverture de l'outil de capture posée.
+    capture_timer: Timer,
     toast_timer: Timer,
     /// Raccourcis clavier globaux (absents si le système les refuse).
     hotkeys: RefCell<Option<crate::hotkeys::Hotkeys>>,
@@ -252,6 +277,7 @@ impl Controller {
         self.apply_theme();
         self.reload_custom_view();
         self.update_shelf_ui();
+        self.apply_tasks();
         let (choice, size) = self.placement();
         if let Some(pos) = platform::initial_position(choice, size) {
             self.ui.window().set_position(pos);
@@ -305,6 +331,22 @@ impl Controller {
         self.ui
             .on_notif_action(with(&weak, |c, action: slint::SharedString| {
                 c.notif_action(&action);
+            }));
+        self.ui.on_github_open({
+            let weak = weak.clone();
+            move || {
+                if let Some(c) = weak.upgrade() {
+                    let url = c.github_url.borrow().clone();
+                    // Une adresse de GitHub que le module a lue, jamais autre chose.
+                    if url.starts_with("https://github.com/") {
+                        platform::open_path(std::path::Path::new(&url));
+                    }
+                }
+            }
+        });
+        self.ui
+            .on_task_action(with(&weak, |c, action: slint::SharedString| {
+                c.tasks_action(&action);
             }));
         self.ui.on_dnd_toggle({
             let weak = weak.clone();
@@ -476,11 +518,14 @@ impl Controller {
             self.refresh_shape();
             if expanded {
                 self.refresh_activity();
+                // Le fichier a pu être modifié à la main depuis la dernière fois.
+                if self.ui.get_has_tasks_tab() {
+                    self.reload_tasks(false);
+                }
             }
-            self.send_action(
-                bw_system::MODULE_ID,
-                if expanded { "open" } else { "close" },
-            );
+            for module in [bw_system::MODULE_ID, bw_network::MODULE_ID] {
+                self.send_action(module, if expanded { "open" } else { "close" });
+            }
             self.update_progress();
             self.update_viz_activity();
             self.update_timer_ui();
@@ -824,6 +869,7 @@ impl Controller {
             self.reload_custom_view();
         }
         self.update_shelf_ui();
+        self.apply_tasks();
         if moved {
             self.place();
         }
@@ -894,6 +940,9 @@ impl Controller {
         self.ui.set_has_timer(false);
         self.ui.set_has_weather(false);
         self.ui.set_has_system(false);
+        self.ui.set_has_network(false);
+        self.ui.set_has_github(false);
+        self.ui.set_transfer_visible(false);
         self.live.set(false);
         self.ui.set_live(false);
         self.gauges.borrow_mut().clear();
@@ -921,6 +970,7 @@ impl Controller {
         }
         if self.expanded.get() {
             self.send_action(bw_system::MODULE_ID, "open");
+            self.send_action(bw_network::MODULE_ID, "open");
         }
         self.refresh_shape();
     }
@@ -974,6 +1024,35 @@ impl Controller {
                         detail: system.detail().into(),
                         cpu_hot: system.cpu >= HOT_PERCENT,
                         ram_hot: system.ram_percent() >= HOT_PERCENT,
+                    });
+                } else if let Some(transfer) =
+                    state.downcast_ref::<bw_transfers::TransferProgress>()
+                {
+                    self.ui.set_transfer_visible(transfer.active);
+                    self.ui
+                        .set_transfer_indeterminate(transfer.fraction.is_none());
+                    self.ui
+                        .set_transfer_progress(transfer.fraction.unwrap_or(0.0));
+                } else if let Some(github) = state.downcast_ref::<bw_github::GithubSnapshot>() {
+                    use bw_github::Tone;
+                    *self.github_url.borrow_mut() = github.open_url();
+                    self.ui.set_has_github(true);
+                    self.ui.set_github(GithubInfo {
+                        detail: github.detail().into(),
+                        tone: match github.tone() {
+                            Tone::Idle => 0,
+                            Tone::Running => 1,
+                            Tone::Pass => 2,
+                            Tone::Fail => 3,
+                        },
+                        reviews: github.has_reviews(),
+                    });
+                } else if let Some(network) = state.downcast_ref::<bw_network::NetworkSnapshot>() {
+                    self.ui.set_has_network(true);
+                    self.ui.set_network(NetworkInfo {
+                        icon: network.icon().into(),
+                        detail: network.detail().into(),
+                        offline: network.offline(),
                     });
                 } else if let Ok(snapshot) = state.clone().downcast::<CalendarSnapshot>() {
                     *self.calendar.borrow_mut() = Some(snapshot);
@@ -2108,12 +2187,14 @@ impl Controller {
 
     /// L'île hors des captures et partages d'écran, si demandé.
     fn apply_capture_exclusion(&self) {
-        let hide = self.presentation_config().hide_from_capture;
+        let config = self.presentation_config();
+        let hide = config.hide_from_capture && (!config.hide_only_when_live || self.live.get());
         self.with_platform(|p| p.set_capture_excluded(hide));
     }
 
     fn apply_live(&self, snapshot: &bw_presence::LiveSnapshot) {
         self.live.set(snapshot.live());
+        self.apply_capture_exclusion();
         self.ui.set_live(snapshot.live());
         self.refresh_shape();
     }
@@ -2134,6 +2215,159 @@ impl Controller {
             });
     }
 
+    // --- Tâches ------------------------------------------------------------------
+
+    fn tasks_config(&self) -> TasksConfig {
+        TasksConfig::from_table(self.config.borrow().modules.get("tasks")).unwrap_or_default()
+    }
+
+    /// Applique la config des tâches : l'onglet, le fichier, le rappel du raccourci.
+    fn apply_tasks(&self) {
+        let config = self.tasks_config();
+        let dir = self.path.parent().unwrap_or(std::path::Path::new("."));
+        *self.tasks_path.borrow_mut() = config.path(dir);
+        self.ui.set_has_tasks_tab(config.enabled);
+        self.ui
+            .set_tasks_hint(self.config.borrow().hotkeys.quick_add.trim().into());
+        if config.enabled {
+            self.reload_tasks(true);
+        } else {
+            // L'onglet disparaît : on ne reste pas dessus.
+            if self.ui.get_tab() == TAB_TASKS {
+                self.ui.set_tab(0);
+            }
+            *self.tasks.borrow_mut() = Tasks::default();
+            self.update_tasks_ui();
+        }
+    }
+
+    /// Relit le fichier s'il a changé (modifié à la main, ailleurs…).
+    fn reload_tasks(&self, force: bool) {
+        let path = self.tasks_path.borrow().clone();
+        let stamp = std::fs::metadata(&path).and_then(|m| m.modified()).ok();
+        if !force && stamp == self.tasks_stamp.get() {
+            return;
+        }
+        *self.tasks.borrow_mut() = Tasks::load(&path);
+        self.tasks_stamp.set(stamp);
+        self.update_tasks_ui();
+    }
+
+    fn update_tasks_ui(&self) {
+        let tasks = self.tasks.borrow();
+        let rows: Vec<TaskRow> = tasks
+            .display()
+            .into_iter()
+            .take(MAX_TASK_ROWS)
+            .map(|t| TaskRow {
+                ordinal: t.ordinal as i32,
+                text: t.text.as_str().into(),
+                done: t.done,
+            })
+            .collect();
+        self.ui.set_tasks_rows(ModelRc::new(VecModel::from(rows)));
+        self.ui.set_tasks_open(tasks.open_count() as i32);
+        self.ui.set_tasks_done(tasks.done_count() as i32);
+    }
+
+    /// Modifie la liste à partir de ce qui est sur le disque (pour ne pas écraser
+    /// une modification faite ailleurs), puis l'enregistre.
+    fn edit_tasks(self: &Rc<Self>, edit: impl FnOnce(&mut Tasks) -> bool) {
+        self.reload_tasks(true);
+        if !edit(&mut self.tasks.borrow_mut()) {
+            return;
+        }
+        let path = self.tasks_path.borrow().clone();
+        if let Err(e) = self.tasks.borrow().save(&path) {
+            log::warn!("tâches : impossible d'écrire {} : {e}", path.display());
+            self.flash(&tr!(
+                "Could not save the tasks",
+                "Impossible d'enregistrer les tâches"
+            ));
+            return;
+        }
+        self.tasks_stamp
+            .set(std::fs::metadata(&path).and_then(|m| m.modified()).ok());
+        self.update_tasks_ui();
+    }
+
+    fn tasks_action(self: &Rc<Self>, action: &str) {
+        let ordinal = |rest: &str| rest.parse::<usize>().ok();
+        match action {
+            "add" => self.open_quick_add(),
+            "clear" => self.edit_tasks(|t| t.clear_done() > 0),
+            _ => {
+                if let Some(n) = action.strip_prefix("toggle:").and_then(ordinal) {
+                    self.edit_tasks(|t| t.toggle(n));
+                } else if let Some(n) = action.strip_prefix("remove:").and_then(ordinal) {
+                    self.edit_tasks(|t| t.remove(n));
+                }
+            }
+        }
+    }
+
+    /// La petite fenêtre d'ajout, sous l'île : l'île ne reçoit jamais le clavier.
+    fn open_quick_add(self: &Rc<Self>) {
+        if !self.tasks_config().enabled {
+            return;
+        }
+        if self.quick_add.borrow().is_none() {
+            let window = match QuickAddWindow::new() {
+                Ok(w) => w,
+                Err(e) => {
+                    log::error!("fenêtre d'ajout de tâche : {e}");
+                    return;
+                }
+            };
+            let weak = Rc::downgrade(self);
+            window.on_accepted({
+                let weak = weak.clone();
+                move |text| {
+                    if let Some(c) = weak.upgrade() {
+                        c.edit_tasks(|t| t.add(&text));
+                        c.close_quick_add();
+                    }
+                }
+            });
+            window.on_cancelled(move || {
+                if let Some(c) = weak.upgrade() {
+                    c.close_quick_add();
+                }
+            });
+            *self.quick_add.borrow_mut() = Some(window);
+        }
+        let quick = self.quick_add.borrow();
+        let Some(window) = quick.as_ref() else { return };
+        window.set_text("".into());
+        window.set_hint(
+            tr!(
+                "Enter adds it · Esc cancels · {} to reopen",
+                "Entrée l'ajoute · Échap annule · {} pour rouvrir",
+                self.config.borrow().hotkeys.quick_add.trim()
+            )
+            .into(),
+        );
+        // Centrée sous l'île, qui est en haut de l'écran.
+        let scale = self.ui.window().scale_factor();
+        let island = self.ui.window();
+        let (pos, size) = (island.position(), island.size());
+        let width = (window.window().size().width as f32).max(480.0 * scale);
+        let x = pos.x as f32 + size.width as f32 / 2.0 - width / 2.0;
+        let y = pos.y as f32 + (self.theme().top_offset + 64.0) * scale;
+        window
+            .window()
+            .set_position(slint::PhysicalPosition::new(x as i32, y as i32));
+        let _ = window.show();
+        platform::focus_tool_window(window.window());
+        window.invoke_focus_input();
+    }
+
+    fn close_quick_add(&self) {
+        if let Some(window) = self.quick_add.borrow().as_ref() {
+            let _ = window.hide();
+        }
+    }
+
     // --- Raccourcis clavier ---------------------------------------------------
 
     /// Enregistre les raccourcis de la config ; les erreurs s'affichent dans
@@ -2144,7 +2378,12 @@ impl Controller {
             let Some(hotkeys) = hotkeys.as_mut() else {
                 return;
             };
-            hotkeys.apply(&self.config.borrow().hotkeys)
+            // L'ajout de tâche n'a de raccourci que si les tâches sont activées.
+            let mut config = self.config.borrow().hotkeys.clone();
+            if !self.tasks_config().enabled {
+                config.quick_add.clear();
+            }
+            hotkeys.apply(&config)
         };
         if let Some(first) = errors.first() {
             for e in &errors {
@@ -2190,10 +2429,31 @@ impl Controller {
                 self.run_gesture(gesture, &self.gestures_config());
             }
             HotkeyAction::DoNotDisturb => self.toggle_dnd_with_feedback(),
+            HotkeyAction::QuickAdd => self.open_quick_add(),
         }
     }
 
     // --- Système -----------------------------------------------------------
+
+    /// Un outil de capture est-il au premier plan ? L'île reste alors affichée
+    /// mais ne reçoit plus les clics : on cadre une capture, on ne manipule pas
+    /// l'île.
+    fn update_capturing(&self) {
+        let capturing = self
+            .platform
+            .borrow()
+            .as_ref()
+            .is_some_and(Platform::foreground_is_capture_tool);
+        if self.capturing.replace(capturing) != capturing {
+            self.with_platform(|p| p.set_click_through(capturing));
+        }
+        // Le calque de capture peut prendre le premier plan après l'annonce
+        // du plein écran : l'île réapparaît alors.
+        if capturing && self.fullscreen.get() {
+            self.fullscreen.set(false);
+            self.update_visibility();
+        }
+    }
 
     fn on_platform_event(&self, event: PlatformEvent) {
         match event {
@@ -2207,16 +2467,13 @@ impl Controller {
             // Le calque de capture peut prendre le premier plan après
             // l'annonce du plein écran : l'île réapparaît alors.
             PlatformEvent::Foreground => {
-                if self.fullscreen.get()
-                    && self
-                        .platform
-                        .borrow()
-                        .as_ref()
-                        .is_some_and(Platform::foreground_is_capture_tool)
-                {
-                    self.fullscreen.set(false);
-                    self.update_visibility();
-                }
+                self.update_capturing();
+                // À l'ouverture d'un outil de capture, le premier plan passe
+                // par plusieurs fenêtres : on relit une fois la rafale posée.
+                self.capture_timer
+                    .start(TimerMode::SingleShot, Duration::from_millis(300), || {
+                        post(|c| c.update_capturing());
+                    });
             }
             PlatformEvent::TaskbarChanged => self.update_taskbar(),
             PlatformEvent::PointerLeft => {
@@ -2373,6 +2630,28 @@ fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
             Ok(c) => modules.push(Box::new(bw_system::SystemModule::new(c))),
             Err(e) => errors.push(format!("modules.system : {e:#}")),
         }
+    }
+    if config.module_enabled(bw_network::MODULE_ID, true) {
+        match bw_network::NetworkConfig::from_table(config.modules.get(bw_network::MODULE_ID)) {
+            Ok(c) => modules.push(Box::new(bw_network::NetworkModule::new(c))),
+            Err(e) => errors.push(format!("modules.network : {e:#}")),
+        }
+    }
+    if config.module_enabled(bw_transfers::MODULE_ID, true) {
+        match bw_transfers::TransfersConfig::from_table(config.modules.get(bw_transfers::MODULE_ID))
+        {
+            Ok(c) => modules.push(Box::new(bw_transfers::TransfersModule::new(c))),
+            Err(e) => errors.push(format!("modules.transfers : {e:#}")),
+        }
+    }
+    if config.module_enabled(bw_github::MODULE_ID, false) {
+        match bw_github::GithubConfig::from_table(config.modules.get(bw_github::MODULE_ID)) {
+            Ok(c) => modules.push(Box::new(bw_github::GithubModule::new(c))),
+            Err(e) => errors.push(format!("modules.github : {e:#}")),
+        }
+    }
+    if let Err(e) = TasksConfig::from_table(config.modules.get("tasks")) {
+        errors.push(format!("modules.tasks : {e:#}"));
     }
     if config.module_enabled("demo", false) {
         modules.push(Box::new(demo::Demo::default()));

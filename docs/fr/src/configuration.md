@@ -86,6 +86,7 @@ exemple `"Ctrl+Alt+B"` ; `""` : aucun.
 | `next_track` | `""` | musique : morceau suivant |
 | `previous_track` | `""` | musique : morceau précédent |
 | `do_not_disturb` | `""` | activer ou couper « ne pas déranger » |
+| `quick_add` | `"Ctrl+Alt+N"` | ajouter une [tâche](taches.md) (si les tâches sont activées) |
 
 ## `[modules.claude]`
 
@@ -207,6 +208,50 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 | `ram_alert_percent` | `0` | 0, ou 50 à 100 | alerte quand la mémoire reste au-dessus (%) ; 0 : jamais |
 | `alert_after_secs` | `30` | 5 à 600 | durée au-dessus du seuil avant l'alerte (s) |
 
+## `[modules.network]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `true` | | afficher le [réseau](reseau.md) (icône de l'île ouverte, annonces) |
+| `compact_speed` | `"off"` | `off`, `active`, `always` | débit dans la pilule repliée : jamais, seulement quand ça circule, ou tout le temps |
+| `unit` | `"bytes"` | `bytes`, `bits` | unité des débits (Mo/s ou Mb/s) |
+| `refresh_secs` | `1` | 1 à 10 | rafraîchissement du débit (s) |
+| `active_kb_per_sec` | `50` | 1 à 1000000 | mode `active` : débit à partir duquel il s'affiche (Ko/s) |
+| `announce_connection` | `true` | | annoncer la perte et le retour de la connexion |
+| `announce_vpn` | `true` | | annoncer un VPN connecté ou déconnecté |
+| `announce_wifi` | `false` | | annoncer un changement de réseau Wi-Fi |
+| `show_secs` | `5` | 2 à 30 | durée d'affichage d'une annonce (s) |
+
+## `[modules.transfers]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `true` | | afficher la [progression des transferts](transferts.md) dans la pilule repliée |
+| `copies` | `true` | | suivre les copies, déplacements et suppressions de l'Explorateur (Windows) |
+| `downloads` | `true` | | suivre les téléchargements des navigateurs |
+| `downloads_folder` | `""` | | dossier surveillé ; vide : le dossier Téléchargements du système |
+| `announce_done` | `true` | | annoncer la fin d'un transfert |
+| `show_secs` | `5` | 2 à 30 | durée d'affichage de l'annonce (s) |
+
+## `[modules.github]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `false` | | afficher le [statut GitHub](github.md) : CI de tes pull requests, revues demandées |
+| `token` | `""` | | jeton d'accès : `secret:<id>` (coffre de l'OS, ce que font les réglages) ou le jeton ; vide : la session du GitHub CLI |
+| `use_gh_cli` | `true` | | sans jeton, demander le sien à `gh auth token` |
+| `refresh_secs` | `120` | 30 à 3600 | intervalle entre deux relevés (s) |
+| `announce_ci` | `true` | | annoncer la réussite ou l'échec de la CI |
+| `announce_reviews` | `true` | | annoncer une revue demandée |
+| `show_secs` | `6` | 2 à 30 | durée d'affichage d'une annonce (s) |
+
+## `[modules.tasks]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `false` | | afficher l'onglet des [tâches rapides](taches.md) |
+| `file` | `""` | | fichier Markdown des tâches, relatif au dossier de config.toml ; vide : `tasks.md` |
+
 ## `[modules.mascot]`
 
 | Option | Défaut | Plage | Rôle |
@@ -230,6 +275,7 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 |---|---|---|---|
 | `enabled` | `true` | | [mode présentation](presentation.md) : rien ne s'annonce pendant un appel ou un partage d'écran |
 | `hide_from_capture` | `true` | | l'île n'apparaît pas dans les partages d'écran, enregistrements et captures |
+| `hide_only_when_live` | `false` | | avec `hide_from_capture` : l'île n'est cachée que pendant un appel ou un partage d'écran |
 | `call_apps` | Teams, Discord, Zoom… | | applications dont l'usage du micro veut dire « en appel » (morceau de nom) |
 
 ## `[modules.visualizer]`

@@ -23,6 +23,9 @@ bw-notify.workspace = true
 bw-power.workspace = true
 bw-presence.workspace = true
 bw-system.workspace = true
+bw-network.workspace = true
+bw-transfers.workspace = true
+bw-github.workspace = true
 bw-weather.workspace = true
 bw-timer.workspace = true
 bw-volume.workspace = true
@@ -126,6 +129,9 @@ windows = { version = "0.62", features = [
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }
+
+[dev-dependencies]
+tempfile = "3"
 
 [build-dependencies]
 slint-build = "~1.18"

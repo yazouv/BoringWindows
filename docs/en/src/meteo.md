@@ -1,8 +1,8 @@
 # Weather
 
 The current weather shows up next to the date in the open island: an icon
-(sun, clouds, rain, snow, storm…) and the temperature. **Hover it**: the date
-makes room for the day's details, for example "Lyon · Partly cloudy · 9° /
+(sun, clouds, rain, snow, storm…) and the temperature. **Hover it**: a bubble
+under the header gives the day's details, for example "Lyon · Partly cloudy · 9° /
 16°".
 
 Off by default: it needs a city.
