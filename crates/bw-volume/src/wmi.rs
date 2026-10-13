@@ -56,8 +56,21 @@ fn listen(tx: &UnboundedSender<u8>, stop: &Receiver<()>) -> anyhow::Result<()> {
             None,
         );
         let has_screen = match screens {
-            Ok(e) => secure(&e).is_ok() && next(&e, WBEM_INFINITE).is_some(),
-            Err(_) => false,
+            Ok(e) => match secure(&e) {
+                Ok(()) => {
+                    let found = next(&e, WBEM_INFINITE).is_some();
+                    log::debug!("luminosité : écran trouvé = {found}");
+                    found
+                }
+                Err(err) => {
+                    log::debug!("luminosité : emprunt d'identité refusé : {err}");
+                    false
+                }
+            },
+            Err(err) => {
+                log::debug!("luminosité : requête refusée : {err}");
+                false
+            }
         };
         if !has_screen {
             log::info!("luminosité : aucun écran intégré, module inactif");
@@ -111,11 +124,19 @@ unsafe fn connect() -> anyhow::Result<IWbemServices> {
 
 /// Niveau d'emprunt d'identité « impersonate » sur un proxy WMI : sans lui,
 /// le fournisseur refuse les requêtes (niveau par défaut du processus trop bas).
+///
+/// Posé sur le pointeur d'interface lui-même, celui qu'on utilisera ensuite :
+/// le réglage d'un `IUnknown` obtenu par `QueryInterface` ne s'applique pas aux
+/// autres interfaces (`IEnumWbemClassObject::Next` répondait « accès refusé »).
 unsafe fn secure(proxy: &impl Interface) -> windows::core::Result<()> {
-    // SAFETY: proxy COM valide, paramètres documentés pour WMI local.
+    let raw = proxy.as_raw();
+    // SAFETY: `raw` est le pointeur d'interface de `proxy`, valide tant que
+    // `proxy` l'est ; il n'est ni copié ni libéré ici.
     unsafe {
+        let unknown = IUnknown::from_raw_borrowed(&raw)
+            .ok_or_else(|| windows::core::Error::from(windows::Win32::Foundation::E_POINTER))?;
         CoSetProxyBlanket(
-            &proxy.cast::<IUnknown>()?,
+            unknown,
             RPC_C_AUTHN_WINNT,
             RPC_C_AUTHZ_NONE,
             None,
