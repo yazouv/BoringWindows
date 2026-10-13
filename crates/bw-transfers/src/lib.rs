@@ -146,11 +146,18 @@ pub fn format_size(bytes: u64) -> String {
     format!("{number} {}", steps[step])
 }
 
+/// Un fichier partiel qui n'a pas été écrit depuis aussi longtemps n'est pas un
+/// téléchargement en cours : abandon, pause, reste d'un navigateur fermé en
+/// plein élan (Firefox laisse des `.part`). Il reprend dès qu'il grossit.
+pub const STALE_SECS: u64 = 30;
+
 /// Un fichier partiel trouvé dans le dossier.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Partial {
     pub path: PathBuf,
     pub size: u64,
+    /// Secondes depuis la dernière écriture.
+    pub idle_secs: u64,
 }
 
 /// Suit les téléchargements en cours d'un relevé à l'autre.
@@ -178,7 +185,9 @@ impl DownloadTracker {
         elapsed: f64,
         exists: impl Fn(&Path) -> bool,
     ) -> Vec<String> {
-        let grown: u64 = now
+        // Seuls comptent les partiels écrits récemment.
+        let live: Vec<&Partial> = now.iter().filter(|p| p.idle_secs <= STALE_SECS).collect();
+        let grown: u64 = live
             .iter()
             .filter_map(|p| {
                 self.files
@@ -195,6 +204,7 @@ impl DownloadTracker {
 
         let mut done = Vec::new();
         for path in self.files.keys() {
+            // Encore là (même immobile) : ni terminé ni annulé.
             if now.iter().any(|p| &p.path == path) {
                 continue;
             }
@@ -211,7 +221,7 @@ impl DownloadTracker {
         }
         done.sort();
 
-        self.files = now.iter().map(|p| (p.path.clone(), p.size)).collect();
+        self.files = live.iter().map(|p| (p.path.clone(), p.size)).collect();
         if self.files.is_empty() {
             self.rate = 0.0;
         }
@@ -283,6 +293,14 @@ mod tests {
         Partial {
             path: PathBuf::from("dl").join(name),
             size,
+            idle_secs: 0,
+        }
+    }
+
+    fn stale(name: &str, size: u64) -> Partial {
+        Partial {
+            idle_secs: STALE_SECS + 1,
+            ..partial(name, size)
         }
     }
 
@@ -394,6 +412,25 @@ mod tests {
         t.update(&[partial("Unconfirmed 123.crdownload", 10)], 1.0, |_| false);
         assert_eq!(t.summary().as_deref(), Some("Download · 10 B"));
         // Même si un fichier du même nom existait, son nom ne dirait rien.
+        assert!(t.update(&[], 1.0, |_| true).is_empty());
+    }
+
+    #[test]
+    fn abandoned_partials_are_not_downloads() {
+        let _lang = lang(Lang::En);
+        let mut t = DownloadTracker::new();
+        // Un vieux `.part` laissé dans le dossier : rien à suivre.
+        let done = t.update(&[stale("old.xlsx.part", 36_000)], 1.0, |_| true);
+        assert!(done.is_empty() && !t.active());
+        assert_eq!(t.summary(), None);
+
+        // Il se remet à grossir : c'est un téléchargement.
+        t.update(&[partial("old.xlsx.part", 40_000)], 1.0, |_| false);
+        assert!(t.active());
+        // Il cale : on ne l'affiche plus, sans annoncer de fin.
+        let done = t.update(&[stale("old.xlsx.part", 40_000)], 1.0, |_| true);
+        assert!(done.is_empty() && !t.active());
+        // Il disparaît ensuite : plus suivi, donc rien à annoncer non plus.
         assert!(t.update(&[], 1.0, |_| true).is_empty());
     }
 

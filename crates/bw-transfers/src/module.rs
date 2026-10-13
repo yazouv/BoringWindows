@@ -282,9 +282,15 @@ fn list_partials(dir: &Path) -> Vec<Partial> {
             let meta = std::fs::metadata(&path)
                 .ok()
                 .filter(std::fs::Metadata::is_file)?;
+            let idle_secs = meta
+                .modified()
+                .ok()
+                .and_then(|t| t.elapsed().ok())
+                .map_or(0, |d| d.as_secs());
             Some(Partial {
                 path,
                 size: meta.len(),
+                idle_secs,
             })
         })
         .collect()
@@ -319,5 +325,7 @@ mod tests {
         partial.write_all(&[0u8; 3000]).unwrap();
         partial.flush().unwrap();
         assert_eq!(list_partials(dir.path())[0].size, 8000);
+        // Écrit à l'instant : pas abandonné.
+        assert!(list_partials(dir.path())[0].idle_secs <= 2);
     }
 }

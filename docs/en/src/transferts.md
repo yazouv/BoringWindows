@@ -30,6 +30,11 @@ The folder is only sampled (once per second) **while a temporary file
 exists**; the rest of the time, the island just waits for a change in the
 folder.
 
+A temporary file that has not been written to for more than **30 seconds**
+(abandoned or paused download, a `.part` left behind by Firefox) is not
+counted: the island doesn't get stuck on an old file. It is picked up again as
+soon as it grows.
+
 A cancelled download disappears without any announcement.
 
 ## Announcements

@@ -31,6 +31,11 @@ Le dossier n'est relevé (une fois par seconde) que **tant qu'un fichier
 provisoire existe** ; le reste du temps, l'île attend simplement un
 changement dans le dossier.
 
+Un fichier provisoire qui n'a pas été écrit depuis plus de **30 secondes**
+(téléchargement abandonné ou en pause, `.part` oublié par Firefox) n'est pas
+compté : l'île ne reste pas bloquée sur un vieux fichier. Il est repris dès
+qu'il grossit à nouveau.
+
 Un téléchargement annulé disparaît sans rien annoncer.
 
 ## Annonces
