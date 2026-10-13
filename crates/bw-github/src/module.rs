@@ -182,9 +182,13 @@ fn resolve_token(config: &GithubConfig) -> anyhow::Result<String> {
 
 /// `gh auth token` : le jeton de la session GitHub CLI de l'utilisateur.
 fn gh_token() -> anyhow::Result<String> {
-    let mut candidates = vec![std::ffi::OsString::from("gh")];
     #[cfg(windows)]
-    candidates.push(r"C:\Program Files\GitHub CLI\gh.exe".into());
+    let candidates = [
+        std::ffi::OsString::from("gh"),
+        std::ffi::OsString::from(r"C:\Program Files\GitHub CLI\gh.exe"),
+    ];
+    #[cfg(not(windows))]
+    let candidates = [std::ffi::OsString::from("gh")];
 
     let mut last = anyhow::anyhow!("jeton : GitHub CLI introuvable");
     for program in candidates {
