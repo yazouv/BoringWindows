@@ -220,6 +220,17 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 | `announce_wifi` | `false` | | announce a Wi-Fi network change |
 | `show_secs` | `5` | 2 to 30 | how long an announcement stays (s) |
 
+## `[modules.transfers]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `true` | | show the [transfer progress](transferts.md) in the collapsed pill |
+| `copies` | `true` | | follow File Explorer copies, moves and deletions (Windows) |
+| `downloads` | `true` | | follow browser downloads |
+| `downloads_folder` | `""` | | watched folder; empty: the system Downloads folder |
+| `announce_done` | `true` | | announce when a transfer finishes |
+| `show_secs` | `5` | 2 to 30 | how long the announcement stays (s) |
+
 ## `[modules.mascot]`
 
 | Option | Default | Range | Purpose |

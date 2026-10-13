@@ -221,6 +221,17 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 | `announce_wifi` | `false` | | annoncer un changement de réseau Wi-Fi |
 | `show_secs` | `5` | 2 à 30 | durée d'affichage d'une annonce (s) |
 
+## `[modules.transfers]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `true` | | afficher la [progression des transferts](transferts.md) dans la pilule repliée |
+| `copies` | `true` | | suivre les copies, déplacements et suppressions de l'Explorateur (Windows) |
+| `downloads` | `true` | | suivre les téléchargements des navigateurs |
+| `downloads_folder` | `""` | | dossier surveillé ; vide : le dossier Téléchargements du système |
+| `announce_done` | `true` | | annoncer la fin d'un transfert |
+| `show_secs` | `5` | 2 à 30 | durée d'affichage de l'annonce (s) |
+
 ## `[modules.mascot]`
 
 | Option | Défaut | Plage | Rôle |

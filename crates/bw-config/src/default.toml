@@ -183,6 +183,23 @@ announce_wifi = false
 # Durée d'affichage d'une annonce (s, de 2 à 30).
 show_secs = 5
 
+[modules.transfers]
+# Transferts : une barre de progression au bord bas de la pilule repliée pendant
+# une copie de fichiers ou un téléchargement.
+enabled = true
+# Copies, déplacements et suppressions de l'Explorateur (Windows).
+copies = true
+# Téléchargements des navigateurs (Chrome, Edge, Firefox…). Les navigateurs ne
+# donnent pas la taille finale : la barre va et vient, avec la taille reçue et la
+# vitesse.
+downloads = true
+# Dossier surveillé ; vide : le dossier Téléchargements du système.
+downloads_folder = ""
+# Annoncer la fin d'une copie ou d'un téléchargement.
+announce_done = true
+# Durée d'affichage de l'annonce (s, de 2 à 30).
+show_secs = 5
+
 [modules.mascot]
 # La mascotte : un petit blob dans la pilule qui réagit à Claude Code, danse sur
 # la musique, s'endort quand tu t'absentes et se déguise selon la saison.

@@ -650,3 +650,24 @@ msgstr "Seulement pendant les appels et partages d'écran"
 
 msgid "The rest of the time, your own screenshots show the island"
 msgstr "Le reste du temps, tes propres captures montrent l'île"
+
+msgid "Transfers"
+msgstr "Transferts"
+
+msgid "Show file transfers"
+msgstr "Afficher les transferts de fichiers"
+
+msgid "A progress bar at the bottom of the collapsed island while files are copied or downloaded."
+msgstr "Une barre de progression au bas de l'île repliée pendant une copie ou un téléchargement de fichiers."
+
+msgid "Copies and moves in File Explorer"
+msgstr "Copies et déplacements de l'Explorateur"
+
+msgid "Browser downloads"
+msgstr "Téléchargements des navigateurs"
+
+msgid "Announce when a transfer finishes"
+msgstr "Annoncer la fin d'un transfert"
+
+msgid "Browsers do not tell the final size of a download: its bar moves back and forth, and the island shows the size received and the speed."
+msgstr "Les navigateurs ne donnent pas la taille finale d'un téléchargement : sa barre va et vient, et l'île montre la taille reçue et la vitesse."

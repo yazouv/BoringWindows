@@ -183,6 +183,23 @@ announce_wifi = false
 # How long an announcement stays (s, 2 to 30).
 show_secs = 5
 
+[modules.transfers]
+# Transfers: a progress bar at the bottom of the collapsed pill while files are
+# copied or downloaded.
+enabled = true
+# File Explorer copies, moves and deletions (Windows).
+copies = true
+# Browser downloads (Chrome, Edge, Firefox…). Browsers do not tell the final
+# size: the bar moves back and forth, with the size received and the
+# speed.
+downloads = true
+# Watched folder; empty: the system Downloads folder.
+downloads_folder = ""
+# Announce when a copy or a download finishes.
+announce_done = true
+# How long the announcement stays (s, 2 to 30).
+show_secs = 5
+
 [modules.mascot]
 # The mascot: a little blob in the pill that reacts to Claude Code, dances to
 # the music, falls asleep when you are away and dresses up for the season.

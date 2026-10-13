@@ -900,6 +900,7 @@ impl Controller {
         self.ui.set_has_weather(false);
         self.ui.set_has_system(false);
         self.ui.set_has_network(false);
+        self.ui.set_transfer_visible(false);
         self.live.set(false);
         self.ui.set_live(false);
         self.gauges.borrow_mut().clear();
@@ -982,6 +983,14 @@ impl Controller {
                         cpu_hot: system.cpu >= HOT_PERCENT,
                         ram_hot: system.ram_percent() >= HOT_PERCENT,
                     });
+                } else if let Some(transfer) =
+                    state.downcast_ref::<bw_transfers::TransferProgress>()
+                {
+                    self.ui.set_transfer_visible(transfer.active);
+                    self.ui
+                        .set_transfer_indeterminate(transfer.fraction.is_none());
+                    self.ui
+                        .set_transfer_progress(transfer.fraction.unwrap_or(0.0));
                 } else if let Some(network) = state.downcast_ref::<bw_network::NetworkSnapshot>() {
                     self.ui.set_has_network(true);
                     self.ui.set_network(NetworkInfo {
@@ -2411,6 +2420,13 @@ fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
         match bw_network::NetworkConfig::from_table(config.modules.get(bw_network::MODULE_ID)) {
             Ok(c) => modules.push(Box::new(bw_network::NetworkModule::new(c))),
             Err(e) => errors.push(format!("modules.network : {e:#}")),
+        }
+    }
+    if config.module_enabled(bw_transfers::MODULE_ID, true) {
+        match bw_transfers::TransfersConfig::from_table(config.modules.get(bw_transfers::MODULE_ID))
+        {
+            Ok(c) => modules.push(Box::new(bw_transfers::TransfersModule::new(c))),
+            Err(e) => errors.push(format!("modules.transfers : {e:#}")),
         }
     }
     if config.module_enabled("demo", false) {

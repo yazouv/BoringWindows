@@ -1247,6 +1247,13 @@ export component Island inherits Window {
     in property <bool> has-system;
     in property <SystemInfo> system;
     property <bool> system-hover;
+    // Transfert en cours (copie, téléchargement) : une barre au bord bas de la
+    // pilule repliée, quelle que soit l'information affichée.
+    in property <bool> transfer-visible;
+    in property <bool> transfer-indeterminate;
+    in property <float> transfer-progress;
+    // Phase du va-et-vient de la barre indéterminée.
+    property <float> transfer-t;
     in property <bool> has-network;
     in property <NetworkInfo> network;
     property <bool> network-hover;
@@ -1526,6 +1533,33 @@ export component Island inherits Window {
                 visible: self.opacity > 0;
                 animate opacity { duration: root.anim; }
                 background: @linear-gradient(180deg, transparent 35%, root.notif.tint.with-alpha(0.3) 100%);
+            }
+
+            // Progression d'un transfert : un trait au bord bas de la pilule
+            // (arrondi par son découpage). Indéterminé : un segment qui va et
+            // vient, mû par une minuterie qui ne tourne que tant qu'il est visible.
+            Rectangle {
+                y: parent.height - self.height;
+                height: 3px;
+                visible: root.transfer-visible && !root.expanded;
+                background: root.fg.with-alpha(0.14);
+
+                Rectangle {
+                    x: root.transfer-indeterminate
+                        ? (parent.width - self.width) * Math.abs(Math.mod(root.transfer-t, 2) - 1)
+                        : 0px;
+                    width: root.transfer-indeterminate
+                        ? parent.width * 0.3
+                        : parent.width * clamp(root.transfer-progress, 0, 1);
+                    background: root.accent;
+                    animate width { duration: 300ms; easing: ease-out; }
+                }
+
+                Timer {
+                    interval: 33ms;
+                    running: root.transfer-visible && root.transfer-indeterminate && !root.expanded;
+                    triggered => { root.transfer-t += 0.025; }
+                }
             }
 
             // Trait lumineux qui s'étire le long du bord inférieur.

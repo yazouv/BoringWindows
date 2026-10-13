@@ -19,6 +19,7 @@
 - [Weather](meteo.md)
 - [CPU, memory and shortcuts](systeme.md)
 - [Network](reseau.md)
+- [File transfers](transferts.md)
 - [Mascot](mascotte.md)
 - [Gestures](gestes.md)
 - [Presentation mode](presentation.md)

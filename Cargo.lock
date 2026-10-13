@@ -483,6 +483,7 @@ dependencies = [
  "bw-secrets",
  "bw-system",
  "bw-timer",
+ "bw-transfers",
  "bw-update",
  "bw-viz",
  "bw-volume",
@@ -711,6 +712,23 @@ dependencies = [
  "serde",
  "tokio",
  "toml",
+]
+
+[[package]]
+name = "bw-transfers"
+version = "0.6.0"
+dependencies = [
+ "anyhow",
+ "bw-core",
+ "bw-i18n",
+ "dirs",
+ "log",
+ "notify-debouncer-mini",
+ "serde",
+ "tempfile",
+ "tokio",
+ "toml",
+ "windows",
 ]
 
 [[package]]

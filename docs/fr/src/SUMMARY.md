@@ -19,6 +19,7 @@
 - [Météo](meteo.md)
 - [Processeur, mémoire et raccourcis](systeme.md)
 - [Réseau](reseau.md)
+- [Transferts de fichiers](transferts.md)
 - [Mascotte](mascotte.md)
 - [Gestes](gestes.md)
 - [Mode présentation](presentation.md)

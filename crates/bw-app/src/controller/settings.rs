@@ -227,6 +227,13 @@ impl Controller {
         ui.set_network_announce_connection(network.announce_connection);
         ui.set_network_announce_vpn(network.announce_vpn);
         ui.set_network_announce_wifi(network.announce_wifi);
+        let transfers =
+            bw_transfers::TransfersConfig::from_table(config.modules.get(bw_transfers::MODULE_ID))
+                .unwrap_or_default();
+        ui.set_transfers_enabled(config.module_enabled(bw_transfers::MODULE_ID, true));
+        ui.set_transfers_copies(transfers.copies);
+        ui.set_transfers_downloads(transfers.downloads);
+        ui.set_transfers_announce(transfers.announce_done);
         let hotkeys = &config.hotkeys;
         ui.set_hotkey_toggle(hotkeys.toggle.as_str().into());
         ui.set_hotkey_play_pause(hotkeys.play_pause.as_str().into());
@@ -945,6 +952,22 @@ impl Controller {
             "modules.network.announce_wifi" => Some((
                 vec!["modules", "network", "announce_wifi"],
                 Value::Bool(ui.get_network_announce_wifi()),
+            )),
+            "modules.transfers.enabled" => Some((
+                vec!["modules", "transfers", "enabled"],
+                Value::Bool(ui.get_transfers_enabled()),
+            )),
+            "modules.transfers.copies" => Some((
+                vec!["modules", "transfers", "copies"],
+                Value::Bool(ui.get_transfers_copies()),
+            )),
+            "modules.transfers.downloads" => Some((
+                vec!["modules", "transfers", "downloads"],
+                Value::Bool(ui.get_transfers_downloads()),
+            )),
+            "modules.transfers.announce_done" => Some((
+                vec!["modules", "transfers", "announce_done"],
+                Value::Bool(ui.get_transfers_announce()),
             )),
             "hotkeys.toggle" => Some((
                 vec!["hotkeys", "toggle"],
