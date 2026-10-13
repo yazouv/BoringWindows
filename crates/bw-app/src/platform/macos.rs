@@ -592,6 +592,11 @@ fn bring_app_forward(mtm: MainThreadMarker) {
     NSApplication::sharedApplication(mtm).activateIgnoringOtherApps(true);
 }
 
+/// Met la fenêtre d'ajout rapide au premier plan, avec le clavier.
+pub fn focus_tool_window(_window: &slint::Window) {
+    activate_app();
+}
+
 /// Passe l'app au premier plan (fenêtre de réglages).
 pub fn activate_app() {
     if let Some(mtm) = MainThreadMarker::new() {

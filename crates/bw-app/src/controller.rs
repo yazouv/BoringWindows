@@ -30,9 +30,11 @@ use crate::gestures::{self, Gesture, GesturesConfig};
 use crate::mascot::{self, ClaudeState, MascotConfig};
 use crate::platform::{self, Platform, PlatformEvent, Tray, TrayCommand};
 use crate::shelf::{Shelf, ShelfConfig};
+use crate::tasks::{Tasks, TasksConfig};
 use crate::{
     AgendaRow, ClaudePrompt, ClaudeRow, GaugeInfo, GithubInfo, Island, MediaInfo, NetworkInfo,
-    NotifInfo, PluginRow, RecentRow, ShelfRow, SystemInfo, TimerInfo, WeatherInfo, clock, demo,
+    NotifInfo, PluginRow, QuickAddWindow, RecentRow, ShelfRow, SystemInfo, TaskRow, TimerInfo,
+    WeatherInfo, clock, demo,
 };
 
 /// Pseudo-module utilisé pour signaler une config invalide dans l'île.
@@ -47,6 +49,10 @@ const MAX_ROWS_WITH_MEDIA: usize = 2;
 const NOTIF_ROWS: usize = 4;
 /// Onglets de l'île ouverte (propriété `tab` de `island.slint`).
 const TAB_NOTIFICATIONS: i32 = 2;
+/// Valeur de `tab` pour l'onglet Tâches.
+const TAB_TASKS: i32 = 3;
+/// Tâches transmises à l'interface (l'onglet en montre autant qu'il en tient).
+const MAX_TASK_ROWS: usize = 30;
 /// Avec le flou : cadence de suivi de la pilule pendant une animation, et
 /// marge après sa fin.
 const BLUR_FRAME: Duration = Duration::from_millis(16);
@@ -156,6 +162,10 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         live: Cell::new(false),
         capturing: Cell::new(false),
         github_url: RefCell::new(String::new()),
+        tasks: RefCell::new(Tasks::default()),
+        tasks_path: RefCell::new(PathBuf::new()),
+        tasks_stamp: Cell::new(None),
+        quick_add: RefCell::new(None),
         capture_timer: Timer::default(),
         toast_timer: Timer::default(),
         hotkeys: RefCell::new(None),
@@ -248,6 +258,12 @@ pub struct Controller {
     capturing: Cell<bool>,
     /// Page à ouvrir au clic sur l'icône GitHub.
     github_url: RefCell<String>,
+    /// Tâches rapides (fichier Markdown), son chemin et sa date de modification.
+    tasks: RefCell<Tasks>,
+    tasks_path: RefCell<PathBuf>,
+    tasks_stamp: Cell<Option<std::time::SystemTime>>,
+    /// Fenêtre d'ajout d'une tâche (créée à la première demande).
+    quick_add: RefCell<Option<QuickAddWindow>>,
     /// Revérifie le premier plan une fois l'ouverture de l'outil de capture posée.
     capture_timer: Timer,
     toast_timer: Timer,
@@ -261,6 +277,7 @@ impl Controller {
         self.apply_theme();
         self.reload_custom_view();
         self.update_shelf_ui();
+        self.apply_tasks();
         let (choice, size) = self.placement();
         if let Some(pos) = platform::initial_position(choice, size) {
             self.ui.window().set_position(pos);
@@ -327,6 +344,10 @@ impl Controller {
                 }
             }
         });
+        self.ui
+            .on_task_action(with(&weak, |c, action: slint::SharedString| {
+                c.tasks_action(&action);
+            }));
         self.ui.on_dnd_toggle({
             let weak = weak.clone();
             move || {
@@ -497,6 +518,10 @@ impl Controller {
             self.refresh_shape();
             if expanded {
                 self.refresh_activity();
+                // Le fichier a pu être modifié à la main depuis la dernière fois.
+                if self.ui.get_has_tasks_tab() {
+                    self.reload_tasks(false);
+                }
             }
             for module in [bw_system::MODULE_ID, bw_network::MODULE_ID] {
                 self.send_action(module, if expanded { "open" } else { "close" });
@@ -844,6 +869,7 @@ impl Controller {
             self.reload_custom_view();
         }
         self.update_shelf_ui();
+        self.apply_tasks();
         if moved {
             self.place();
         }
@@ -2189,6 +2215,159 @@ impl Controller {
             });
     }
 
+    // --- Tâches ------------------------------------------------------------------
+
+    fn tasks_config(&self) -> TasksConfig {
+        TasksConfig::from_table(self.config.borrow().modules.get("tasks")).unwrap_or_default()
+    }
+
+    /// Applique la config des tâches : l'onglet, le fichier, le rappel du raccourci.
+    fn apply_tasks(&self) {
+        let config = self.tasks_config();
+        let dir = self.path.parent().unwrap_or(std::path::Path::new("."));
+        *self.tasks_path.borrow_mut() = config.path(dir);
+        self.ui.set_has_tasks_tab(config.enabled);
+        self.ui
+            .set_tasks_hint(self.config.borrow().hotkeys.quick_add.trim().into());
+        if config.enabled {
+            self.reload_tasks(true);
+        } else {
+            // L'onglet disparaît : on ne reste pas dessus.
+            if self.ui.get_tab() == TAB_TASKS {
+                self.ui.set_tab(0);
+            }
+            *self.tasks.borrow_mut() = Tasks::default();
+            self.update_tasks_ui();
+        }
+    }
+
+    /// Relit le fichier s'il a changé (modifié à la main, ailleurs…).
+    fn reload_tasks(&self, force: bool) {
+        let path = self.tasks_path.borrow().clone();
+        let stamp = std::fs::metadata(&path).and_then(|m| m.modified()).ok();
+        if !force && stamp == self.tasks_stamp.get() {
+            return;
+        }
+        *self.tasks.borrow_mut() = Tasks::load(&path);
+        self.tasks_stamp.set(stamp);
+        self.update_tasks_ui();
+    }
+
+    fn update_tasks_ui(&self) {
+        let tasks = self.tasks.borrow();
+        let rows: Vec<TaskRow> = tasks
+            .display()
+            .into_iter()
+            .take(MAX_TASK_ROWS)
+            .map(|t| TaskRow {
+                ordinal: t.ordinal as i32,
+                text: t.text.as_str().into(),
+                done: t.done,
+            })
+            .collect();
+        self.ui.set_tasks_rows(ModelRc::new(VecModel::from(rows)));
+        self.ui.set_tasks_open(tasks.open_count() as i32);
+        self.ui.set_tasks_done(tasks.done_count() as i32);
+    }
+
+    /// Modifie la liste à partir de ce qui est sur le disque (pour ne pas écraser
+    /// une modification faite ailleurs), puis l'enregistre.
+    fn edit_tasks(self: &Rc<Self>, edit: impl FnOnce(&mut Tasks) -> bool) {
+        self.reload_tasks(true);
+        if !edit(&mut self.tasks.borrow_mut()) {
+            return;
+        }
+        let path = self.tasks_path.borrow().clone();
+        if let Err(e) = self.tasks.borrow().save(&path) {
+            log::warn!("tâches : impossible d'écrire {} : {e}", path.display());
+            self.flash(&tr!(
+                "Could not save the tasks",
+                "Impossible d'enregistrer les tâches"
+            ));
+            return;
+        }
+        self.tasks_stamp
+            .set(std::fs::metadata(&path).and_then(|m| m.modified()).ok());
+        self.update_tasks_ui();
+    }
+
+    fn tasks_action(self: &Rc<Self>, action: &str) {
+        let ordinal = |rest: &str| rest.parse::<usize>().ok();
+        match action {
+            "add" => self.open_quick_add(),
+            "clear" => self.edit_tasks(|t| t.clear_done() > 0),
+            _ => {
+                if let Some(n) = action.strip_prefix("toggle:").and_then(ordinal) {
+                    self.edit_tasks(|t| t.toggle(n));
+                } else if let Some(n) = action.strip_prefix("remove:").and_then(ordinal) {
+                    self.edit_tasks(|t| t.remove(n));
+                }
+            }
+        }
+    }
+
+    /// La petite fenêtre d'ajout, sous l'île : l'île ne reçoit jamais le clavier.
+    fn open_quick_add(self: &Rc<Self>) {
+        if !self.tasks_config().enabled {
+            return;
+        }
+        if self.quick_add.borrow().is_none() {
+            let window = match QuickAddWindow::new() {
+                Ok(w) => w,
+                Err(e) => {
+                    log::error!("fenêtre d'ajout de tâche : {e}");
+                    return;
+                }
+            };
+            let weak = Rc::downgrade(self);
+            window.on_accepted({
+                let weak = weak.clone();
+                move |text| {
+                    if let Some(c) = weak.upgrade() {
+                        c.edit_tasks(|t| t.add(&text));
+                        c.close_quick_add();
+                    }
+                }
+            });
+            window.on_cancelled(move || {
+                if let Some(c) = weak.upgrade() {
+                    c.close_quick_add();
+                }
+            });
+            *self.quick_add.borrow_mut() = Some(window);
+        }
+        let quick = self.quick_add.borrow();
+        let Some(window) = quick.as_ref() else { return };
+        window.set_text("".into());
+        window.set_hint(
+            tr!(
+                "Enter adds it · Esc cancels · {} to reopen",
+                "Entrée l'ajoute · Échap annule · {} pour rouvrir",
+                self.config.borrow().hotkeys.quick_add.trim()
+            )
+            .into(),
+        );
+        // Centrée sous l'île, qui est en haut de l'écran.
+        let scale = self.ui.window().scale_factor();
+        let island = self.ui.window();
+        let (pos, size) = (island.position(), island.size());
+        let width = (window.window().size().width as f32).max(480.0 * scale);
+        let x = pos.x as f32 + size.width as f32 / 2.0 - width / 2.0;
+        let y = pos.y as f32 + (self.theme().top_offset + 64.0) * scale;
+        window
+            .window()
+            .set_position(slint::PhysicalPosition::new(x as i32, y as i32));
+        let _ = window.show();
+        platform::focus_tool_window(window.window());
+        window.invoke_focus_input();
+    }
+
+    fn close_quick_add(&self) {
+        if let Some(window) = self.quick_add.borrow().as_ref() {
+            let _ = window.hide();
+        }
+    }
+
     // --- Raccourcis clavier ---------------------------------------------------
 
     /// Enregistre les raccourcis de la config ; les erreurs s'affichent dans
@@ -2199,7 +2378,12 @@ impl Controller {
             let Some(hotkeys) = hotkeys.as_mut() else {
                 return;
             };
-            hotkeys.apply(&self.config.borrow().hotkeys)
+            // L'ajout de tâche n'a de raccourci que si les tâches sont activées.
+            let mut config = self.config.borrow().hotkeys.clone();
+            if !self.tasks_config().enabled {
+                config.quick_add.clear();
+            }
+            hotkeys.apply(&config)
         };
         if let Some(first) = errors.first() {
             for e in &errors {
@@ -2245,6 +2429,7 @@ impl Controller {
                 self.run_gesture(gesture, &self.gestures_config());
             }
             HotkeyAction::DoNotDisturb => self.toggle_dnd_with_feedback(),
+            HotkeyAction::QuickAdd => self.open_quick_add(),
         }
     }
 
@@ -2464,6 +2649,9 @@ fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
             Ok(c) => modules.push(Box::new(bw_github::GithubModule::new(c))),
             Err(e) => errors.push(format!("modules.github : {e:#}")),
         }
+    }
+    if let Err(e) = TasksConfig::from_table(config.modules.get("tasks")) {
+        errors.push(format!("modules.tasks : {e:#}"));
     }
     if config.module_enabled("demo", false) {
         modules.push(Box::new(demo::Demo::default()));

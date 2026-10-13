@@ -85,6 +85,7 @@ for example `"Ctrl+Alt+B"`; `""`: none.
 | `next_track` | `""` | music: next track |
 | `previous_track` | `""` | music: previous track |
 | `do_not_disturb` | `""` | turn "do not disturb" on or off |
+| `quick_add` | `"Ctrl+Alt+N"` | add a [task](taches.md) (when tasks are enabled) |
 
 ## `[modules.claude]`
 
@@ -242,6 +243,13 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 | `announce_ci` | `true` | | announce CI success or failure |
 | `announce_reviews` | `true` | | announce a review request |
 | `show_secs` | `6` | 2 to 30 | how long an announcement stays (s) |
+
+## `[modules.tasks]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `false` | | show the [quick tasks](taches.md) tab |
+| `file` | `""` | | Markdown tasks file, relative to the config.toml folder; empty: `tasks.md` |
 
 ## `[modules.mascot]`
 

@@ -954,6 +954,17 @@ fn activate(hwnd: HWND) -> bool {
 /// Windows met déjà au premier plan une fenêtre ouverte depuis l'icône.
 pub fn activate_app() {}
 
+/// Met une petite fenêtre ordinaire (l'ajout rapide) au premier plan, avec le
+/// clavier, sans bouton dans la barre des tâches.
+pub fn focus_tool_window(window: &slint::Window) {
+    use slint::winit_030::WinitWindowAccessor;
+    use slint::winit_030::winit::platform::windows::WindowExtWindows;
+    window.with_winit_window(|w| {
+        w.set_skip_taskbar(true);
+        w.focus_window();
+    });
+}
+
 pub fn attach_parent_console() {
     use windows::Win32::System::Console::{ATTACH_PARENT_PROCESS, AttachConsole};
     // SAFETY: appel sans pointeur ; échoue sans effet si une console existe déjà.

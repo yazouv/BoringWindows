@@ -248,6 +248,8 @@ impl Controller {
         ui.set_hotkey_next(hotkeys.next_track.as_str().into());
         ui.set_hotkey_previous(hotkeys.previous_track.as_str().into());
         ui.set_hotkey_dnd(hotkeys.do_not_disturb.as_str().into());
+        ui.set_hotkey_quick_add(hotkeys.quick_add.as_str().into());
+        ui.set_tasks_enabled(self.tasks_config().enabled);
         ui.set_notifications_enabled(config.module_enabled(bw_notify::MODULE_ID, true));
         let notify = bw_notify::NotifyConfig::from_table(config.modules.get(bw_notify::MODULE_ID))
             .unwrap_or_default();
@@ -1037,6 +1039,23 @@ impl Controller {
                 vec!["hotkeys", "previous_track"],
                 Value::Str(ui.get_hotkey_previous().trim().to_owned()),
             )),
+            "modules.tasks.enabled" => Some((
+                vec!["modules", "tasks", "enabled"],
+                Value::Bool(ui.get_tasks_enabled()),
+            )),
+            "hotkeys.quick_add" => Some((
+                vec!["hotkeys", "quick_add"],
+                Value::Str(ui.get_hotkey_quick_add().trim().to_owned()),
+            )),
+            "tasks.open_file" => {
+                // Crée le fichier s'il n'existe pas encore : l'éditeur s'ouvre dessus.
+                let path = self.tasks_path.borrow().clone();
+                if !path.exists() {
+                    let _ = crate::tasks::Tasks::default().save(&path);
+                }
+                platform::open_path(&path);
+                None
+            }
             "hotkeys.do_not_disturb" => Some((
                 vec!["hotkeys", "do_not_disturb"],
                 Value::Str(ui.get_hotkey_dnd().trim().to_owned()),

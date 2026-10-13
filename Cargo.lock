@@ -501,6 +501,7 @@ dependencies = [
  "slint",
  "slint-build",
  "slint-interpreter",
+ "tempfile",
  "tokio",
  "toml",
  "tray-icon",

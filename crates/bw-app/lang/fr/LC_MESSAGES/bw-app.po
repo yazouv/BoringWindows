@@ -722,3 +722,42 @@ msgstr "Annoncer les revues demandées"
 
 msgid "GitHub has no event to listen to: the island asks once per interval, in a single request."
 msgstr "GitHub n'a pas d'événement à écouter : l'île interroge une fois par intervalle, en une seule requête."
+
+msgid "Tasks"
+msgstr "Tâches"
+
+msgid "Nothing to do"
+msgstr "Rien à faire"
+
+msgid "+ Add a task"
+msgstr "+ Ajouter une tâche"
+
+msgid "Clear done"
+msgstr "Vider les faites"
+
+msgid "New task"
+msgstr "Nouvelle tâche"
+
+msgid "What needs doing?"
+msgstr "Qu'y a-t-il à faire ?"
+
+msgid "Show quick tasks"
+msgstr "Afficher les tâches rapides"
+
+msgid "A Tasks tab in the open island: check tasks off with a click. They live in a Markdown file you can also edit by hand."
+msgstr "Un onglet Tâches dans l'île ouverte : coche les tâches d'un clic. Elles vivent dans un fichier Markdown que tu peux aussi modifier à la main."
+
+msgid "Add a task"
+msgstr "Ajouter une tâche"
+
+msgid "Shortcut that opens a small box under the island."
+msgstr "Raccourci qui ouvre une petite boîte sous l'île."
+
+msgid "Tasks file"
+msgstr "Fichier des tâches"
+
+msgid "tasks.md next to config.toml: one \"- [ ] task\" line per task."
+msgstr "tasks.md à côté de config.toml : une ligne \"- [ ] tâche\" par tâche."
+
+msgid "Open"
+msgstr "Ouvrir"

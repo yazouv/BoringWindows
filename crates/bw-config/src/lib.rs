@@ -209,6 +209,8 @@ pub struct Hotkeys {
     pub next_track: String,
     pub previous_track: String,
     pub do_not_disturb: String,
+    /// Ajouter une tâche (seulement si les tâches sont activées).
+    pub quick_add: String,
 }
 
 impl Default for Hotkeys {
@@ -219,19 +221,21 @@ impl Default for Hotkeys {
             next_track: String::new(),
             previous_track: String::new(),
             do_not_disturb: String::new(),
+            quick_add: "Ctrl+Alt+N".into(),
         }
     }
 }
 
 impl Hotkeys {
     /// Clé de config et raccourci de chaque action.
-    pub fn entries(&self) -> [(&'static str, &str); 5] {
+    pub fn entries(&self) -> [(&'static str, &str); 6] {
         [
             ("toggle", &self.toggle),
             ("play_pause", &self.play_pause),
             ("next_track", &self.next_track),
             ("previous_track", &self.previous_track),
             ("do_not_disturb", &self.do_not_disturb),
+            ("quick_add", &self.quick_add),
         ]
     }
 }

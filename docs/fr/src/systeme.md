@@ -42,6 +42,7 @@ Des raccourcis valables dans toutes les applications :
 | Morceau suivant | `next_track` | aucun |
 | Morceau précédent | `previous_track` | aucun |
 | Ne pas déranger | `do_not_disturb` | aucun |
+| Ajouter une [tâche](taches.md) | `quick_add` | `Ctrl+Alt+N` (si les tâches sont activées) |
 
 Ouverte au clavier, l'île se referme seule au bout de 6 secondes si la souris
 ne vient pas dessus (ou au prochain appui sur le raccourci).
@@ -55,6 +56,7 @@ play_pause = "Ctrl+Alt+P"
 next_track = "Ctrl+Alt+Right"
 previous_track = "Ctrl+Alt+Left"
 do_not_disturb = ""          # vide : pas de raccourci
+quick_add = "Ctrl+Alt+N"     # ajouter une tâche
 ```
 
 Un raccourci s'écrit avec ses modificateurs d'abord, séparés par `+` :

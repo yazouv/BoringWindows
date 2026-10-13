@@ -67,6 +67,8 @@ next_track = ""
 previous_track = ""
 # Turn "do not disturb" on or off.
 do_not_disturb = ""
+# Add a task (when tasks are enabled).
+quick_add = "Ctrl+Alt+N"
 
 # Each module is configured in its [modules.<name>] section.
 # A module with enabled = false is not even started.
@@ -216,6 +218,13 @@ announce_ci = true
 announce_reviews = true
 # How long an announcement stays (s, 2 to 30).
 show_secs = 6
+
+[modules.tasks]
+# Quick tasks: a "Tasks" tab in the open island, fed by the
+# hotkeys.quick_add shortcut.
+enabled = false
+# Markdown file ("- [ ]" checkboxes), next to config.toml; empty: tasks.md.
+file = ""
 
 [modules.mascot]
 # The mascot: a little blob in the pill that reacts to Claude Code, dances to

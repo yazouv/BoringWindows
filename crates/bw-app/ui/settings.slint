@@ -442,6 +442,8 @@ export component SettingsWindow inherits Window {
     in-out property <string> hotkey-next;
     in-out property <string> hotkey-previous;
     in-out property <string> hotkey-dnd;
+    in-out property <string> hotkey-quick-add;
+    in-out property <bool> tasks-enabled;
     // --- État de l'enregistrement ---
     in property <string> status;
     in property <bool> status-error;
@@ -1924,6 +1926,47 @@ export component SettingsWindow inherits Window {
 
                 Hint {
                     text: @tr("GitHub has no event to listen to: the island asks once per interval, in a single request.");
+                }
+            }
+
+            Section {
+                title: @tr("Tasks");
+
+                Card {
+                    Setting {
+                        title: @tr("Show quick tasks");
+                        description: @tr("A Tasks tab in the open island: check tasks off with a click. They live in a Markdown file you can also edit by hand.");
+                        Toggle {
+                            checked <=> root.tasks-enabled;
+                            toggled => { root.changed("modules.tasks.enabled"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.tasks-enabled;
+                        title: @tr("Add a task");
+                        description: @tr("Shortcut that opens a small box under the island.");
+                        LineEdit {
+                            width: 200px;
+                            enabled: root.tasks-enabled;
+                            text <=> root.hotkey-quick-add;
+                            placeholder-text: "Ctrl+Alt+N";
+                            edited => { root.changed("hotkeys.quick_add"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.tasks-enabled;
+                        title: @tr("Tasks file");
+                        description: @tr("tasks.md next to config.toml: one \"- [ ] task\" line per task.");
+                        Button {
+                            text: @tr("Open");
+                            enabled: root.tasks-enabled;
+                            clicked => { root.changed("tasks.open_file"); }
+                        }
+                    }
                 }
             }
 

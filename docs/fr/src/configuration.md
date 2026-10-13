@@ -86,6 +86,7 @@ exemple `"Ctrl+Alt+B"` ; `""` : aucun.
 | `next_track` | `""` | musique : morceau suivant |
 | `previous_track` | `""` | musique : morceau précédent |
 | `do_not_disturb` | `""` | activer ou couper « ne pas déranger » |
+| `quick_add` | `"Ctrl+Alt+N"` | ajouter une [tâche](taches.md) (si les tâches sont activées) |
 
 ## `[modules.claude]`
 
@@ -243,6 +244,13 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 | `announce_ci` | `true` | | annoncer la réussite ou l'échec de la CI |
 | `announce_reviews` | `true` | | annoncer une revue demandée |
 | `show_secs` | `6` | 2 à 30 | durée d'affichage d'une annonce (s) |
+
+## `[modules.tasks]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `false` | | afficher l'onglet des [tâches rapides](taches.md) |
+| `file` | `""` | | fichier Markdown des tâches, relatif au dossier de config.toml ; vide : `tasks.md` |
 
 ## `[modules.mascot]`
 

@@ -10,6 +10,7 @@ mod hotkeys;
 mod mascot;
 mod platform;
 mod shelf;
+mod tasks;
 #[cfg(test)]
 mod translations;
 

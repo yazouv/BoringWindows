@@ -21,6 +21,7 @@
 - [Réseau](reseau.md)
 - [Transferts de fichiers](transferts.md)
 - [GitHub](github.md)
+- [Tâches rapides](taches.md)
 - [Mascotte](mascotte.md)
 - [Gestes](gestes.md)
 - [Mode présentation](presentation.md)

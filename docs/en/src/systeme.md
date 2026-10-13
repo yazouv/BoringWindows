@@ -41,6 +41,7 @@ Shortcuts that work in every app:
 | Next track | `next_track` | none |
 | Previous track | `previous_track` | none |
 | Do not disturb | `do_not_disturb` | none |
+| Add a [task](taches.md) | `quick_add` | `Ctrl+Alt+N` (when tasks are enabled) |
 
 When opened with the keyboard, the island closes by itself after 6 seconds if
 the mouse doesn't come over it (or on the next press of the shortcut).
@@ -54,6 +55,7 @@ play_pause = "Ctrl+Alt+P"
 next_track = "Ctrl+Alt+Right"
 previous_track = "Ctrl+Alt+Left"
 do_not_disturb = ""          # empty: no shortcut
+quick_add = "Ctrl+Alt+N"     # add a task
 ```
 
 Write a shortcut with its modifiers first, separated by `+`:

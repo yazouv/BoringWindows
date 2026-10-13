@@ -67,6 +67,8 @@ next_track = ""
 previous_track = ""
 # Activer ou couper « ne pas déranger ».
 do_not_disturb = ""
+# Ajouter une tâche (quand les tâches sont activées).
+quick_add = "Ctrl+Alt+N"
 
 # Chaque module se configure dans sa section [modules.<nom>].
 # Un module avec enabled = false n'est même pas démarré.
@@ -216,6 +218,13 @@ announce_ci = true
 announce_reviews = true
 # Durée d'affichage d'une annonce (s, de 2 à 30).
 show_secs = 6
+
+[modules.tasks]
+# Tâches rapides : un onglet « Tâches » dans l'île ouverte, alimenté par le
+# raccourci hotkeys.quick_add.
+enabled = false
+# Fichier Markdown (cases « - [ ] »), à côté de config.toml ; vide : tasks.md.
+file = ""
 
 [modules.mascot]
 # La mascotte : un petit blob dans la pilule qui réagit à Claude Code, danse sur

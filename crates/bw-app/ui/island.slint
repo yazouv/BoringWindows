@@ -136,6 +136,14 @@ export struct GithubInfo {
     reviews: bool,
 }
 
+// Une tâche de l'onglet Tâches.
+export struct TaskRow {
+    // Rang dans le fichier : sert aux actions (cocher, retirer).
+    ordinal: int,
+    text: string,
+    done: bool,
+}
+
 // Pictogrammes au trait, viewbox 24x24 (tracés d'après Lucide, licence ISC).
 component Glyph inherits Path {
     in property <string> name;
@@ -1216,7 +1224,16 @@ export component Island inherits Window {
     // Place de l'onglet choisi dans le contrôle segmenté (Accueil, Notifs,
     // Claude), et celle de l'onglet Claude (deuxième sans onglet Notifs).
     property <int> claude-slot: root.has-notif-tab ? 2 : 1;
-    property <int> tab-slot: root.tab == 0 ? 0 : root.tab == 2 ? 1 : root.claude-slot;
+    // L'onglet Tâches (quatrième valeur de `tab`) vient en dernier.
+    property <int> tasks-slot: 1 + (root.has-notif-tab ? 1 : 0) + (root.has-claude-tab ? 1 : 0);
+    property <int> tab-slot: root.tab == 0 ? 0 : root.tab == 2 ? 1 : root.tab == 3 ? root.tasks-slot : root.claude-slot;
+    in property <bool> has-tasks-tab;
+    in property <[TaskRow]> tasks-rows;
+    in property <int> tasks-open;
+    in property <int> tasks-done;
+    // Rappel du raccourci d'ajout, au pied de l'onglet.
+    in property <string> tasks-hint;
+    callback task-action(string /* add | clear | toggle:<n> | remove:<n> */);
     in property <[RecentRow]> recent-rows;
     in property <string> usage-text;
     // Carte de consommation : fenêtre en cours, jetons utilisés, limite et
@@ -2023,7 +2040,7 @@ export component Island inherits Window {
                     }
 
                     // Contrôle segmenté : un indicateur glisse sous l'onglet choisi.
-                    if root.has-notif-tab || root.has-claude-tab: Rectangle {
+                    if root.has-notif-tab || root.has-claude-tab || root.has-tasks-tab: Rectangle {
                         property <int> slot: root.tab-slot;
                         width: tabs.preferred-width;
                         height: 24px;
@@ -2070,6 +2087,16 @@ export component Island inherits Window {
                                 ink: root.fg;
                                 accent: root.accent;
                                 clicked => { root.tab = 1; }
+                            }
+
+                            if root.has-tasks-tab: TabChip {
+                                y: (parent.height - self.height) / 2;
+                                text: @tr("Tasks");
+                                active: root.tab == 3;
+                                badge: root.tasks-open;
+                                ink: root.fg;
+                                accent: root.accent;
+                                clicked => { root.tab = 3; }
                             }
                         }
                     }
@@ -3086,6 +3113,155 @@ export component Island inherits Window {
                             font-size: 12px;
                             horizontal-alignment: center;
                             vertical-alignment: center;
+                        }
+                    }
+
+                    // Onglet des tâches : des cases à cocher (fichier tasks.md, modifiable
+                    // à la main). Un clic coche, × retire ; l'ajout passe par une petite
+                    // fenêtre, car l'île ne reçoit jamais le clavier.
+                    if root.has-tasks-tab: tasks-tab := Rectangle {
+                        property <float> d: root.tasks-slot - parent.pos;
+                        // Lignes qui tiennent au-dessus du pied de l'onglet.
+                        property <int> capacity: Math.max(1, Math.floor((self.height - 26px) / 26px));
+                        x: self.d * parent.step;
+                        width: parent.width;
+                        height: parent.height;
+                        opacity: 1 - Math.min(1, Math.abs(self.d)) * 0.7;
+                        visible: Math.abs(self.d) < 0.999;
+                        vertical-stretch: 1;
+
+                        for task[i] in root.tasks-rows: Rectangle {
+                            property <bool> shown: root.expanded && root.tab == 3;
+                            property <bool> hover: task-ta.has-hover || del-ta.has-hover;
+                            visible: i < parent.capacity;
+                            y: i * 26px + (self.shown ? 0px : 6px);
+                            width: parent.width;
+                            height: 24px;
+                            opacity: self.shown ? (task.done ? 0.55 : 1) : 0;
+                            animate opacity, y { duration: 240ms; delay: self.shown ? i * 40ms + 100ms : 0ms; easing: ease-out-quint; }
+                            border-radius: 8px;
+                            background: self.hover ? root.fg.with-alpha(0.07) : transparent;
+
+                            task-ta := TouchArea {
+                                clicked => { root.task-action("toggle:\{task.ordinal}"); }
+                            }
+
+                            HorizontalLayout {
+                                padding-left: 6px;
+                                padding-right: 30px;
+                                spacing: 10px;
+
+                                Rectangle {
+                                    width: 16px;
+                                    height: 16px;
+                                    y: (parent.height - self.height) / 2;
+                                    border-radius: 8px;
+                                    border-width: 1.5px;
+                                    border-color: task.done ? root.accent : root.fg.with-alpha(0.45);
+                                    background: task.done ? root.accent : transparent;
+
+                                    Text {
+                                        text: "✓";
+                                        visible: task.done;
+                                        color: white;
+                                        font-size: 10px;
+                                        font-weight: 800;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                Text {
+                                    text: task.text;
+                                    color: root.fg;
+                                    font-size: 12.5px;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                    horizontal-stretch: 1;
+                                }
+                            }
+
+                            // × : retirer la tâche (au survol).
+                            Rectangle {
+                                x: parent.width - self.width - 6px;
+                                y: 3px;
+                                width: 18px;
+                                height: 18px;
+                                border-radius: 9px;
+                                background: del-ta.has-hover ? root.fg.with-alpha(0.25) : transparent;
+                                opacity: parent.hover ? 1 : 0;
+                                animate opacity { duration: 120ms; }
+
+                                Text {
+                                    text: "×";
+                                    color: root.fg;
+                                    font-size: 13px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+
+                                del-ta := TouchArea {
+                                    clicked => { root.task-action("remove:\{task.ordinal}"); }
+                                }
+                            }
+                        }
+
+                        if root.tasks-rows.length == 0: Text {
+                            width: parent.width;
+                            height: parent.height - 24px;
+                            text: @tr("Nothing to do");
+                            color: root.fg.with-alpha(0.5);
+                            font-size: 12px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        // Pied : ajouter, raccourci, et ce qui dépasse.
+                        HorizontalLayout {
+                            y: parent.height - self.height;
+                            width: parent.width;
+                            height: 22px;
+                            padding-left: 6px;
+                            spacing: 12px;
+
+                            Text {
+                                text: @tr("+ Add a task");
+                                color: add-ta.has-hover ? root.accent : root.fg.with-alpha(0.7);
+                                font-size: 12px;
+                                font-weight: 600;
+                                vertical-alignment: center;
+
+                                add-ta := TouchArea {
+                                    clicked => { root.task-action("add"); }
+                                }
+                            }
+
+                            Text {
+                                text: root.tasks-hint;
+                                color: root.fg.with-alpha(0.4);
+                                font-size: 11px;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+
+                            if root.tasks-rows.length > tasks-tab.capacity: Text {
+                                text: "+\{root.tasks-rows.length - tasks-tab.capacity}";
+                                color: root.fg.with-alpha(0.5);
+                                font-size: 11px;
+                                vertical-alignment: center;
+                            }
+
+                            if root.tasks-done > 0: Text {
+                                text: @tr("Clear done");
+                                color: clear-done-ta.has-hover ? root.accent : root.fg.with-alpha(0.55);
+                                font-size: 11px;
+                                vertical-alignment: center;
+
+                                clear-done-ta := TouchArea {
+                                    clicked => { root.task-action("clear"); }
+                                }
+                            }
                         }
                     }
                 }

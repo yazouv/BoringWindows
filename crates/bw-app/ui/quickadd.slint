@@ -1,0 +1,60 @@
+// Ajout rapide d'une tâche : une petite fenêtre sans cadre, ouverte par un
+// raccourci global sous l'île. L'île ne prend jamais le focus du clavier, donc
+// on ne peut pas y taper : c'est cette fenêtre, normale, qui reçoit le texte.
+// Entrée ajoute, Échap annule (comme perdre le focus).
+
+import { LineEdit, Palette } from "std-widgets.slint";
+
+export component QuickAddWindow inherits Window {
+    title: @tr("New task");
+    no-frame: true;
+    always-on-top: true;
+    width: 480px;
+    height: 78px;
+    background: Palette.color-scheme == ColorScheme.dark ? #202020 : #fbfbfb;
+
+    // Rappel affiché sous le champ (le raccourci pour rouvrir, le fichier…).
+    in property <string> hint;
+    in-out property <string> text;
+    callback accepted(string);
+    callback cancelled();
+
+    public function focus-input() {
+        input.focus();
+    }
+
+    // Liseré qui détache la fenêtre du fond.
+    Rectangle {
+        border-width: 1px;
+        border-color: Palette.foreground.with-alpha(0.25);
+    }
+
+    FocusScope {
+        key-pressed(event) => {
+            if event.text == Key.Escape {
+                root.cancelled();
+                return accept;
+            }
+            return reject;
+        }
+
+        VerticalLayout {
+            padding: 14px;
+            spacing: 8px;
+            alignment: center;
+
+            input := LineEdit {
+                placeholder-text: @tr("What needs doing?");
+                text <=> root.text;
+                accepted(value) => { root.accepted(value); }
+            }
+
+            Text {
+                text: root.hint;
+                color: Palette.foreground.with-alpha(0.6);
+                font-size: 11px;
+                overflow: elide;
+            }
+        }
+    }
+}
