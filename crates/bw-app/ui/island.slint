@@ -126,6 +126,16 @@ export struct NetworkInfo {
     offline: bool,
 }
 
+// GitHub dans l'en-tête : une icône dont la couleur dit l'état de la CI de tes
+// pull requests ; au survol, le détail remplace la date ; un clic ouvre la page utile.
+export struct GithubInfo {
+    detail: string,
+    // 0 rien · 1 CI en cours · 2 CI réussie · 3 CI en échec
+    tone: int,
+    // Des revues t'attendent : un point sur l'icône.
+    reviews: bool,
+}
+
 // Pictogrammes au trait, viewbox 24x24 (tracés d'après Lucide, licence ISC).
 component Glyph inherits Path {
     in property <string> name;
@@ -154,6 +164,7 @@ component Glyph inherits Path {
         : root.name == "ethernet" ? "M15 20l3-3h2a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h2l3 3z M6 8v1 M10 8v1 M14 8v1 M18 8v1"
         : root.name == "shield" ? "M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z M9 12l2 2 4-4"
         : root.name == "globe" ? "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z M2 12h20 M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
+        : root.name == "git-pull-request" ? "M18 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M13 6h3a2 2 0 0 1 2 2v7 M6 9v12"
         : root.name == "battery" ? "M16 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z M22 11v2"
         : "M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z";
 }
@@ -1254,6 +1265,10 @@ export component Island inherits Window {
     in property <float> transfer-progress;
     // Phase du va-et-vient de la barre indéterminée.
     property <float> transfer-t;
+    in property <bool> has-github;
+    in property <GithubInfo> github;
+    property <bool> github-hover;
+    callback github-open();
     in property <bool> has-network;
     in property <NetworkInfo> network;
     property <bool> network-hover;
@@ -1955,8 +1970,38 @@ export component Island inherits Window {
                         }
                     }
 
+                    // GitHub : la CI de tes pull requests ; un clic ouvre la page utile.
+                    if root.has-github: TouchArea {
+                        width: 15px;
+                        changed has-hover => {
+                            root.github-hover = self.has-hover;
+                        }
+                        clicked => { root.github-open(); }
+
+                        Glyph {
+                            width: 15px;
+                            height: 15px;
+                            y: (parent.height - self.height) / 2;
+                            name: "git-pull-request";
+                            ink: root.github.tone == 3 ? root.alert-color
+                                : root.github.tone == 2 ? root.ok-color
+                                : root.github.tone == 1 ? root.accent
+                                : root.fg.with-alpha(0.7);
+                        }
+
+                        if root.github.reviews: Rectangle {
+                            x: parent.width - 6px;
+                            y: 1px;
+                            width: 6px;
+                            height: 6px;
+                            border-radius: 3px;
+                            background: root.accent;
+                        }
+                    }
+
                     Text {
                         text: root.toast != "" ? root.toast : root.weather-hover ? root.weather.detail
+                            : root.github-hover ? root.github.detail
                             : root.network-hover ? root.network.detail
                             : root.system-hover ? root.system.detail : root.date-text;
                         color: root.toast != "" ? root.fg : root.fg.with-alpha(0.5);

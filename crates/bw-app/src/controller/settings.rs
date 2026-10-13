@@ -234,6 +234,14 @@ impl Controller {
         ui.set_transfers_copies(transfers.copies);
         ui.set_transfers_downloads(transfers.downloads);
         ui.set_transfers_announce(transfers.announce_done);
+        let github = bw_github::GithubConfig::from_table(config.modules.get(bw_github::MODULE_ID))
+            .unwrap_or_default();
+        ui.set_github_enabled(config.module_enabled(bw_github::MODULE_ID, false));
+        ui.set_github_use_gh(github.use_gh_cli);
+        ui.set_github_token_saved(!github.token.trim().is_empty());
+        ui.set_github_refresh_index(github_refresh_index(github.refresh_secs));
+        ui.set_github_announce_ci(github.announce_ci);
+        ui.set_github_announce_reviews(github.announce_reviews);
         let hotkeys = &config.hotkeys;
         ui.set_hotkey_toggle(hotkeys.toggle.as_str().into());
         ui.set_hotkey_play_pause(hotkeys.play_pause.as_str().into());
@@ -969,6 +977,50 @@ impl Controller {
                 vec!["modules", "transfers", "announce_done"],
                 Value::Bool(ui.get_transfers_announce()),
             )),
+            "modules.github.enabled" => Some((
+                vec!["modules", "github", "enabled"],
+                Value::Bool(ui.get_github_enabled()),
+            )),
+            "modules.github.use_gh_cli" => Some((
+                vec!["modules", "github", "use_gh_cli"],
+                Value::Bool(ui.get_github_use_gh()),
+            )),
+            "modules.github.refresh_secs" => Some((
+                vec!["modules", "github", "refresh_secs"],
+                Value::Int(GITHUB_REFRESH_SECS[ui.get_github_refresh_index().clamp(0, 4) as usize]),
+            )),
+            "modules.github.announce_ci" => Some((
+                vec!["modules", "github", "announce_ci"],
+                Value::Bool(ui.get_github_announce_ci()),
+            )),
+            "modules.github.announce_reviews" => Some((
+                vec!["modules", "github", "announce_reviews"],
+                Value::Bool(ui.get_github_announce_reviews()),
+            )),
+            "modules.github.token" => {
+                // Le jeton saisi va dans le coffre de l'OS ; la config n'en garde
+                // que la référence. Le champ est vidé aussitôt.
+                let typed = ui.get_github_token().trim().to_owned();
+                ui.set_github_token("".into());
+                if typed.is_empty() {
+                    None
+                } else {
+                    forget_github_token(&self.config.borrow());
+                    ui.set_github_token_saved(true);
+                    Some((
+                        vec!["modules", "github", "token"],
+                        Value::Str(protect("github", &typed)),
+                    ))
+                }
+            }
+            "modules.github.token_clear" => {
+                forget_github_token(&self.config.borrow());
+                ui.set_github_token_saved(false);
+                Some((
+                    vec!["modules", "github", "token"],
+                    Value::Str(String::new()),
+                ))
+            }
             "hotkeys.toggle" => Some((
                 vec!["hotkeys", "toggle"],
                 Value::Str(ui.get_hotkey_toggle().trim().to_owned()),
@@ -1141,6 +1193,29 @@ impl Controller {
 
 /// Seuils d'alerte proposés (processeur, mémoire) ; 0 : jamais.
 const ALERT_STEPS: [u8; 5] = [0, 70, 80, 90, 95];
+
+/// Intervalles proposés pour le relevé GitHub (secondes).
+const GITHUB_REFRESH_SECS: [i64; 5] = [60, 120, 300, 600, 1800];
+
+/// Entrée de la liste la plus proche de `secs` (config écrite à la main).
+fn github_refresh_index(secs: u32) -> i32 {
+    (0..GITHUB_REFRESH_SECS.len())
+        .min_by_key(|&i| GITHUB_REFRESH_SECS[i].abs_diff(i64::from(secs)))
+        .unwrap_or(1) as i32
+}
+
+/// Retire du coffre le jeton GitHub que la config référence, s'il y en a un.
+fn forget_github_token(config: &bw_config::Config) {
+    let token = config
+        .modules
+        .get(bw_github::MODULE_ID)
+        .and_then(|t| t.get("token"))
+        .and_then(toml::Value::as_str)
+        .and_then(bw_secrets::reference_id);
+    if let Some(id) = token {
+        let _ = bw_secrets::delete(id);
+    }
+}
 
 /// Entrée de la liste pour un seuil : la plus proche (config écrite à la main).
 fn alert_index(percent: u8) -> i32 {

@@ -231,6 +231,18 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 | `announce_done` | `true` | | announce when a transfer finishes |
 | `show_secs` | `5` | 2 to 30 | how long the announcement stays (s) |
 
+## `[modules.github]`
+
+| Option | Default | Range | Purpose |
+|---|---|---|---|
+| `enabled` | `false` | | show the [GitHub status](github.md): CI of your pull requests, review requests |
+| `token` | `""` | | access token: `secret:<id>` (OS vault, what the settings do) or the token; empty: the GitHub CLI session |
+| `use_gh_cli` | `true` | | without a token, ask `gh auth token` for one |
+| `refresh_secs` | `120` | 30 to 3600 | interval between two reads (s) |
+| `announce_ci` | `true` | | announce CI success or failure |
+| `announce_reviews` | `true` | | announce a review request |
+| `show_secs` | `6` | 2 to 30 | how long an announcement stays (s) |
+
 ## `[modules.mascot]`
 
 | Option | Default | Range | Purpose |

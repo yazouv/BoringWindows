@@ -671,3 +671,54 @@ msgstr "Annoncer la fin d'un transfert"
 
 msgid "Browsers do not tell the final size of a download: its bar moves back and forth, and the island shows the size received and the speed."
 msgstr "Les navigateurs ne donnent pas la taille finale d'un téléchargement : sa barre va et vient, et l'île montre la taille reçue et la vitesse."
+
+msgid "Show GitHub status"
+msgstr "Afficher le statut GitHub"
+
+msgid "An icon next to the time: the CI of your open pull requests, and a dot when a review is requested. Click it to open the page that needs you."
+msgstr "Une icône à côté de l'heure : la CI de tes pull requests ouvertes, et un point quand une revue est demandée. Un clic ouvre la page qui a besoin de toi."
+
+msgid "Use the GitHub CLI session"
+msgstr "Utiliser la session du GitHub CLI"
+
+msgid "Without a saved token, ask `gh auth token`. Nothing to type if you are already logged in with gh."
+msgstr "Sans jeton enregistré, interroge `gh auth token`. Rien à saisir si tu es déjà connecté avec gh."
+
+msgid "Access token"
+msgstr "Jeton d'accès"
+
+msgid "A token is saved in the Windows Credential Manager."
+msgstr "Un jeton est enregistré dans le Gestionnaire d'identifiants de Windows."
+
+msgid "Paste a token (scopes: repo, read:org) and press Enter. It goes to the Windows Credential Manager."
+msgstr "Colle un jeton (droits : repo, read:org) puis Entrée. Il va dans le Gestionnaire d'identifiants de Windows."
+
+msgid "Forget"
+msgstr "Oublier"
+
+msgid "Refresh"
+msgstr "Rafraîchissement"
+
+msgid "every minute"
+msgstr "toutes les minutes"
+
+msgid "every 2 minutes"
+msgstr "toutes les 2 minutes"
+
+msgid "every 5 minutes"
+msgstr "toutes les 5 minutes"
+
+msgid "every 10 minutes"
+msgstr "toutes les 10 minutes"
+
+msgid "every 30 minutes"
+msgstr "toutes les 30 minutes"
+
+msgid "Announce CI results"
+msgstr "Annoncer les résultats de la CI"
+
+msgid "Announce review requests"
+msgstr "Annoncer les revues demandées"
+
+msgid "GitHub has no event to listen to: the island asks once per interval, in a single request."
+msgstr "GitHub n'a pas d'événement à écouter : l'île interroge une fois par intervalle, en une seule requête."

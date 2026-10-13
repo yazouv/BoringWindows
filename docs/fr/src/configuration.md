@@ -232,6 +232,18 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 | `announce_done` | `true` | | annoncer la fin d'un transfert |
 | `show_secs` | `5` | 2 à 30 | durée d'affichage de l'annonce (s) |
 
+## `[modules.github]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `false` | | afficher le [statut GitHub](github.md) : CI de tes pull requests, revues demandées |
+| `token` | `""` | | jeton d'accès : `secret:<id>` (coffre de l'OS, ce que font les réglages) ou le jeton ; vide : la session du GitHub CLI |
+| `use_gh_cli` | `true` | | sans jeton, demander le sien à `gh auth token` |
+| `refresh_secs` | `120` | 30 à 3600 | intervalle entre deux relevés (s) |
+| `announce_ci` | `true` | | annoncer la réussite ou l'échec de la CI |
+| `announce_reviews` | `true` | | annoncer une revue demandée |
+| `show_secs` | `6` | 2 à 30 | durée d'affichage d'une annonce (s) |
+
 ## `[modules.mascot]`
 
 | Option | Défaut | Plage | Rôle |

@@ -31,8 +31,8 @@ use crate::mascot::{self, ClaudeState, MascotConfig};
 use crate::platform::{self, Platform, PlatformEvent, Tray, TrayCommand};
 use crate::shelf::{Shelf, ShelfConfig};
 use crate::{
-    AgendaRow, ClaudePrompt, ClaudeRow, GaugeInfo, Island, MediaInfo, NetworkInfo, NotifInfo,
-    PluginRow, RecentRow, ShelfRow, SystemInfo, TimerInfo, WeatherInfo, clock, demo,
+    AgendaRow, ClaudePrompt, ClaudeRow, GaugeInfo, GithubInfo, Island, MediaInfo, NetworkInfo,
+    NotifInfo, PluginRow, RecentRow, ShelfRow, SystemInfo, TimerInfo, WeatherInfo, clock, demo,
 };
 
 /// Pseudo-module utilisé pour signaler une config invalide dans l'île.
@@ -155,6 +155,7 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         wheel: RefCell::new(gestures::Wheel::default()),
         live: Cell::new(false),
         capturing: Cell::new(false),
+        github_url: RefCell::new(String::new()),
         capture_timer: Timer::default(),
         toast_timer: Timer::default(),
         hotkeys: RefCell::new(None),
@@ -245,6 +246,8 @@ pub struct Controller {
     live: Cell<bool>,
     /// Un outil de capture d'écran est au premier plan : l'île laisse passer les clics.
     capturing: Cell<bool>,
+    /// Page à ouvrir au clic sur l'icône GitHub.
+    github_url: RefCell<String>,
     /// Revérifie le premier plan une fois l'ouverture de l'outil de capture posée.
     capture_timer: Timer,
     toast_timer: Timer,
@@ -312,6 +315,18 @@ impl Controller {
             .on_notif_action(with(&weak, |c, action: slint::SharedString| {
                 c.notif_action(&action);
             }));
+        self.ui.on_github_open({
+            let weak = weak.clone();
+            move || {
+                if let Some(c) = weak.upgrade() {
+                    let url = c.github_url.borrow().clone();
+                    // Une adresse de GitHub que le module a lue, jamais autre chose.
+                    if url.starts_with("https://github.com/") {
+                        platform::open_path(std::path::Path::new(&url));
+                    }
+                }
+            }
+        });
         self.ui.on_dnd_toggle({
             let weak = weak.clone();
             move || {
@@ -900,6 +915,7 @@ impl Controller {
         self.ui.set_has_weather(false);
         self.ui.set_has_system(false);
         self.ui.set_has_network(false);
+        self.ui.set_has_github(false);
         self.ui.set_transfer_visible(false);
         self.live.set(false);
         self.ui.set_live(false);
@@ -991,6 +1007,20 @@ impl Controller {
                         .set_transfer_indeterminate(transfer.fraction.is_none());
                     self.ui
                         .set_transfer_progress(transfer.fraction.unwrap_or(0.0));
+                } else if let Some(github) = state.downcast_ref::<bw_github::GithubSnapshot>() {
+                    use bw_github::Tone;
+                    *self.github_url.borrow_mut() = github.open_url();
+                    self.ui.set_has_github(true);
+                    self.ui.set_github(GithubInfo {
+                        detail: github.detail().into(),
+                        tone: match github.tone() {
+                            Tone::Idle => 0,
+                            Tone::Running => 1,
+                            Tone::Pass => 2,
+                            Tone::Fail => 3,
+                        },
+                        reviews: github.has_reviews(),
+                    });
                 } else if let Some(network) = state.downcast_ref::<bw_network::NetworkSnapshot>() {
                     self.ui.set_has_network(true);
                     self.ui.set_network(NetworkInfo {
@@ -2427,6 +2457,12 @@ fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
         {
             Ok(c) => modules.push(Box::new(bw_transfers::TransfersModule::new(c))),
             Err(e) => errors.push(format!("modules.transfers : {e:#}")),
+        }
+    }
+    if config.module_enabled(bw_github::MODULE_ID, false) {
+        match bw_github::GithubConfig::from_table(config.modules.get(bw_github::MODULE_ID)) {
+            Ok(c) => modules.push(Box::new(bw_github::GithubModule::new(c))),
+            Err(e) => errors.push(format!("modules.github : {e:#}")),
         }
     }
     if config.module_enabled("demo", false) {

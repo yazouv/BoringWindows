@@ -473,6 +473,7 @@ dependencies = [
  "bw-claude",
  "bw-config",
  "bw-core",
+ "bw-github",
  "bw-i18n",
  "bw-media",
  "bw-network",
@@ -567,6 +568,22 @@ dependencies = [
  "anyhow",
  "log",
  "tokio",
+]
+
+[[package]]
+name = "bw-github"
+version = "0.6.0"
+dependencies = [
+ "anyhow",
+ "bw-core",
+ "bw-i18n",
+ "bw-net",
+ "bw-secrets",
+ "log",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml",
 ]
 
 [[package]]

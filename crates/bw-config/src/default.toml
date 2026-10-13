@@ -200,6 +200,23 @@ announce_done = true
 # Durée d'affichage de l'annonce (s, de 2 à 30).
 show_secs = 5
 
+[modules.github]
+# GitHub : une icône à côté de l'heure (couleur = état de la CI de tes pull
+# requests ouvertes, point = revue demandée), et des annonces dans la pilule.
+enabled = false
+# Jeton d'accès : "secret:<id>" (rempli par les réglages, coffre de l'OS) ou le
+# jeton lui-même. Vide : la session du GitHub CLI, si use_gh_cli = true.
+token = ""
+# Sans jeton, demander le sien à `gh auth token`.
+use_gh_cli = true
+# Intervalle entre deux relevés (s, de 30 à 3600).
+refresh_secs = 120
+# Annoncer le résultat de la CI de tes pull requests, et les revues demandées.
+announce_ci = true
+announce_reviews = true
+# Durée d'affichage d'une annonce (s, de 2 à 30).
+show_secs = 6
+
 [modules.mascot]
 # La mascotte : un petit blob dans la pilule qui réagit à Claude Code, danse sur
 # la musique, s'endort quand tu t'absentes et se déguise selon la saison.

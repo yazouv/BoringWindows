@@ -430,6 +430,13 @@ export component SettingsWindow inherits Window {
     in-out property <bool> transfers-copies;
     in-out property <bool> transfers-downloads;
     in-out property <bool> transfers-announce;
+    in-out property <bool> github-enabled;
+    in-out property <bool> github-use-gh;
+    in-out property <string> github-token;
+    in property <bool> github-token-saved;
+    in-out property <int> github-refresh-index;
+    in-out property <bool> github-announce-ci;
+    in-out property <bool> github-announce-reviews;
     in-out property <string> hotkey-toggle;
     in-out property <string> hotkey-play-pause;
     in-out property <string> hotkey-next;
@@ -1832,6 +1839,91 @@ export component SettingsWindow inherits Window {
 
                 Hint {
                     text: @tr("Browsers do not tell the final size of a download: its bar moves back and forth, and the island shows the size received and the speed.");
+                }
+            }
+
+            Section {
+                title: "GitHub";
+
+                Card {
+                    Setting {
+                        title: @tr("Show GitHub status");
+                        description: @tr("An icon next to the time: the CI of your open pull requests, and a dot when a review is requested. Click it to open the page that needs you.");
+                        Toggle {
+                            checked <=> root.github-enabled;
+                            toggled => { root.changed("modules.github.enabled"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.github-enabled;
+                        title: @tr("Use the GitHub CLI session");
+                        description: @tr("Without a saved token, ask `gh auth token`. Nothing to type if you are already logged in with gh.");
+                        Toggle {
+                            enabled: root.github-enabled;
+                            checked <=> root.github-use-gh;
+                            toggled => { root.changed("modules.github.use_gh_cli"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.github-enabled;
+                        title: @tr("Access token");
+                        description: root.github-token-saved ? @tr("A token is saved in the Windows Credential Manager.") : @tr("Paste a token (scopes: repo, read:org) and press Enter. It goes to the Windows Credential Manager.");
+                        LineEdit {
+                            width: 200px;
+                            enabled: root.github-enabled;
+                            text <=> root.github-token;
+                            input-type: password;
+                            placeholder-text: "ghp_…";
+                            accepted => { root.changed("modules.github.token"); }
+                        }
+                        if root.github-token-saved: Button {
+                            text: @tr("Forget");
+                            clicked => { root.changed("modules.github.token_clear"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.github-enabled;
+                        title: @tr("Refresh");
+                        ComboBox {
+                            width: 150px;
+                            enabled: root.github-enabled;
+                            model: [@tr("every minute"), @tr("every 2 minutes"), @tr("every 5 minutes"), @tr("every 10 minutes"), @tr("every 30 minutes")];
+                            current-index <=> root.github-refresh-index;
+                            selected => { root.changed("modules.github.refresh_secs"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.github-enabled;
+                        title: @tr("Announce CI results");
+                        Toggle {
+                            enabled: root.github-enabled;
+                            checked <=> root.github-announce-ci;
+                            toggled => { root.changed("modules.github.announce_ci"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.github-enabled;
+                        title: @tr("Announce review requests");
+                        Toggle {
+                            enabled: root.github-enabled;
+                            checked <=> root.github-announce-reviews;
+                            toggled => { root.changed("modules.github.announce_reviews"); }
+                        }
+                    }
+                }
+
+                Hint {
+                    text: @tr("GitHub has no event to listen to: the island asks once per interval, in a single request.");
                 }
             }
 

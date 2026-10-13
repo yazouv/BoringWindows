@@ -200,6 +200,23 @@ announce_done = true
 # How long the announcement stays (s, 2 to 30).
 show_secs = 5
 
+[modules.github]
+# GitHub: an icon next to the time (color = CI state of your open pull
+# requests, dot = review requested), and announcements in the pill.
+enabled = false
+# Access token: "secret:<id>" (filled in by the settings, OS vault) or the token
+# itself. Empty: the GitHub CLI session, if use_gh_cli = true.
+token = ""
+# Without a token, ask `gh auth token` for one.
+use_gh_cli = true
+# Interval between two reads (s, 30 to 3600).
+refresh_secs = 120
+# Announce the CI result of your pull requests, and review requests.
+announce_ci = true
+announce_reviews = true
+# How long an announcement stays (s, 2 to 30).
+show_secs = 6
+
 [modules.mascot]
 # The mascot: a little blob in the pill that reacts to Claude Code, dances to
 # the music, falls asleep when you are away and dresses up for the season.
