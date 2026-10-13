@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.7.0](https://github.com/yazouv/BoringWindows/compare/v0.6.0...v0.7.0) (2026-10-13)
+
+
+### Nouveautés
+
+* l'île laisse passer les clics pendant une capture d'écran, et option pour ne la cacher qu'en direct ([ae3af46](https://github.com/yazouv/BoringWindows/commit/ae3af460ee838e1f962191dbad4646d418bdac5b))
+* module réseau (Wi-Fi, VPN, débit) avec débit dans la pilule repliée ([a104b43](https://github.com/yazouv/BoringWindows/commit/a104b43ad808ff1949d6dcb9a6097a8f56703065))
+* progression des copies et des téléchargements, avec une barre dans la pilule repliée ([8be92e5](https://github.com/yazouv/BoringWindows/commit/8be92e5f9a3216aa716de3745b5896dadee20d57))
+* réseau, transferts, GitHub, tâches rapides, et correctifs de l'île ([2e8aeff](https://github.com/yazouv/BoringWindows/commit/2e8aeffc93a6f7e246dcf4991bafb027bace1aa8))
+* statut GitHub (CI des pull requests, revues demandées) dans l'en-tête et la pilule ([cf7169d](https://github.com/yazouv/BoringWindows/commit/cf7169db6a8a6138db9fa31840076523aa1d17de))
+* tâches rapides (onglet de l'île, fichier Markdown, ajout par raccourci) ([5b309c7](https://github.com/yazouv/BoringWindows/commit/5b309c74e1558159360902e38d5d12532ebac045))
+
+
+### Corrections
+
+* bw-github passe clippy sur macOS et Linux ([1cc277d](https://github.com/yazouv/BoringWindows/commit/1cc277d2ca0f7c972800be138d35059d363b6584))
+* détecter les VPN OpenVPN, FortiClient et WireGuard dans le module réseau ([267291f](https://github.com/yazouv/BoringWindows/commit/267291f28a48bebcba6ec3f77399d15458c2964a))
+* en-tête de l'île ouverte moins chargé, détails des puces lisibles ([7293ac3](https://github.com/yazouv/BoringWindows/commit/7293ac3a3a79a673a1ce814bc42b37f29c218f64))
+* l'île reste au-dessus de la barre des tâches après un clic dessus et au démarrage ([4e1512e](https://github.com/yazouv/BoringWindows/commit/4e1512ecb557af99589c2738ca922745da1eb9c4))
+* la luminosité de l'écran s'affiche enfin dans l'île ([ba33a72](https://github.com/yazouv/BoringWindows/commit/ba33a722322275322e4ed27b7991b2faafaa121e))
+* ne pas prendre un fichier partiel abandonné pour un téléchargement en cours ([9c8f20a](https://github.com/yazouv/BoringWindows/commit/9c8f20aa33cbe3362e84c292b96a8db68bd814c9))
+
 ## [0.6.0](https://github.com/yazouv/BoringWindows/compare/v0.5.0...v0.6.0) (2026-10-10)
 
 
