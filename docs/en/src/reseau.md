@@ -10,7 +10,7 @@ stand:
 | Shield | a VPN is connected |
 | Crossed-out Wi-Fi (red) | no Internet connection |
 
-**Hover the icon**: the date gives way to the details, for example
+**Hover the icon**: a bubble under the header gives the details, for example
 "Home · ↓ 2.3 MB/s  ↑ 120 KB/s", or "Home · VPN · ↓ …" with a VPN.
 
 The connection state comes from Windows events: nothing is polled.

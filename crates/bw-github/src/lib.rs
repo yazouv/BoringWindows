@@ -120,7 +120,7 @@ impl GithubSnapshot {
     }
 
     /// « 2 PR ouvertes · CI en échec : api#31 · 1 revue demandée » : détail
-    /// montré au survol, à la place de la date.
+    /// montré au survol, dans la bulle sous l'en-tête.
     pub fn detail(&self) -> String {
         let mut parts = Vec::new();
         let count = self.prs.len();

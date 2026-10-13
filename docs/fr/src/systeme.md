@@ -3,8 +3,8 @@
 ## Processeur et mémoire
 
 Dans l'île ouverte, à côté de l'heure (et de la météo), deux petits compteurs
-donnent l'usage du **processeur** et de la **mémoire**. **Survole-les** : la
-date laisse la place à la mémoire utilisée, par exemple « Mémoire 8,4 /
+donnent l'usage du **processeur** et de la **mémoire**. **Survole-les** : une
+bulle sous l'en-tête donne la mémoire utilisée, par exemple « Mémoire 8,4 /
 16,0 Go ». Une valeur au-dessus de 90 % passe en rouge.
 
 Rien n'est mesuré quand l'île est fermée : la mesure tourne seulement pendant

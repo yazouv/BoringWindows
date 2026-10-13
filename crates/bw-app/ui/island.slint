@@ -106,7 +106,7 @@ export struct WeatherInfo {
     detail: string,
 }
 
-// Processeur et mémoire dans l'en-tête ; au survol, le détail remplace la date.
+// Processeur et mémoire dans l'en-tête ; au survol, le détail s'affiche dans la bulle.
 export struct SystemInfo {
     cpu: string,
     ram: string,
@@ -117,7 +117,7 @@ export struct SystemInfo {
 }
 
 // Réseau dans l'en-tête : une icône de largeur fixe ; au survol, le détail
-// (réseau, débits) remplace la date.
+// (réseau, débits) s'affiche dans la bulle sous l'en-tête.
 export struct NetworkInfo {
     /// wifi | wifi-off | ethernet | shield | globe
     icon: string,
@@ -127,7 +127,7 @@ export struct NetworkInfo {
 }
 
 // GitHub dans l'en-tête : une icône dont la couleur dit l'état de la CI de tes
-// pull requests ; au survol, le détail remplace la date ; un clic ouvre la page utile.
+// pull requests ; au survol, le détail s'affiche dans la bulle ; un clic ouvre la page utile.
 export struct GithubInfo {
     detail: string,
     // 0 rien · 1 CI en cours · 2 CI réussie · 3 CI en échec
@@ -1131,6 +1131,7 @@ component UsageRing inherits Rectangle {
 }
 
 component TabChip inherits Rectangle {
+    in property <length> chip-width: 62px;
     in property <string> text;
     in property <bool> active;
     in property <int> badge;
@@ -1139,7 +1140,7 @@ component TabChip inherits Rectangle {
     callback clicked;
 
     // Largeur fixe : l'indicateur du contrôle segmenté glisse d'un cran à l'autre.
-    width: 62px;
+    width: root.chip-width;
     height: 22px;
 
     row := HorizontalLayout {
@@ -1149,7 +1150,7 @@ component TabChip inherits Rectangle {
         Text {
             text: root.text;
             color: root.active ? root.ink : ta.has-hover ? root.ink.with-alpha(0.85) : root.ink.with-alpha(0.55);
-            font-size: 12px;
+            font-size: root.chip-width < 60px ? 11px : 12px;
             font-weight: root.active ? 650 : 500;
             vertical-alignment: center;
             animate color { duration: 150ms; }
@@ -1224,6 +1225,14 @@ export component Island inherits Window {
     // Place de l'onglet choisi dans le contrôle segmenté (Accueil, Notifs,
     // Claude), et celle de l'onglet Claude (deuxième sans onglet Notifs).
     property <int> claude-slot: root.has-notif-tab ? 2 : 1;
+    // Quatre onglets, c'est trop large pour l'en-tête : ils se resserrent un peu.
+    property <length> tab-chip-width: (1 + (root.has-notif-tab ? 1 : 0) + (root.has-claude-tab ? 1 : 0) + (root.has-tasks-tab ? 1 : 0)) >= 4 ? 56px : 62px;
+    // Détail montré dans la bulle sous l'en-tête : message bref, ou puce survolée.
+    property <string> tip: root.toast != "" ? root.toast
+        : root.weather-hover ? root.weather.detail
+        : root.github-hover ? root.github.detail
+        : root.network-hover ? root.network.detail
+        : root.system-hover ? root.system.detail : "";
     // L'onglet Tâches (quatrième valeur de `tab`) vient en dernier.
     property <int> tasks-slot: 1 + (root.has-notif-tab ? 1 : 0) + (root.has-claude-tab ? 1 : 0);
     property <int> tab-slot: root.tab == 0 ? 0 : root.tab == 2 ? 1 : root.tab == 3 ? root.tasks-slot : root.claude-slot;
@@ -1268,7 +1277,7 @@ export component Island inherits Window {
     // Batterie ou appareil Bluetooth en tête de pilule : icône et jauge.
     in property <bool> compact-gauge-visible;
     in property <GaugeInfo> compact-gauge;
-    // Météo à côté de la date ; au survol, le détail remplace la date.
+    // Météo à côté de l'heure ; au survol, le détail s'affiche dans la bulle.
     in property <bool> has-weather;
     in property <WeatherInfo> weather;
     // Processeur et mémoire à côté de la météo (module system).
@@ -2016,16 +2025,16 @@ export component Island inherits Window {
                         }
                     }
 
+                    // La date cède la place aux puces et aux onglets : trop étroite
+                    // pour être lue, elle s'efface plutôt que de se tronquer.
                     Text {
-                        text: root.toast != "" ? root.toast : root.weather-hover ? root.weather.detail
-                            : root.github-hover ? root.github.detail
-                            : root.network-hover ? root.network.detail
-                            : root.system-hover ? root.system.detail : root.date-text;
-                        color: root.toast != "" ? root.fg : root.fg.with-alpha(0.5);
+                        text: root.date-text;
+                        color: root.fg.with-alpha(0.5);
                         font-size: 12px;
                         vertical-alignment: center;
                         horizontal-stretch: 1;
                         overflow: elide;
+                        opacity: self.width > 76px ? 1 : 0;
                     }
 
                     if root.tab == 2 && root.notif-rows.length > 0: Text {
@@ -2049,9 +2058,9 @@ export component Island inherits Window {
                         background: root.fg.with-alpha(0.07);
 
                         Rectangle {
-                            x: 1px + parent.slot * 62px;
+                            x: 1px + parent.slot * root.tab-chip-width;
                             y: 1px;
-                            width: 62px;
+                            width: root.tab-chip-width;
                             height: 22px;
                             border-radius: 11px;
                             background: root.fg.with-alpha(0.16);
@@ -2063,6 +2072,7 @@ export component Island inherits Window {
 
                             TabChip {
                                 y: (parent.height - self.height) / 2;
+                                chip-width: root.tab-chip-width;
                                 text: @tr("Home");
                                 active: root.tab == 0;
                                 ink: root.fg;
@@ -2072,6 +2082,7 @@ export component Island inherits Window {
 
                             if root.has-notif-tab: TabChip {
                                 y: (parent.height - self.height) / 2;
+                                chip-width: root.tab-chip-width;
                                 text: @tr("Notifs");
                                 active: root.tab == 2;
                                 badge: root.notif-unread;
@@ -2082,6 +2093,7 @@ export component Island inherits Window {
 
                             if root.has-claude-tab: TabChip {
                                 y: (parent.height - self.height) / 2;
+                                chip-width: root.tab-chip-width;
                                 text: "Claude";
                                 active: root.tab == 1;
                                 ink: root.fg;
@@ -2091,6 +2103,7 @@ export component Island inherits Window {
 
                             if root.has-tasks-tab: TabChip {
                                 y: (parent.height - self.height) / 2;
+                                chip-width: root.tab-chip-width;
                                 text: @tr("Tasks");
                                 active: root.tab == 3;
                                 badge: root.tasks-open;
@@ -3264,6 +3277,37 @@ export component Island inherits Window {
                             }
                         }
                     }
+                }
+            }
+
+            // Détail d'une puce de l'en-tête survolée (météo, processeur, réseau,
+            // GitHub…) ou message bref : une bulle sous l'en-tête, sur toute la
+            // largeur utile. Dans l'en-tête, il n'avait que la place laissée par
+            // l'heure, les puces et les onglets, et devenait illisible.
+            tip-bubble := Rectangle {
+                x: 16px;
+                y: root.top-offset / 2 + 38px;
+                width: min(tip-text.preferred-width + 28px, parent.width - 32px);
+                height: 28px;
+                border-radius: 14px;
+                // `mix` pèse la couleur d'origine : 14 % de texte dans 86 % de fond.
+                background: root.fg.mix(root.bg.with-alpha(1), 0.14);
+                border-width: 1px;
+                border-color: root.fg.with-alpha(0.16);
+                opacity: root.expanded && !root.custom-view && root.tip != "" ? 1 : 0;
+                visible: self.opacity > 0;
+                animate opacity { duration: 120ms; }
+
+                tip-text := Text {
+                    x: 14px;
+                    width: parent.width - 28px;
+                    height: parent.height;
+                    text: root.tip;
+                    color: root.fg;
+                    font-size: 13px;
+                    font-weight: 500;
+                    vertical-alignment: center;
+                    overflow: elide;
                 }
             }
         }

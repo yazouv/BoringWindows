@@ -3,8 +3,8 @@
 ## CPU and memory
 
 In the open island, next to the time (and the weather), two small counters
-show the **CPU** and **memory** use. **Hover them**: the date gives way to
-the memory in use, for example "Memory 8.4 / 16.0 GB". A value above
+show the **CPU** and **memory** use. **Hover them**: a bubble under the
+header shows the memory in use, for example "Memory 8.4 / 16.0 GB". A value above
 90 % turns red.
 
 Nothing is measured while the island is closed: measuring only runs while it

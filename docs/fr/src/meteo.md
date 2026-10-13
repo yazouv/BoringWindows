@@ -2,8 +2,8 @@
 
 La météo du moment s'affiche à côté de la date, dans l'île ouverte : un
 pictogramme (soleil, nuages, pluie, neige, orage…) et la température.
-**Survole-la** : la date laisse la place au détail du jour, par exemple
-« Lyon · Éclaircies · 9° / 16° ».
+**Survole-la** : une bulle sous l'en-tête donne le détail du jour, par
+exemple « Lyon · Éclaircies · 9° / 16° ».
 
 Désactivé par défaut : il faut une ville.
 

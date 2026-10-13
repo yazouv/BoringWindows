@@ -12,7 +12,7 @@ color sums up the **CI of your open pull requests**:
 
 A **dot** on the icon means someone is waiting for **your review**.
 
-**Hover the icon**: the date gives way to the details, for example "2 open
+**Hover the icon**: a bubble under the header gives the details, for example "2 open
 PRs · CI failing: api#31 · 1 review requested". **Click it** to open the page
 that needs you: the failing pull request, otherwise the first requested
 review, otherwise your first pull request.

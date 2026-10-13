@@ -9,7 +9,7 @@ Une petite **icône** à côté de l'heure, dans l'île ouverte, dit où tu en e
 | Bouclier | un VPN est connecté |
 | Wi-Fi barré (rouge) | pas de connexion Internet |
 
-**Survole l'icône** : la date laisse la place au détail, par exemple
+**Survole l'icône** : une bulle sous l'en-tête donne le détail, par exemple
 « Maison · ↓ 2,3 Mo/s  ↑ 120 Ko/s », ou « Maison · VPN · ↓ … » avec un VPN.
 
 L'état de la connexion vient d'événements de Windows : rien n'est interrogé en

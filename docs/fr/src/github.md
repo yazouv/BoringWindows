@@ -12,7 +12,7 @@ ouverte. Sa couleur résume la **CI de tes pull requests ouvertes** :
 
 Un **point** sur l'icône dit que quelqu'un attend **ta revue**.
 
-**Survole l'icône** : la date laisse la place au détail, par exemple
+**Survole l'icône** : une bulle sous l'en-tête donne le détail, par exemple
 « 2 PR ouvertes · CI en échec : api#31 · 1 revue demandée ». **Clique-la** pour
 ouvrir la page qui a besoin de toi : la pull request en échec, sinon la
 première revue demandée, sinon ta première pull request.

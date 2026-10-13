@@ -107,8 +107,8 @@ impl NetworkSnapshot {
         self.link.as_ref().is_some_and(|l| !l.online)
     }
 
-    /// « Home · VPN · ↓ 2,3 Mo/s  ↑ 120 Ko/s » : détail montré au survol, à
-    /// la place de la date.
+    /// « Home · VPN · ↓ 2,3 Mo/s  ↑ 120 Ko/s » : détail montré au survol, dans
+    /// la bulle sous l'en-tête.
     pub fn detail(&self) -> String {
         let mut parts = Vec::new();
         if let Some(link) = &self.link {
