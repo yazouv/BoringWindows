@@ -55,9 +55,11 @@ La pilule prévient quand :
 
 Chaque annonce se règle séparément.
 
-> Le VPN est repéré parmi les connexions Windows de type « tunnel » : le client
-> VPN de Windows et WireGuard sont reconnus, d'autres clients à carte virtuelle
-> peuvent ne pas l'être.
+> Le VPN est repéré à un **adaptateur réseau en service**, avec une adresse IP
+> utilisable, dont le type est « tunnel » (VPN de Windows) ou dont le nom est
+> celui d'un VPN : OpenVPN (cartes TAP, Wintun, DCO), WireGuard, FortiClient,
+> Cisco AnyConnect, GlobalProtect, Mullvad, NordVPN… Un client qui nomme sa carte
+> autrement ne sera pas reconnu.
 
 ## Réglages
 

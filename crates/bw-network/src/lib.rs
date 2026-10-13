@@ -227,6 +227,63 @@ impl Ticker {
     }
 }
 
+// --- VPN ---------------------------------------------------------------------
+
+/// `IfType` des interfaces de type « tunnel » (VPN de Windows, WireGuard…).
+const IF_TYPE_TUNNEL: u32 = 131;
+/// Fragments du nom d'un adaptateur qui trahissent un VPN : OpenVPN (TAP, Wintun,
+/// DCO), WireGuard, FortiClient, Cisco, Palo Alto…
+const VPN_NAMES: [&str; 10] = [
+    "openvpn",
+    "tap-windows",
+    "wintun",
+    "wireguard",
+    "nordlynx",
+    "vpn",
+    "anyconnect",
+    "globalprotect",
+    "pangp",
+    "mullvad",
+];
+/// Adaptateurs de tunnel qui n'ont rien d'un VPN, ou virtuels (machines, conteneurs).
+const NOT_VPN_NAMES: [&str; 9] = [
+    "teredo",
+    "6to4",
+    "isatap",
+    "ip-https",
+    "hyper-v",
+    "virtualbox",
+    "vmware",
+    "wsl",
+    "docker",
+];
+
+/// L'adaptateur est-il celui d'un VPN ? `if_type` est l'`IfType` de Windows,
+/// `description` le nom de la carte (« OpenVPN Data Channel Offload »).
+pub fn looks_like_vpn(if_type: u32, description: &str) -> bool {
+    let name = description.to_lowercase();
+    if NOT_VPN_NAMES.iter().any(|n| name.contains(n)) {
+        return false;
+    }
+    if_type == IF_TYPE_TUNNEL || VPN_NAMES.iter().any(|n| name.contains(n))
+}
+
+/// Une adresse qui prouve que l'adaptateur est réellement en service : ni
+/// locale au lien (169.254.x.x, fe80::), ni de bouclage, ni non spécifiée. Un
+/// adaptateur de VPN déconnecté n'a que des adresses locales au lien.
+pub fn usable_address(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => {
+            !(v4.is_link_local() || v4.is_loopback() || v4.is_unspecified())
+        }
+        std::net::IpAddr::V6(v6) => {
+            // fe80::/10
+            let link_local = (v6.segments()[0] & 0xffc0) == 0xfe80;
+            !(link_local || v6.is_loopback() || v6.is_unspecified())
+        }
+    }
+}
+
 // --- Connexion ---------------------------------------------------------------
 
 /// Annonce à faire dans la pilule.
@@ -436,6 +493,42 @@ mod tests {
         let unknown = snapshot(None);
         assert_eq!(unknown.icon(), "globe");
         assert_eq!(unknown.detail(), "↓ 2.3 MB/s  ↑ 120 KB/s");
+    }
+
+    #[test]
+    fn vpn_adapters() {
+        // OpenVPN (carte DCO ou TAP), WireGuard, FortiClient, VPN de Windows.
+        assert!(looks_like_vpn(53, "OpenVPN Data Channel Offload"));
+        assert!(looks_like_vpn(6, "TAP-Windows Adapter V9"));
+        assert!(looks_like_vpn(53, "Wintun Userspace Tunnel"));
+        assert!(looks_like_vpn(
+            6,
+            "Fortinet SSL VPN Virtual Ethernet Adapter"
+        ));
+        assert!(looks_like_vpn(131, "WAN Miniport (IKEv2)"));
+        // Tunnels d'IPv6 de Windows, machines virtuelles, cartes ordinaires.
+        assert!(!looks_like_vpn(131, "Teredo Tunneling Pseudo-Interface"));
+        assert!(!looks_like_vpn(
+            131,
+            "Microsoft IP-HTTPS Platform Interface"
+        ));
+        assert!(!looks_like_vpn(6, "VirtualBox Host-Only Ethernet Adapter"));
+        assert!(!looks_like_vpn(71, "Intel(R) Wi-Fi 6E AX211 160MHz"));
+        assert!(!looks_like_vpn(6, "Ethernet"));
+    }
+
+    #[test]
+    fn usable_addresses() {
+        let ip = |s: &str| s.parse::<std::net::IpAddr>().unwrap();
+        assert!(usable_address(ip("10.2.0.2")));
+        assert!(usable_address(ip("192.168.1.20")));
+        assert!(usable_address(ip("2001:db8::1")));
+        // Adresses locales au lien : un VPN déconnecté n'a que celles-là.
+        assert!(!usable_address(ip("169.254.24.153")));
+        assert!(!usable_address(ip("fe80::1c4f:c482:33f8:3c9a")));
+        assert!(!usable_address(ip("127.0.0.1")));
+        assert!(!usable_address(ip("::1")));
+        assert!(!usable_address(ip("0.0.0.0")));
     }
 
     #[test]

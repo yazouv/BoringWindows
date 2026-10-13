@@ -55,9 +55,11 @@ The pill tells you when:
 
 Each announcement is set separately.
 
-> The VPN is detected from Windows connections of the "tunnel" type: the
-> Windows VPN client and WireGuard are recognized, other clients that use a
-> virtual adapter may not be.
+> The VPN is detected from a **network adapter that is up**, with a usable IP
+> address, whose type is "tunnel" (Windows VPN) or whose name is that of a VPN:
+> OpenVPN (TAP, Wintun, DCO adapters), WireGuard, FortiClient, Cisco AnyConnect,
+> GlobalProtect, Mullvad, NordVPN… A client that names its adapter differently
+> will not be recognized.
 
 ## Settings
 

@@ -1,6 +1,7 @@
 //! État de la connexion via `Windows.Networking.Connectivity` : un événement
 //! signale chaque changement de réseau, l'état est relu une fois la rafale passée.
 
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::mpsc::{Receiver, RecvTimeoutError, Sender, channel};
 use std::time::Duration;
 
@@ -10,7 +11,19 @@ use windows::Networking::Connectivity::{
     NetworkStatusChangedEventHandler,
 };
 
-use crate::{Link, Medium};
+use windows::Win32::NetworkManagement::IpHelper::{
+    GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_DNS_SERVER, GAA_FLAG_SKIP_MULTICAST, GetAdaptersAddresses,
+    IP_ADAPTER_ADDRESSES_LH,
+};
+use windows::Win32::NetworkManagement::Ndis::IfOperStatusUp;
+use windows::Win32::Networking::WinSock::{
+    AF_INET, AF_INET6, AF_UNSPEC, SOCKADDR_IN, SOCKADDR_IN6,
+};
+
+use crate::{Link, Medium, looks_like_vpn, usable_address};
+
+/// `ERROR_BUFFER_OVERFLOW` : le tampon est trop petit, `size` donne la taille voulue.
+const ERROR_BUFFER_OVERFLOW_CODE: u32 = 111;
 
 /// Signal envoyé au thread d'écoute.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,8 +37,6 @@ pub(crate) enum Wake {
 /// rafale d'événements, dont les premiers montrent des états transitoires.
 const SETTLE: Duration = Duration::from_millis(800);
 
-/// `IanaInterfaceType` : tunnel (VPN Windows, WireGuard…).
-const IANA_TUNNEL: u32 = 131;
 const IANA_ETHERNET: u32 = 6;
 const IANA_WIFI: u32 = 71;
 
@@ -47,18 +58,76 @@ fn medium(profile: &ConnectionProfile) -> Medium {
     }
 }
 
-/// Un profil connecté dont la carte est un tunnel.
+/// Un VPN est-il connecté ? Un adaptateur en service (`IfOperStatusUp`), avec une
+/// adresse utilisable, qui a le type ou le nom d'un VPN (`looks_like_vpn`).
+///
+/// Le type « tunnel » de Windows ne suffit pas : OpenVPN (cartes TAP et DCO) se
+/// déclare en `IfType` 6 ou 53.
 fn vpn_active() -> bool {
-    let Ok(profiles) = NetworkInformation::GetConnectionProfiles() else {
-        return false;
-    };
-    profiles.into_iter().any(|p| {
-        p.GetNetworkConnectivityLevel()
-            .is_ok_and(|level| level != NetworkConnectivityLevel::None)
-            && p.NetworkAdapter()
-                .and_then(|a| a.IanaInterfaceType())
-                .is_ok_and(|t| t == IANA_TUNNEL)
-    })
+    let mut size = 16 * 1024u32;
+    let mut buffer: Vec<u64>;
+    // SAFETY: tampon aligné (u64) de `size` octets que Windows remplit d'une
+    // liste chaînée ; elle est lue sans sortir du tampon, qui vit jusqu'à la fin.
+    unsafe {
+        let flags = GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST | GAA_FLAG_SKIP_DNS_SERVER;
+        loop {
+            buffer = vec![0u64; (size as usize).div_ceil(8)];
+            let head = buffer.as_mut_ptr().cast::<IP_ADAPTER_ADDRESSES_LH>();
+            match GetAdaptersAddresses(u32::from(AF_UNSPEC.0), flags, None, Some(head), &mut size) {
+                0 => break,
+                ERROR_BUFFER_OVERFLOW_CODE => {}
+                _ => return false,
+            }
+        }
+        let mut adapter = buffer.as_ptr().cast::<IP_ADAPTER_ADDRESSES_LH>();
+        while !adapter.is_null() {
+            let a = &*adapter;
+            if a.OperStatus == IfOperStatusUp
+                && !a.Description.is_null()
+                && looks_like_vpn(a.IfType, &a.Description.to_string().unwrap_or_default())
+                && has_usable_address(a)
+            {
+                return true;
+            }
+            adapter = a.Next;
+        }
+    }
+    false
+}
+
+/// L'adaptateur a-t-il une adresse IP en service ?
+///
+/// # Safety
+/// `adapter` doit venir d'un tampon de `GetAdaptersAddresses` encore valide.
+unsafe fn has_usable_address(adapter: &IP_ADAPTER_ADDRESSES_LH) -> bool {
+    let mut address = adapter.FirstUnicastAddress;
+    // SAFETY: chaîne d'adresses du même tampon, terminée par un pointeur nul.
+    unsafe {
+        while !address.is_null() {
+            let unicast = &*address;
+            let socket = unicast.Address.lpSockaddr;
+            if !socket.is_null() {
+                let ip = match (*socket).sa_family {
+                    AF_INET => Some(IpAddr::V4(Ipv4Addr::from(
+                        (*socket.cast::<SOCKADDR_IN>())
+                            .sin_addr
+                            .S_un
+                            .S_addr
+                            .to_ne_bytes(),
+                    ))),
+                    AF_INET6 => Some(IpAddr::V6(Ipv6Addr::from(
+                        (*socket.cast::<SOCKADDR_IN6>()).sin6_addr.u.Byte,
+                    ))),
+                    _ => None,
+                };
+                if ip.is_some_and(usable_address) {
+                    return true;
+                }
+            }
+            address = unicast.Next;
+        }
+    }
+    false
 }
 
 fn read() -> Link {
