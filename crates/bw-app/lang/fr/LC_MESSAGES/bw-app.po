@@ -809,3 +809,123 @@ msgstr "Raccourci"
 
 msgid "Each question is sent alone to the provider you picked, with your key. Nothing else leaves your PC."
 msgstr "Chaque question part seule chez le fournisseur choisi, avec ta clé. Rien d'autre ne quitte ton PC."
+
+msgid "Welcome assistant"
+msgstr "Assistant d'accueil"
+
+msgid "Pick the modules again, connect Claude Code or a calendar."
+msgstr "Rechoisir les modules, brancher Claude Code ou un agenda."
+
+msgid "Welcome to BoringWindows"
+msgstr "Bienvenue dans BoringWindows"
+
+msgid "A small island at the top of your screen: it stays out of the way, and grows when something deserves your attention (Claude Code waiting for you, a new song, a meeting in 5 minutes). Hover it to open it."
+msgstr "Une petite île en haut de ton écran : elle se fait oublier, et grandit quand quelque chose mérite ton attention (Claude Code qui t'attend, un nouveau morceau, une réunion dans 5 minutes). Survole-la pour l'ouvrir."
+
+msgid "This takes a minute. Everything can be changed later in Settings."
+msgstr "Ça prend une minute. Tout se change ensuite dans les Réglages."
+
+msgid "What should the island show?"
+msgstr "Que doit montrer l'île ?"
+
+msgid "A module that is off costs nothing: it doesn't even start."
+msgstr "Un module désactivé ne coûte rien : il ne démarre même pas."
+
+msgid "What Claude is doing, its questions and permission requests"
+msgstr "Ce que fait Claude, ses questions et ses demandes de permission"
+
+msgid "Song, cover and controls (Spotify, browsers, Apple Music…)"
+msgstr "Morceau, pochette et commandes (Spotify, navigateurs, Apple Music…)"
+
+msgid "Next meeting, countdown and a Join button"
+msgstr "Prochaine réunion, compte à rebours et bouton Rejoindre"
+
+msgid "Messages from your apps (Discord, Slack, Teams…)"
+msgstr "Messages de tes applications (Discord, Slack, Teams…)"
+
+msgid "Current weather next to the date"
+msgstr "La météo du moment, à côté de la date"
+
+msgid "Pomodoro, focus sessions, cooking"
+msgstr "Pomodoro, sessions de concentration, cuisine"
+
+msgid "Quick tasks"
+msgstr "Tâches rapides"
+
+msgid "A checklist in the island, added with a shortcut"
+msgstr "Une liste à cocher dans l'île, complétée par un raccourci"
+
+msgid "A little blob that reacts to Claude, music and the time of day"
+msgstr "Une petite bestiole qui réagit à Claude, à la musique et à l'heure"
+
+msgid "Wi-Fi, VPN and speed"
+msgstr "Wi-Fi, VPN et débit"
+
+msgid "Next to the time, measured only while the island is open"
+msgstr "À côté de l'heure, mesurés seulement île ouverte"
+
+msgid "Connect your tools"
+msgstr "Branche tes outils"
+
+msgid "Both are optional; you can do it later from Settings."
+msgstr "Les deux sont facultatifs ; tu peux le faire plus tard depuis les Réglages."
+
+msgid "The Claude Code module is off."
+msgstr "Le module Claude Code est désactivé."
+
+msgid "Claude Code was not found on this PC. Install it, then come back to Settings › Claude Code."
+msgstr "Claude Code n'est pas installé sur ce PC. Installe-le, puis reviens dans Réglages › Claude Code."
+
+msgid "Connected. Restart your Claude Code sessions so they pick it up."
+msgstr "Branché. Relance tes sessions Claude Code pour qu'elles le prennent en compte."
+
+msgid "BoringWindows adds a few hooks to ~/.claude/settings.json (with a backup) to follow your sessions."
+msgstr "BoringWindows ajoute quelques hooks à ~/.claude/settings.json (avec une sauvegarde) pour suivre tes sessions."
+
+msgid "Install the hooks…"
+msgstr "Installer les hooks…"
+
+msgid "Google, Outlook, iCloud, Proton… The settings walk you through finding the link."
+msgstr "Google, Outlook, iCloud, Proton… Les réglages t'aident à trouver le lien."
+
+msgid "The Calendar module is off."
+msgstr "Le module Agenda est désactivé."
+
+msgid "Add a calendar…"
+msgstr "Ajouter un agenda…"
+
+msgid "You're all set"
+msgstr "C'est prêt"
+
+msgid "Hover the pill at the top of the screen, or click it."
+msgstr "Survole la pilule en haut de l'écran, ou clique dessus."
+
+msgid "Hover the pill at the top of the screen, or press {}."
+msgstr "Survole la pilule en haut de l'écran, ou appuie sur {}."
+
+msgid "Settings"
+msgstr "Réglages"
+
+msgid "Right-click the BoringWindows icon in the notification area."
+msgstr "Clic droit sur l'icône de BoringWindows dans la zone de notification."
+
+msgid "Make it yours"
+msgstr "À ton goût"
+
+msgid "Themes, sizes, shortcuts, order of the modules: everything is in Settings, or in config.toml."
+msgstr "Thèmes, tailles, raccourcis, ordre des modules : tout est dans les Réglages, ou dans config.toml."
+
+msgid "Open Settings"
+msgstr "Ouvrir les Réglages"
+
+msgid "Skip"
+msgstr "Passer"
+
+msgid "Back"
+msgstr "Retour"
+
+msgid "Next"
+msgstr "Suivant"
+
+msgid "Finish"
+msgstr "Terminer"

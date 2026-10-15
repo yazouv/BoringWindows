@@ -88,8 +88,23 @@ options commentées :
 %APPDATA%\BoringWindows\config.toml
 ```
 
-Tu n'as rien à y modifier pour commencer : la musique marche tout de suite.
-Pour Claude Code et l'agenda, suis les pages dédiées.
+Un **assistant d'accueil** s'ouvre en même temps, en quatre étapes :
+
+1. la langue ;
+2. ce que l'île doit montrer : Claude Code, musique, agenda, notifications,
+   météo (avec ta ville), minuteur, tâches, mascotte, réseau, processeur et
+   mémoire. Un module désactivé ne coûte rien ;
+3. brancher Claude Code (installation des hooks, en un clic) et ajouter un
+   agenda (ouvre les réglages sur l'assistant d'agenda) ;
+4. comment ouvrir l'île et retrouver les réglages.
+
+Tes choix sont enregistrés à la fin, ou si tu fermes la fenêtre ; **Passer**
+garde ce qui est affiché. Pour le relancer plus tard : Réglages › **Général** ›
+**Assistant d'accueil**.
+
+Tu n'as rien d'autre à modifier pour commencer : la musique marche tout de
+suite. Pour aller plus loin avec Claude Code et l'agenda, suis les pages
+dédiées.
 
 ## Lancer au démarrage de Windows
 
