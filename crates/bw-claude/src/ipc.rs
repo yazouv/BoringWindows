@@ -24,18 +24,36 @@ pub struct Message {
     pub event: HookEvent,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Decision {
     Allow,
+    /// Autoriser et appliquer les règles que Claude Code propose
+    /// (`permission_suggestions`) : il ne redemandera plus.
+    AllowAlways,
     Deny,
     /// Laisser Claude Code demander dans le terminal.
+    #[default]
     Ask,
+    /// Réponse à une question (`AskUserQuestion`), dans `Reply::answers`.
+    Answer,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Reply {
     pub decision: Decision,
+    /// Pour `Answer` : par question, les rangs des options choisies.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub answers: Vec<Vec<usize>>,
+}
+
+impl Reply {
+    pub fn new(decision: Decision) -> Self {
+        Self {
+            decision,
+            answers: Vec::new(),
+        }
+    }
 }
 
 /// Adresse du canal. `BW_IPC_ENDPOINT` la remplace (tests, instances parallèles).

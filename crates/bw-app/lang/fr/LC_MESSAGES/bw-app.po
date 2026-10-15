@@ -465,8 +465,8 @@ msgstr "Ouvre l'île et choisis une durée pour lancer le minuteur."
 msgid "Open the right place on click"
 msgstr "Ouvrir le bon endroit au clic"
 
-msgid "Permissions"
-msgstr "Autorisations"
+msgid "Answer from the island"
+msgstr "Répondre depuis l'île"
 
 msgid "Picking a theme replaces the colors below with the theme's. Your own themes go in the themes folder."
 msgstr "Choisir un thème remplace les couleurs ci-dessous par les siennes. Tes propres thèmes vont dans le dossier des thèmes."
@@ -831,6 +831,21 @@ msgstr "Raccourci"
 msgid "Each question is sent alone to the provider you picked, with your key. Nothing else leaves your PC."
 msgstr "Chaque question part seule chez le fournisseur choisi, avec ta clé. Rien d'autre ne quitte ton PC."
 
+msgid "Always: {}"
+msgstr "Toujours : {}"
+
+msgid "Always"
+msgstr "Toujours"
+
+msgid "{} asks you"
+msgstr "{} te demande"
+
+msgid "{} asks you · {}"
+msgstr "{} te demande · {}"
+
+msgid "Send"
+msgstr "Envoyer"
+
 msgid "Welcome assistant"
 msgstr "Assistant d'accueil"
 
@@ -947,6 +962,12 @@ msgstr "Retour"
 
 msgid "Next"
 msgstr "Suivant"
+
+msgid "Answer Claude's questions from the island"
+msgstr "Répondre aux questions de Claude depuis l'île"
+
+msgid "Multiple-choice questions: one click answers"
+msgstr "Questions à choix : un clic répond"
 
 msgid "Finish"
 msgstr "Terminer"

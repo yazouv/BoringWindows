@@ -8,6 +8,8 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
+use serde_json::Value;
+
 use crate::event::HookEvent;
 use crate::ipc::{self, Decision, Message, Reply};
 
@@ -15,10 +17,13 @@ use crate::ipc::{self, Decision, Message, Reply};
 pub const CONNECT_BUDGET: Duration = Duration::from_millis(300);
 /// Attente maximale d'une décision (sous le timeout de 300 s posé dans settings.json).
 pub const REPLY_CAP: Duration = Duration::from_secs(290);
+/// Argument du hook bloquant posé sur `PreToolUse` d'`AskUserQuestion`
+/// (`bw-hook hook question`) : seule cette entrée attend une réponse de l'île.
+pub const QUESTION_ARG: &str = "question";
 
 enum Step {
     Sent,
-    Reply(Decision),
+    Reply(Reply),
 }
 
 /// Ce qu'il s'est passé, pour le journal et le diagnostic.
@@ -28,16 +33,16 @@ pub enum Outcome {
     Unreachable(String),
     /// Événement remis, aucune réponse attendue.
     Sent,
-    /// Réponse de l'île à une demande de permission.
-    Decided(Decision),
+    /// Réponse de l'île à une demande de permission ou à une question.
+    Decided(Reply),
     /// Demande remise, mais pas de réponse exploitable (délai, app fermée entre-temps).
     NoReply,
 }
 
 impl Outcome {
-    pub fn decision(&self) -> Option<Decision> {
+    pub fn reply(&self) -> Option<&Reply> {
         match self {
-            Self::Decided(d) => Some(*d),
+            Self::Decided(r) => Some(r),
             _ => None,
         }
     }
@@ -48,34 +53,48 @@ impl std::fmt::Display for Outcome {
         match self {
             Self::Unreachable(e) => write!(f, "app injoignable ({e})"),
             Self::Sent => f.write_str("remis"),
-            Self::Decided(d) => write!(f, "réponse : {d:?}"),
+            Self::Decided(r) => write!(f, "réponse : {:?}", r.decision),
             Self::NoReply => f.write_str("remis, sans réponse"),
         }
     }
 }
 
 /// Point d'entrée : lit stdin, relaie, écrit éventuellement la décision sur
-/// stdout. Retourne le code de sortie (toujours 0).
-pub fn run() -> i32 {
+/// stdout. `mode` : l'argument après `hook` (`question` ou rien). Retourne le
+/// code de sortie (toujours 0).
+pub fn run(mode: Option<&str>) -> i32 {
     let mut input = String::new();
     if std::io::stdin().read_to_string(&mut input).is_err() {
         journal("?", "stdin illisible");
         return 0;
     }
-    let Some(event) = HookEvent::from_hook_input(&input) else {
+    // Un BOM (entrée écrite par PowerShell…) ferait échouer serde_json.
+    let raw: Value = serde_json::from_str(input.trim_start_matches('\u{feff}')).unwrap_or_default();
+    let Some(event) = HookEvent::from_value(&raw) else {
         journal("?", "événement illisible");
         return 0;
+    };
+    let question = mode == Some(QUESTION_ARG);
+    let wants_reply = if question {
+        // Seulement une question que l'île sait afficher ; sinon, sortie
+        // muette : Claude la pose dans le terminal.
+        if !is_island_question(&event) {
+            return 0;
+        }
+        true
+    } else {
+        // Les questions et les plans passent par la demande de permission,
+        // qui ne les retient pas : réponse dans le terminal.
+        event.kind == "PermissionRequest"
+            && !event
+                .tool_name
+                .as_deref()
+                .is_some_and(crate::event::is_interactive_tool)
     };
     let kind = event.kind.clone();
     let message = Message {
         v: ipc::PROTOCOL_VERSION,
-        // Les questions (AskUserQuestion, plan) partent tout de suite au
-        // terminal : l'île les signale sans les retenir.
-        wants_reply: kind == "PermissionRequest"
-            && !event
-                .tool_name
-                .as_deref()
-                .is_some_and(crate::event::is_interactive_tool),
+        wants_reply,
         ancestors: process::ancestors(),
         console_window: process::console_window(),
         event,
@@ -86,12 +105,20 @@ pub fn run() -> i32 {
     let outcome = relay(&endpoint, &message);
     // Les tests du diagnostic ne polluent pas le journal qu'il relit.
     if !doctor {
-        journal(&kind, &outcome.to_string());
+        let label = if question { "Question" } else { kind.as_str() };
+        journal(label, &outcome.to_string());
     }
-    if let Some(decision) = outcome.decision() {
-        print_decision(decision);
+    if let Some(out) = outcome.reply().and_then(|r| hook_output(r, &raw)) {
+        println!("{out}");
     }
     0
+}
+
+/// `PreToolUse` d'`AskUserQuestion` dont les questions tiennent dans l'île.
+pub fn is_island_question(event: &HookEvent) -> bool {
+    event.kind == "PreToolUse"
+        && event.tool_name.as_deref() == Some("AskUserQuestion")
+        && !event.questions.is_empty()
 }
 
 /// Envoie `message` et attend la décision si besoin.
@@ -130,7 +157,7 @@ pub fn relay(endpoint: &str, message: &Message) -> Outcome {
         if reader.read_line(&mut reply).is_ok()
             && let Ok(reply) = serde_json::from_str::<Reply>(&reply)
         {
-            let _ = tx.send(Ok(Step::Reply(reply.decision)));
+            let _ = tx.send(Ok(Step::Reply(reply)));
         }
     });
 
@@ -143,7 +170,7 @@ pub fn relay(endpoint: &str, message: &Message) -> Outcome {
         return Outcome::Sent;
     }
     match rx.recv_timeout(REPLY_CAP) {
-        Ok(Ok(Step::Reply(decision))) => Outcome::Decided(decision),
+        Ok(Ok(Step::Reply(reply))) => Outcome::Decided(reply),
         _ => Outcome::NoReply,
     }
 }
@@ -177,23 +204,80 @@ fn journal(kind: &str, outcome: &str) {
     }
 }
 
-fn print_decision(decision: Decision) {
-    let behavior = match decision {
-        Decision::Allow => "allow",
-        Decision::Deny => "deny",
-        Decision::Ask => return,
+/// Sortie JSON pour Claude Code. `input` est l'entrée brute du hook : les
+/// questions et les règles renvoyées en viennent, l'app ne fournit que des
+/// rangs et ne peut donc rien ajouter. `None` : rien à écrire, Claude demande
+/// dans le terminal.
+pub fn hook_output(reply: &Reply, input: &Value) -> Option<Value> {
+    let kind = input.get("hook_event_name").and_then(Value::as_str);
+    let permission = |decision: Value| {
+        serde_json::json!({
+            "hookSpecificOutput": { "hookEventName": "PermissionRequest", "decision": decision }
+        })
     };
-    let mut out = serde_json::json!({
-        "hookSpecificOutput": {
-            "hookEventName": "PermissionRequest",
-            "decision": { "behavior": behavior }
+    match reply.decision {
+        Decision::Ask => None,
+        Decision::Answer => {
+            if kind != Some("PreToolUse") {
+                return None;
+            }
+            let mut updated = input.get("tool_input")?.clone();
+            updated["answers"] = answers(&updated, &reply.answers)?;
+            Some(serde_json::json!({
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "allow",
+                    "updatedInput": updated,
+                }
+            }))
         }
-    });
-    if decision == Decision::Deny {
-        out["hookSpecificOutput"]["decision"]["message"] =
-            bw_i18n::tr!("Denied from BoringWindows", "Refusé depuis BoringWindows").into();
+        _ if kind != Some("PermissionRequest") => None,
+        Decision::Allow => Some(permission(serde_json::json!({ "behavior": "allow" }))),
+        Decision::AllowAlways => {
+            let mut decision = serde_json::json!({ "behavior": "allow" });
+            // Seulement des règles que l'île a pu résumer, donc montrer.
+            if let Some(event) = HookEvent::from_value(input)
+                && event.always.is_some()
+                && let Some(suggestions) = input.get("permission_suggestions")
+            {
+                decision["updatedPermissions"] = suggestions.clone();
+            }
+            Some(permission(decision))
+        }
+        Decision::Deny => Some(permission(serde_json::json!({
+            "behavior": "deny",
+            "message": bw_i18n::tr!("Denied from BoringWindows", "Refusé depuis BoringWindows"),
+        }))),
     }
-    println!("{out}");
+}
+
+/// `answers` d'`AskUserQuestion` : texte exact de chaque question → libellés
+/// choisis, séparés par des virgules. `None` si les rangs ne collent pas.
+fn answers(tool_input: &Value, picks: &[Vec<usize>]) -> Option<Value> {
+    let questions = tool_input.get("questions")?.as_array()?;
+    if picks.len() != questions.len() {
+        return None;
+    }
+    let mut out = serde_json::Map::new();
+    for (q, picked) in questions.iter().zip(picks) {
+        let multi = q
+            .get("multiSelect")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        if picked.is_empty() || (!multi && picked.len() > 1) {
+            return None;
+        }
+        let options = q.get("options")?.as_array()?;
+        let labels = picked
+            .iter()
+            .map(|&i| options.get(i)?.get("label")?.as_str())
+            .collect::<Option<Vec<_>>>()?;
+        out.insert(
+            q.get("question")?.as_str()?.to_owned(),
+            labels.join(", ").into(),
+        );
+    }
+    Some(Value::Object(out))
 }
 
 #[cfg(windows)]
@@ -420,5 +504,130 @@ mod process {
 
     pub fn console_window() -> Option<i64> {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn question_input() -> Value {
+        serde_json::json!({
+            "session_id": "s",
+            "hook_event_name": "PreToolUse",
+            "tool_name": "AskUserQuestion",
+            "tool_input": {
+                "questions": [
+                    { "question": "Which framework?", "header": "Framework", "multiSelect": false,
+                      "options": [{ "label": "React" }, { "label": "Vue" }] },
+                    { "question": "Extras?", "header": "Extras", "multiSelect": true,
+                      "options": [{ "label": "Tests" }, { "label": "CI" }, { "label": "Docs" }] }
+                ]
+            }
+        })
+    }
+
+    fn answer(picks: Vec<Vec<usize>>) -> Reply {
+        Reply {
+            decision: Decision::Answer,
+            answers: picks,
+        }
+    }
+
+    #[test]
+    fn answers_echo_the_questions() {
+        let input = question_input();
+        let out = hook_output(&answer(vec![vec![1], vec![0, 2]]), &input).unwrap();
+        let specific = &out["hookSpecificOutput"];
+        assert_eq!(specific["hookEventName"], "PreToolUse");
+        assert_eq!(specific["permissionDecision"], "allow");
+        let updated = &specific["updatedInput"];
+        assert_eq!(updated["questions"], input["tool_input"]["questions"]);
+        assert_eq!(updated["answers"]["Which framework?"], "Vue");
+        assert_eq!(updated["answers"]["Extras?"], "Tests, Docs");
+    }
+
+    #[test]
+    fn bad_answers_fall_back_to_the_terminal() {
+        let input = question_input();
+        for picks in [
+            vec![vec![0]],                  // une question sans réponse
+            vec![vec![5], vec![0]],         // option inexistante
+            vec![vec![0, 1], vec![0]],      // deux choix pour une question simple
+            vec![vec![0], vec![]],          // aucun choix
+            vec![vec![0], vec![0], vec![]], // question en trop
+        ] {
+            assert_eq!(
+                hook_output(&answer(picks.clone()), &input),
+                None,
+                "{picks:?}"
+            );
+        }
+        // Une réponse n'a de sens que pour la question retenue en PreToolUse.
+        let mut permission = input;
+        permission["hook_event_name"] = "PermissionRequest".into();
+        assert_eq!(
+            hook_output(&answer(vec![vec![0], vec![0]]), &permission),
+            None
+        );
+    }
+
+    #[test]
+    fn allow_always_applies_only_shown_suggestions() {
+        let mut input = serde_json::json!({
+            "session_id": "s",
+            "hook_event_name": "PermissionRequest",
+            "tool_name": "Bash",
+            "tool_input": { "command": "cargo test" },
+            "permission_suggestions": [
+                { "type": "addRules", "rules": [{ "toolName": "Bash", "ruleContent": "cargo test:*" }],
+                  "behavior": "allow", "destination": "localSettings" }
+            ]
+        });
+        let always = Reply::new(Decision::AllowAlways);
+        let out = hook_output(&always, &input).unwrap();
+        let decision = &out["hookSpecificOutput"]["decision"];
+        assert_eq!(decision["behavior"], "allow");
+        assert_eq!(
+            decision["updatedPermissions"],
+            input["permission_suggestions"]
+        );
+
+        // Une règle que l'île ne sait pas résumer : simple autorisation.
+        input["permission_suggestions"][0]["type"] = "replaceRules".into();
+        let out = hook_output(&always, &input).unwrap();
+        assert_eq!(out["hookSpecificOutput"]["decision"]["behavior"], "allow");
+        assert!(
+            out["hookSpecificOutput"]["decision"]
+                .get("updatedPermissions")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn permission_decisions() {
+        let input = serde_json::json!({
+            "session_id": "s", "hook_event_name": "PermissionRequest", "tool_name": "Bash"
+        });
+        let allow = hook_output(&Reply::new(Decision::Allow), &input).unwrap();
+        assert_eq!(allow["hookSpecificOutput"]["decision"]["behavior"], "allow");
+        let deny = hook_output(&Reply::new(Decision::Deny), &input).unwrap();
+        assert_eq!(deny["hookSpecificOutput"]["decision"]["behavior"], "deny");
+        assert!(deny["hookSpecificOutput"]["decision"]["message"].is_string());
+        assert_eq!(hook_output(&Reply::new(Decision::Ask), &input), None);
+        // Autoriser une question sans réponse ne suffit pas à Claude : rien.
+        assert_eq!(
+            hook_output(&Reply::new(Decision::Allow), &question_input()),
+            None
+        );
+    }
+
+    #[test]
+    fn only_displayable_questions_are_held() {
+        let e = HookEvent::from_value(&question_input()).unwrap();
+        assert!(is_island_question(&e));
+        let mut other = question_input();
+        other["tool_input"]["questions"][0]["options"] = serde_json::json!([]);
+        assert!(!is_island_question(&HookEvent::from_value(&other).unwrap()));
     }
 }

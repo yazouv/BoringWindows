@@ -403,6 +403,7 @@ export component SettingsWindow inherits Window {
     // --- Claude ---
     in property <bool> hooks-installed;
     in-out property <bool> claude-permissions;
+    in-out property <bool> claude-questions;
     in-out property <bool> claude-sound;
     in-out property <int> claude-wait;
     in property <string> doctor-report;
@@ -1112,7 +1113,7 @@ export component SettingsWindow inherits Window {
             }
 
             Section {
-                title: @tr("Permissions");
+                title: @tr("Answer from the island");
 
                 Card {
                     Setting {
@@ -1124,12 +1125,21 @@ export component SettingsWindow inherits Window {
                     }
 
                     Setting {
+                        title: @tr("Answer Claude's questions from the island");
+                        description: @tr("Multiple-choice questions: one click answers");
+                        Toggle {
+                            checked <=> root.claude-questions;
+                            toggled => { root.changed("modules.claude.questions"); }
+                        }
+                    }
+
+                    Setting {
                         nested: true;
-                        enabled: root.claude-permissions;
+                        enabled: root.claude-permissions || root.claude-questions;
                         title: @tr("Time to answer in the island (s)");
                         SpinBox {
                             width: 110px;
-                            enabled: root.claude-permissions;
+                            enabled: root.claude-permissions || root.claude-questions;
                             minimum: 5;
                             maximum: 280;
                             value <=> root.claude-wait;

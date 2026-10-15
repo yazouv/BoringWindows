@@ -97,6 +97,7 @@ Voir [Claude Code](claude-code.md).
 |---|---|---|---|
 | `enabled` | `true` | | activer le module |
 | `permissions` | `true` | | répondre aux demandes de permission depuis l'île |
+| `questions` | `true` | | répondre aux questions de Claude (choix proposés) depuis l'île |
 | `permission_wait_secs` | `60` | 5 à 280 | délai pour répondre dans l'île avant de rendre la main au terminal (s) |
 | `done_secs` | `8` | 0 à 600 | durée d'affichage de « terminé » (s) |
 | `sound` | `true` | | son système quand Claude se met à t'attendre |

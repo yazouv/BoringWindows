@@ -21,6 +21,7 @@ pub mod transcripts;
 
 pub use activity::{ACTIVITY_ID, ActivityConfig, ActivityModule, ActivitySnapshot, RecentSession};
 pub use config::ClaudeConfig;
+pub use event::Question;
 pub use module::{ClaudeModule, MODULE_ID};
 pub use tracker::{PromptView, SessionKind, SessionView, Snapshot};
 pub use transcripts::{UsageSummary, is_session_id};

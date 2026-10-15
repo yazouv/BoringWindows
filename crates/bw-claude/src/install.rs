@@ -160,11 +160,30 @@ fn hook_group(event: &str, command: &str) -> Value {
     group
 }
 
+/// Nos entrées pour un événement. `PreToolUse` en a une seconde, bloquante et
+/// réservée à `AskUserQuestion` : c'est là que Claude accepte une réponse
+/// venue d'ailleurs que du terminal.
+fn our_groups(event: &str, command: &str) -> Vec<Value> {
+    let mut groups = vec![hook_group(event, command)];
+    if event == "PreToolUse" {
+        groups.push(json!({
+            "matcher": "AskUserQuestion",
+            "hooks": [{
+                "type": "command",
+                "command": format!("{command} {}", crate::hook::QUESTION_ARG),
+                "timeout": PERMISSION_TIMEOUT,
+            }],
+        }));
+    }
+    groups
+}
+
 /// Nos entrées sont exactement celles de cette version (sinon : mise à jour).
 pub fn is_current(settings: &Value, command: &str) -> bool {
     HOOK_EVENTS.iter().all(|event| {
-        let expected = hook_group(event, command);
-        entries(&settings["hooks"][*event]).any(|g| *g == expected)
+        our_groups(event, command)
+            .iter()
+            .all(|expected| entries(&settings["hooks"][*event]).any(|g| g == expected))
     })
 }
 
@@ -188,7 +207,6 @@ pub fn with_hooks(settings: Value, command: &str) -> anyhow::Result<Value> {
         })?;
 
     for event in HOOK_EVENTS {
-        let group = hook_group(event, command);
         hooks
             .entry(event)
             .or_insert_with(|| Value::Array(Vec::new()))
@@ -199,7 +217,7 @@ pub fn with_hooks(settings: Value, command: &str) -> anyhow::Result<Value> {
                     "« hooks.{event} » doit être une liste"
                 )
             })?
-            .push(group);
+            .extend(our_groups(event, command));
     }
     Ok(settings)
 }
@@ -405,6 +423,23 @@ mod tests {
             .push(json!({ "hooks": [{ "type": "command", "command": "x" }] }));
         assert!(is_current(&s2, CMD));
         assert!(!is_current(&s, "\"autre\" hook"));
+    }
+
+    #[test]
+    fn questions_get_their_own_blocking_entry() {
+        let s = with_hooks(json!({}), CMD).unwrap();
+        let question = &s["hooks"]["PreToolUse"][1];
+        assert_eq!(question["matcher"], "AskUserQuestion");
+        let hook = &question["hooks"][0];
+        assert_eq!(hook["command"], format!("{CMD} question"));
+        assert_eq!(hook["timeout"], 300);
+        assert!(hook.get("async").is_none());
+        // Une installation d'avant les questions est à mettre à jour.
+        let mut old = s.clone();
+        old["hooks"]["PreToolUse"].as_array_mut().unwrap().pop();
+        assert!(is_complete(&old) && !is_current(&old, CMD));
+        // Et la désinstallation retire les deux.
+        assert_eq!(without_hooks(s), json!({}));
     }
 
     #[test]

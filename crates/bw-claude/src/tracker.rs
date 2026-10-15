@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use bw_core::Attention;
 
-use crate::event::{HookEvent, project_name};
+use crate::event::{HookEvent, Question, project_name};
 use crate::ipc::Decision;
 
 /// Une session sans nouvelles depuis ce délai est oubliée (Claude fermé brutalement).
@@ -41,6 +41,8 @@ struct Prompt {
     session_id: String,
     tool: String,
     detail: String,
+    questions: Vec<Question>,
+    always: Option<String>,
     deadline: Instant,
 }
 
@@ -62,6 +64,10 @@ pub struct PromptView {
     pub project: String,
     pub tool: String,
     pub detail: String,
+    /// Non vide : une question de Claude, à laquelle on répond par ses choix.
+    pub questions: Vec<Question>,
+    /// Règles que « Toujours autoriser » ajouterait (absent : pas de bouton).
+    pub always: Option<String>,
 }
 
 /// État complet publié vers l'UI.
@@ -192,6 +198,8 @@ impl Tracker {
             session_id: e.session_id.clone(),
             tool: e.tool_name.clone().unwrap_or_else(|| "outil".into()),
             detail: e.tool_detail.clone().unwrap_or_default(),
+            questions: e.questions.clone(),
+            always: e.always.clone(),
             deadline,
         });
     }
@@ -210,8 +218,14 @@ impl Tracker {
             && !still_pending
         {
             (s.kind, s.detail) = match decision {
-                Decision::Allow | Decision::Deny => (SessionKind::Working, None),
+                Decision::Allow | Decision::AllowAlways | Decision::Deny | Decision::Answer => {
+                    (SessionKind::Working, None)
+                }
                 // Claude va poser la question dans le terminal.
+                Decision::Ask if !prompt.questions.is_empty() => (
+                    SessionKind::NeedsYou,
+                    Some(tr!("is asking you a question", "te pose une question")),
+                ),
                 Decision::Ask => (
                     SessionKind::NeedsYou,
                     Some(tr!("needs a permission", "demande une permission")),
@@ -283,6 +297,8 @@ impl Tracker {
                 .map_or_else(|| "Claude".into(), |s| s.project.clone()),
             tool: p.tool.clone(),
             detail: p.detail.clone(),
+            questions: p.questions.clone(),
+            always: p.always.clone(),
         });
 
         let (attention, summary) = attention(&sessions);
@@ -436,6 +452,8 @@ mod tests {
                 project: "a".into(),
                 tool: "Bash".into(),
                 detail: "rm -rf target".into(),
+                questions: Vec::new(),
+                always: None,
             })
         );
         assert_eq!(s.summary.as_deref(), Some("a · autoriser Bash ?"));
@@ -449,6 +467,56 @@ mod tests {
         let s = t.snapshot();
         assert_eq!(s.prompt, None);
         assert_eq!(s.sessions[0].kind, SessionKind::Working);
+    }
+
+    #[test]
+    fn question_prompt_carries_choices_and_falls_back_to_terminal() {
+        let (mut t, now) = tracker();
+        let question = HookEvent {
+            questions: vec![Question {
+                header: "Framework".into(),
+                question: "Which framework?".into(),
+                options: vec!["React".into(), "Vue".into()],
+                multi: false,
+            }],
+            ..tool("a", "PreToolUse", "AskUserQuestion", "?")
+        };
+        t.on_event(&question, &[], None, now);
+        t.add_prompt(9, &question, now + Duration::from_secs(60));
+        // Le PreToolUse asynchrone du même appel arrive ensuite : sans effet.
+        t.on_event(
+            &tool("a", "PreToolUse", "AskUserQuestion", "?"),
+            &[],
+            None,
+            now,
+        );
+        let s = t.snapshot();
+        assert_eq!(s.summary.as_deref(), Some("a · te pose une question"));
+        let prompt = s.prompt.unwrap();
+        assert_eq!(prompt.questions[0].options, ["React", "Vue"]);
+
+        // « Terminal » : la session attend une réponse là-bas.
+        assert!(t.resolve_prompt(9, Decision::Ask));
+        let s = t.snapshot();
+        assert_eq!(s.sessions[0].kind, SessionKind::NeedsYou);
+        assert_eq!(s.sessions[0].status, "te pose une question");
+    }
+
+    #[test]
+    fn answered_question_resumes_work() {
+        let (mut t, now) = tracker();
+        let question = HookEvent {
+            questions: vec![Question {
+                question: "Go?".into(),
+                options: vec!["Yes".into()],
+                ..Question::default()
+            }],
+            ..tool("a", "PreToolUse", "AskUserQuestion", "?")
+        };
+        t.on_event(&question, &[], None, now);
+        t.add_prompt(10, &question, now + Duration::from_secs(60));
+        assert!(t.resolve_prompt(10, Decision::Answer));
+        assert_eq!(t.snapshot().sessions[0].kind, SessionKind::Working);
     }
 
     #[test]

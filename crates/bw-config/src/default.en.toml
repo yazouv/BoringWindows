@@ -80,6 +80,8 @@ ask = "Ctrl+Alt+Space"
 enabled = true
 # Answer permission requests from the island.
 permissions = true
+# Answer Claude's questions (multiple choice) from the island.
+questions = true
 # Time left to answer in the island before handing back to the terminal (s, max 280).
 permission_wait_secs = 60
 # How long "done" stays (s).

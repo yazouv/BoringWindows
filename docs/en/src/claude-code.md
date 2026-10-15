@@ -2,7 +2,8 @@
 
 The island follows your [Claude Code](https://claude.com/claude-code)
 sessions: it shows what Claude is doing, tells you when it's waiting for you,
-and lets you **allow or deny a command without going back to the terminal**.
+and lets you **allow a command or answer its questions without going back to
+the terminal**.
 
 ![Pill: question, permission request, then Claude resuming](images/claude-pilule.png)
 
@@ -32,7 +33,7 @@ What happens:
 | ● grey · `project · Bash` | Claude is working (tool running) |
 | ● grey · `project · thinking…` | Claude is writing its answer |
 | ● orange · `project · allow Bash?` | **permission request**, to handle in the island |
-| ● orange · `project · is asking you a question` | a question or a plan to approve: **answer in the terminal** |
+| ● orange · `project · is asking you a question` | a **question**, to handle in the island, or a plan to approve in the terminal |
 | ● orange · `project · waiting for you` | Claude is done and waits for your next message |
 | `project · done` | end of turn (a few seconds) |
 
@@ -50,20 +51,39 @@ that goes around once when it is done. To turn it off: Settings ›
 ## Answering a permission request
 
 When Claude wants to run a command that needs your approval, hover the island:
-it shows the tool and the command, with three buttons.
+it shows the tool and the command, with its buttons.
 
 - **Allow**: Claude runs the command.
+- **Always**: Claude runs it and adds the rule it suggests (shown under the
+  command, for example `Bash(cargo test:*)`) so it won't ask again. It is the
+  same rule as "always allow" in the terminal; the button only shows up when
+  Claude suggests one.
 - **Deny**: Claude doesn't run it and carries on another way.
 - **Terminal**: the question goes back to the terminal, which comes to the
-  front (to pick "always allow", for example).
+  front.
 
 Without an answer after 60 seconds, the question also goes back to the
 terminal. If you answer directly in the terminal, the request disappears from
 the island.
 
-Claude's **questions** (multiple choice, approving a plan) don't use these
-buttons: they show up normally in the terminal, the island just tells you
-"is asking you a question".
+## Answering a question from Claude
+
+When Claude asks you a multiple-choice question ("Which library?"), the island
+shows it with its possible answers: **one click answers**. For a question that
+takes several answers, tick them, then **Send**. When Claude asks several
+questions at once, they come one at a time (`1/2`, `2/2`) and the answer is sent
+once they all have one.
+
+**Terminal**, at the top right of the card, sends the question back to the
+terminal: to type an answer that isn't offered, for example. As with
+permissions, without an answer after 60 seconds the question goes back to the
+terminal.
+
+These stay in the terminal: approving a **plan**, and questions too big for the
+island (more than 4 questions or 6 choices).
+
+> While the question is in the island, the terminal doesn't show it yet: click
+> **Terminal** to answer it there.
 
 ## Settings
 
@@ -72,6 +92,7 @@ In [`[modules.claude]`](configuration.md#modulesclaude):
 ```toml
 [modules.claude]
 permissions = true          # answer permissions from the island
+questions = true            # answer Claude's questions from the island
 permission_wait_secs = 60   # delay before handing back to the terminal
 sound = true                # sound when Claude is waiting for you
 ```
