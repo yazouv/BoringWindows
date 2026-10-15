@@ -351,6 +351,7 @@ de texte aux écrans de l'assistant), puis la fenêtre de réglages.
 
 ### Phase 5 — Extensions
 - [x] Claude : conversations récentes (reprise `claude --resume`) et consommation estimée de la fenêtre de 5 h, depuis les transcripts locaux (`[modules.claude_activity]`, doc FR + EN)
+- [x] Alerte de consommation Claude (`alert_percent`, 80 % par défaut, avec une limite estimée) : une annonce par fenêtre, puis au renouvellement ; transcripts relus à la fin de chaque tour (hook `Stop`), sans relecture périodique
 - [ ] Spotify Web API (like, queue, Connect)
 - [x] Minuteur (module `bw-timer`, durées prédéfinies, doc FR + EN)
 - [x] Session de concentration (bouton « Focus » du minuteur, `focus_minutes`) : ne pas déranger le temps de la session puis rétabli, trait de progression au bas de la pilule, mascotte concentrée et immobile ; doc FR + EN

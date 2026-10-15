@@ -15,6 +15,7 @@ pub mod hook;
 pub mod install;
 pub mod ipc;
 mod module;
+pub mod quota;
 pub mod tracker;
 pub mod transcripts;
 

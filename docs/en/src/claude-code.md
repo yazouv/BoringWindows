@@ -116,6 +116,12 @@ the `ccusage` tool does; for a gauge, enter the limit you believe you have
 (millions of tokens) in Settings › Claude Code. For your real remainder, `/usage`
 in Claude Code is the reference.
 
+With a limit, the island **warns you** when the window goes past 80 % of it
+("Claude: 82 % of the window used · resets in 1 h 20"), once per window, then when
+the window renews. Set the threshold in Settings › Claude Code (0: never). The
+transcripts are read again at the end of each Claude answer, at most every 15 s:
+nothing runs in between.
+
 **Remote** conversations (SSH sessions) are not listed: their folder does not
 exist on this PC. They still count toward usage.
 
@@ -125,6 +131,7 @@ enabled = true
 recent = 4                # conversations offered (0 to 4)
 window_hours = 5          # usage window length (1 to 24)
 limit_tokens = 0          # estimated limit for the gauge (0: no gauge)
+alert_percent = 80        # announce at 80 % of the limit (0: never)
 reset_at = ""             # end of a known window (see below)
 count_cache_reads = false # also count cache reads
 ```

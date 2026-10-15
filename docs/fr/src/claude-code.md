@@ -119,6 +119,12 @@ fenêtre en cours, comme l'outil `ccusage` ; pour avoir une jauge, indique la
 limite que tu estimes avoir (millions de tokens) dans Réglages › Claude Code. Pour
 ton vrai reste, `/usage` dans Claude Code fait foi.
 
+Avec une limite, l'île **te prévient** quand la fenêtre en dépasse 80 % (« Claude :
+82 % de la fenêtre utilisés · reset dans 1 h 20 »), une seule fois par fenêtre,
+puis quand la fenêtre se renouvelle. Le seuil se règle dans Réglages › Claude Code
+(0 : jamais). Les transcripts sont relus à la fin de chaque réponse de Claude, au
+plus toutes les 15 s : rien ne tourne entre-temps.
+
 Les conversations **distantes** (sessions SSH) ne sont pas listées : leur dossier
 n'existe pas sur ce PC. Elles comptent quand même dans la consommation.
 
@@ -128,6 +134,7 @@ enabled = true
 recent = 4                # conversations proposées (0 à 4)
 window_hours = 5          # durée de la fenêtre de consommation (1 à 24)
 limit_tokens = 0          # limite estimée pour la jauge (0 : pas de jauge)
+alert_percent = 80        # annonce à 80 % de la limite (0 : jamais)
 reset_at = ""             # fin d'une fenêtre connue (voir ci-dessous)
 count_cache_reads = false # compter aussi les lectures de cache
 ```

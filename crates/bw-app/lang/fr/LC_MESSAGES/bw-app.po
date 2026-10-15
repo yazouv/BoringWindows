@@ -309,6 +309,12 @@ msgstr "Limite estimée, millions de tokens (0 = pas de jauge)"
 msgid "Window reset time (optional)"
 msgstr "Heure de reset de la fenêtre (facultatif)"
 
+msgid "Warn at this share of the limit (%, 0 = never)"
+msgstr "Prévenir à cette part de la limite (%, 0 = jamais)"
+
+msgid "Once per window, then again when the window renews."
+msgstr "Une fois par fenêtre, puis quand la fenêtre se renouvelle."
+
 msgid "now"
 msgstr "à l'instant"
 

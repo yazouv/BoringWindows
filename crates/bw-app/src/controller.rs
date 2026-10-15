@@ -1209,6 +1209,14 @@ impl Controller {
         self.send_action(bw_claude::ACTIVITY_ID, "refresh");
     }
 
+    /// L'alerte de consommation a de quoi calculer un pourcentage.
+    fn quota_alert_enabled(&self) -> bool {
+        bw_claude::ActivityConfig::from_table(
+            self.config.borrow().modules.get(bw_claude::ACTIVITY_ID),
+        )
+        .is_ok_and(|c| c.limit_tokens > 0 && c.alert_percent > 0)
+    }
+
     /// Action adressée à un module, s'il est actif.
     fn send_action(&self, module: &str, name: &str) {
         if !self.module_ids.borrow().contains(&module) {
@@ -1900,6 +1908,26 @@ impl Controller {
         };
         let before = waiting(self.claude.borrow().as_deref());
         let now_waiting = waiting(snapshot.as_deref());
+        // Fin d'un tour : des tokens viennent d'être consommés, l'alerte de
+        // consommation relit les transcripts (au plus toutes les 15 s).
+        let done = |s: Option<&Snapshot>| -> Vec<String> {
+            s.map(|s| {
+                s.sessions
+                    .iter()
+                    .filter(|v| v.kind == SessionKind::Done)
+                    .map(|v| v.id.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+        };
+        let was_done = done(self.claude.borrow().as_deref());
+        if done(snapshot.as_deref())
+            .iter()
+            .any(|id| !was_done.contains(id))
+            && self.quota_alert_enabled()
+        {
+            self.refresh_activity();
+        }
         let config = self.claude_config();
         if now_waiting.iter().any(|w| !before.contains(w)) && config.sound {
             platform::alert_sound();
