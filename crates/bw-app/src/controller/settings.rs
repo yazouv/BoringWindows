@@ -263,6 +263,7 @@ impl Controller {
                 .unwrap_or_default();
         ui.set_activity_enabled(config.module_enabled(bw_claude::ACTIVITY_ID, true));
         ui.set_activity_limit_millions((activity.limit_tokens / 1_000_000) as i32);
+        ui.set_activity_alert_percent(i32::from(activity.alert_percent));
         // Reset connu et encore à venir : affiché en heure locale ; passé, le champ se vide.
         ui.set_activity_reset(
             activity
@@ -840,6 +841,10 @@ impl Controller {
             "modules.claude_activity.limit_millions" => Some((
                 vec!["modules", "claude_activity", "limit_tokens"],
                 Value::Int(i64::from(ui.get_activity_limit_millions()) * 1_000_000),
+            )),
+            "modules.claude_activity.alert_percent" => Some((
+                vec!["modules", "claude_activity", "alert_percent"],
+                Value::Int(i64::from(ui.get_activity_alert_percent().clamp(0, 100))),
             )),
             "modules.plugins.enabled" => Some((
                 vec!["modules", "plugins", "enabled"],

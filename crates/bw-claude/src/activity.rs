@@ -10,12 +10,13 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration as StdDuration, Instant, SystemTime};
 
-use bw_core::{Module, ModuleCtx};
+use bw_core::{Attention, Module, ModuleCtx};
 use bw_i18n::tr;
 use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
 use tokio::sync::mpsc::unbounded_channel;
 
+use crate::quota::{QuotaNotice, QuotaWatch};
 use crate::transcripts::{
     FileScan, UsageEntry, UsageSummary, list_transcripts, scan_file, summarize,
 };
@@ -38,6 +39,8 @@ pub struct ActivityConfig {
     pub limit_tokens: u64,
     /// Compter aussi les lectures de cache (très nombreuses, quasi gratuites).
     pub count_cache_reads: bool,
+    /// Annonce quand la fenêtre dépasse ce pourcentage de `limit_tokens` (0 : jamais).
+    pub alert_percent: u8,
     /// Fin d'une fenêtre connue (RFC 3339, lue dans `/usage`) : recale le calcul.
     pub reset_at: String,
     /// Dossier des transcripts ; vide = `<dossier de Claude Code>/projects`.
@@ -52,6 +55,7 @@ impl Default for ActivityConfig {
             window_hours: 5,
             limit_tokens: 0,
             count_cache_reads: false,
+            alert_percent: 80,
             reset_at: String::new(),
             projects_dir: String::new(),
         }
@@ -83,6 +87,13 @@ impl ActivityConfig {
             tr!(
                 "modules.claude_activity.limit_tokens is too large",
                 "modules.claude_activity.limit_tokens est trop grand"
+            )
+        );
+        anyhow::ensure!(
+            config.alert_percent <= 100,
+            tr!(
+                "modules.claude_activity.alert_percent must be between 0 and 100",
+                "modules.claude_activity.alert_percent doit être entre 0 et 100"
             )
         );
         anyhow::ensure!(
@@ -239,6 +250,8 @@ impl Module for ActivityModule {
         let config = self.config.clone();
         ctx.clone().spawn(async move {
             let mut cache = Cache::default();
+            let mut watch = QuotaWatch::default();
+            let mut notice_end: Option<Instant> = None;
             loop {
                 let cfg = config.clone();
                 let run = tokio::task::spawn_blocking(move || {
@@ -250,15 +263,41 @@ impl Module for ActivityModule {
                     return;
                 };
                 cache = returned;
+                if let Some(notice) = watch.update(
+                    &snapshot.usage,
+                    config.limit_tokens,
+                    config.alert_percent,
+                    Utc::now(),
+                ) {
+                    announce(&ctx, &notice, &mut notice_end);
+                }
                 ctx.set_state(snapshot);
                 let started = Instant::now();
 
-                // Attend une demande de rafraîchissement ; trop rapprochées, elles sont ignorées.
+                // Attend une demande de rafraîchissement. Trop rapprochée, elle
+                // est remise à la fin de l'intervalle minimal.
+                let mut deferred = false;
                 loop {
-                    match rx.recv().await {
-                        None => return,
-                        Some(()) if started.elapsed() >= MIN_INTERVAL => break,
-                        Some(()) => {}
+                    let refresh_at = deferred.then(|| started + MIN_INTERVAL);
+                    let renewal = watch
+                        .next_deadline()
+                        .map(|end| (end - Utc::now()).to_std().unwrap_or_default());
+                    tokio::select! {
+                        request = rx.recv() => match request {
+                            None => return,
+                            Some(()) if started.elapsed() >= MIN_INTERVAL => break,
+                            Some(()) => deferred = true,
+                        },
+                        () = sleep_until(refresh_at), if refresh_at.is_some() => break,
+                        () = tokio::time::sleep(renewal.unwrap_or_default()), if renewal.is_some() => {
+                            if let Some(notice) = watch.renewed(Utc::now()) {
+                                announce(&ctx, &notice, &mut notice_end);
+                            }
+                        }
+                        () = sleep_until(notice_end), if notice_end.is_some() => {
+                            notice_end = None;
+                            ctx.set_attention(Attention::None, None);
+                        }
                     }
                 }
             }
@@ -266,13 +305,30 @@ impl Module for ActivityModule {
         Ok(())
     }
 
-    /// Action : `refresh` (relire les transcripts, ex. à l'ouverture de l'île).
+    /// Action : `refresh` (relire les transcripts : ouverture de l'île, fin d'un
+    /// tour de Claude).
     fn on_action(&mut self, action: &str) {
         if action == "refresh"
             && let Some(tx) = &self.refresh
         {
             let _ = tx.send(());
         }
+    }
+}
+
+/// Durée d'une annonce de consommation dans la pilule.
+const NOTICE_FOR: StdDuration = StdDuration::from_secs(8);
+
+fn announce(ctx: &ModuleCtx, notice: &QuotaNotice, notice_end: &mut Option<Instant>) {
+    log::info!("consommation : {}", notice.text);
+    ctx.set_attention(notice.attention, Some(notice.text.clone()));
+    *notice_end = Some(Instant::now() + NOTICE_FOR);
+}
+
+async fn sleep_until(at: Option<Instant>) {
+    match at {
+        Some(at) => tokio::time::sleep_until(at.into()).await,
+        None => std::future::pending().await,
     }
 }
 

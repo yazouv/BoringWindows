@@ -357,6 +357,7 @@ export component SettingsWindow inherits Window {
     in-out property <bool> viz-enabled;
     in-out property <bool> activity-enabled;
     in-out property <int> activity-limit-millions;
+    in-out property <int> activity-alert-percent;
     in-out property <string> activity-reset;
     in-out property <bool> plugins-enabled;
     callback open-plugins-folder();
@@ -1161,6 +1162,21 @@ export component SettingsWindow inherits Window {
                             maximum: 100000;
                             value <=> root.activity-limit-millions;
                             edited => { root.changed("modules.claude_activity.limit_millions"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.activity-enabled && root.activity-limit-millions > 0;
+                        title: @tr("Warn at this share of the limit (%, 0 = never)");
+                        description: @tr("Once per window, then again when the window renews.");
+                        SpinBox {
+                            width: 110px;
+                            enabled: root.activity-enabled && root.activity-limit-millions > 0;
+                            minimum: 0;
+                            maximum: 100;
+                            value <=> root.activity-alert-percent;
+                            edited => { root.changed("modules.claude_activity.alert_percent"); }
                         }
                     }
 

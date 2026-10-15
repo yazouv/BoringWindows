@@ -64,6 +64,7 @@ The Cargo workspace (edition 2024) has one crate per concern. `bw-app` is the on
     - `install.rs` edits `~/.claude/settings.json`, adding only our entries, with a backup. It also auto-upgrades outdated hooks.
     - `tracker.rs` turns hook events into per-session state.
     - `doctor.rs` runs the end-to-end diagnostic.
+    - `activity.rs` (module `claude_activity`) reads the local transcripts (`transcripts.rs`) for recent conversations and the estimated usage of the 5 h window. It never polls: it reads at startup, on island open, and at the end of each Claude turn when the usage alert is on (the controller sends `refresh` when a session turns Done), at most every 15 s (a closer request is deferred, not dropped). `quota.rs` is the pure alert logic: one announcement per window past `alert_percent` of `limit_tokens`, then one when that window ends (a sleep until `window_end`).
   - **`bw-media`**: music. It uses Windows GSMTC on a dedicated thread.
   - **`bw-calendar`**: calendars.
     - `ics.rs` is a homegrown ICS parser (RRULE via `rrule`, Windows time-zone names mapped in `tz.rs`).

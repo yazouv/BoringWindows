@@ -305,6 +305,7 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 | `recent` | `4` | 0 to 4 | conversations offered |
 | `window_hours` | `5` | 1 to 24 | usage window length (h) |
 | `limit_tokens` | `0` | | estimated limit for the gauge (0: no gauge) |
+| `alert_percent` | `80` | 0 to 100 | announce in the pill when the window goes past this share of `limit_tokens`, then when it renews (0: never) |
 | `reset_at` | `""` | | end of a known window, `2026-10-02T01:01:00Z` (settable as `HH:MM` in the settings) |
 | `count_cache_reads` | `false` | | also count cache reads |
 | `projects_dir` | `""` | | transcripts folder (empty: `~/.claude/projects`) |

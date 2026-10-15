@@ -809,3 +809,9 @@ msgstr "Raccourci"
 
 msgid "Each question is sent alone to the provider you picked, with your key. Nothing else leaves your PC."
 msgstr "Chaque question part seule chez le fournisseur choisi, avec ta clé. Rien d'autre ne quitte ton PC."
+
+msgid "Warn at this share of the limit (%, 0 = never)"
+msgstr "Prévenir à cette part de la limite (%, 0 = jamais)"
+
+msgid "Once per window, then again when the window renews."
+msgstr "Une fois par fenêtre, puis quand la fenêtre se renouvelle."

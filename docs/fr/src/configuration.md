@@ -306,6 +306,7 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 | `recent` | `4` | 0 à 4 | conversations proposées |
 | `window_hours` | `5` | 1 à 24 | durée de la fenêtre de consommation (h) |
 | `limit_tokens` | `0` | | limite estimée pour la jauge (0 : pas de jauge) |
+| `alert_percent` | `80` | 0 à 100 | annonce dans la pilule quand la fenêtre dépasse ce pourcentage de `limit_tokens`, puis quand elle se renouvelle (0 : jamais) |
 | `reset_at` | `""` | | fin d'une fenêtre connue, `2026-10-02T01:01:00Z` (réglable en `HH:MM` dans les réglages) |
 | `count_cache_reads` | `false` | | compter aussi les lectures de cache |
 | `projects_dir` | `""` | | dossier des transcripts (vide : `~/.claude/projects`) |
