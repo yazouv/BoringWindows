@@ -214,7 +214,7 @@ Modules tiers en **WASM** (via `extism` ou `wasmtime`), sandboxés, qui publient
 ## 5. Roadmap
 
 ### Phase 0 — Fondations ✅
-- [x] Workspace Cargo (la CI GitHub Actions a été retirée : trop de minutes consommées ; vérifs en local)
+- [x] Workspace Cargo (CI GitHub Actions sur des runners hébergés : voir la phase 6)
 - [x] Fenêtre île : sans bordure, transparente, topmost, no-activate, centrée en haut
 - [x] États compact / attention / ouvert + animations (morph de taille)
 - [x] Zone cliquable limitée à la pilule (`SetWindowRgn`), le reste laisse passer les clics
@@ -222,7 +222,8 @@ Modules tiers en **WASM** (via `extism` ou `wasmtime`), sandboxés, qui publient
 - [x] `bw-config` : TOML + hot reload, erreurs de config affichées dans l'île
 - [x] Masquage en plein écran (notification appbar `ABN_FULLSCREENAPP`, sans polling), multi-écrans, DPI
 - [x] Bus d'événements + trait `Module` + arbitrage d'attention (+ module `demo`)
-- [x] Mesure perfs : `scripts/measure-idle.ps1`, exécuté en CI à titre indicatif
+- [x] Mesure perfs : `scripts/measure-idle.ps1`, à lancer à la main (plus exécuté en CI)
+- [ ] Relever RAM / CPU au repos sur un vrai GPU, tous modules activés (réseau, transferts, GitHub compris)
 
 Validé sur Windows : transparence, clics qui traversent, focus jamais volé,
 masquage en plein écran. Reste à relever les chiffres RAM/CPU sur un vrai GPU.
@@ -355,7 +356,7 @@ de texte aux écrans de l'assistant), puis la fenêtre de réglages.
 - [x] Volume (module `bw-volume`, callback WASAPI sans polling, doc FR + EN)
 - [x] Luminosité (`[modules.brightness]` dans `bw-volume`, événement WMI `WmiMonitorBrightnessEvent`, écrans intégrés seulement, doc FR + EN ; à valider sur un portable)
 - [x] Notifications des applications (`bw-notify` : annonce animée dans la pilule, points non lus, onglet « Notifs », clic → ouvre l'application, doc FR + EN)
-- [x] Onglets de l'île ouverte (Accueil, Notifs, Claude)
+- [x] Onglets de l'île ouverte (Accueil, Notifs, Claude, Tâches)
 - [x] Ne pas déranger (lune dans l'île, gardé entre deux lancements)
 - [x] Icône des applications (`shell:AppsFolder`), couleur tirée de l'icône pour les applis inconnues
 - [x] Clic → bon endroit : la notification est rejouée depuis le centre de notifications (Win+N + UI Automation), sinon l'application s'ouvre
@@ -368,13 +369,19 @@ de texte aux écrans de l'assistant), puis la fenêtre de réglages.
 - [x] Mascotte (blob à yeux dans la pilule : humeur selon Claude, musique, heure et absence ; danse sur les basses ; animée seulement quand utile, option « toujours animée » ; doc FR + EN)
 - [x] Décorations de saison (Halloween : chapeau de sorcière et citrouilles ; Noël ; Nouvel An)
 - [x] Gestes sur l'île (molette : volume ; glisser : morceau suivant/précédent ; appui long : ne pas déranger ; doc FR + EN)
-- [x] Mode présentation (`bw-presence` : appel ou partage d'écran détecté → annonces tues et point rouge ; île exclue des captures ; doc FR + EN)
+- [x] Mode présentation (`bw-presence` : appel ou partage d'écran détecté → annonces tues et point rouge ; île exclue des captures, ou seulement en direct avec `hide_only_when_live` ; clics qui traversent l'île pendant qu'un outil de capture est au premier plan ; doc FR + EN)
+- [x] L'île reste au-dessus de la barre des tâches (après un clic dessus et au démarrage)
 - [x] Plus de barre de titre au premier clic sur l'île (sous-classement de la fenêtre)
 - [x] Processeur et mémoire (`bw-system` : à côté de l'heure, mesurés seulement île ouverte ; alertes facultatives qui nomment l'application en cause ; doc FR + EN)
 - [x] Animations façon Dynamic Island : ouverture en ressort (dépasse puis se pose), contenu qui arrive en cascade ; halo de Claude (irisé qui tourne au travail, orange qui pulse quand il attend, vague verte à la fin ; `theme.glow`) ; mascotte en grand et détaillée dans l'île ouverte ; île ouverte élargie à 580 px ; notifications et conversations récentes en cartes, jauge circulaire de consommation, pastilles d'état des sessions Claude
 - [x] Île vivante : onglets qui glissent (ressort), carrousel des pochettes au changement de morceau, mascotte qui suit le curseur des yeux / s'écrase au clic / fait des cœurs aux caresses, accessoire et couleur de la mascotte (`[modules.mascot]`), bulle détachée pour la deuxième activité (pont liquide)
 - [x] Raccourcis clavier globaux (`[hotkeys]` : ouvrir l'île, lecture/pause, morceaux, ne pas déranger ; `global-hotkey`, réglables dans Réglages › Système ; doc FR + EN)
 - [x] Questions à Claude ou Gemini (`bw-ask` : raccourci `hotkeys.ask` → champ sous l'île, modèle au choix, clés dans le coffre de l'OS, réponse en carte dans l'île ; une question à la fois, sans historique ni flux ; `[modules.ask]`, doc FR + EN)
+- [x] Réseau (`bw-network` : Wi-Fi / Ethernet, VPN, en ligne via `NetworkStatusChanged` ; débit dans l'île ouverte et, au choix, dans la pilule repliée ; annonces de connexion ; VPN OpenVPN, WireGuard, FortiClient reconnus ; doc FR + EN)
+- [x] Transferts (`bw-transfers` : copies, déplacements et suppressions de l'Explorateur, téléchargements des navigateurs ; barre de progression au bas de la pilule repliée ; doc FR + EN)
+- [x] Statut GitHub (`bw-github`, désactivé par défaut : CI de tes pull requests et revues demandées, une requête GraphQL par `refresh_secs` ; jeton dans le coffre de l'OS ou `gh auth token` ; icône dans l'en-tête et annonces ; doc FR + EN)
+- [x] Tâches rapides (`[modules.tasks]`, désactivé par défaut : liste à cocher dans `tasks.md`, modifications à la main jamais écrasées, onglet « Tâches », ajout par `hotkeys.quick_add` ; doc FR + EN)
+- [x] En-tête de l'île ouverte allégé : détails des puces (météo, CPU / RAM, réseau, GitHub) dans une bulle sous l'en-tête
 
 ### Port macOS (en parallèle, sans bloquer Windows)
 
