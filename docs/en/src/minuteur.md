@@ -16,12 +16,28 @@ default**; turn it on in Settings › **Timer**.
 
 The timer costs nothing at rest: it only wakes up every minute and at the end.
 
+## Focus session
+
+Next to the durations, **Focus 25 min** starts a focus session:
+
+- **do not disturb** turns on: app notifications stop being announced (the
+  moon lights up in the island);
+- the pill shows "Focus · 18 min", with a thin progress line along its bottom
+  edge;
+- the mascot squints and stays still (it doesn't dance to music), then cheers
+  at the end.
+
+When the session ends, or if you reset it, do not disturb goes back to how it
+was (if it was already on, it stays on). Claude Code still tells you when it is
+waiting for you. Set the length in Settings › **Timer** (0: no button).
+
 ## Settings
 
 ```toml
 [modules.timer]
 enabled = true
 presets = [5, 15, 25]   # 1 to 5 durations, in minutes (1 to 600)
+focus_minutes = 25      # focus session (0: no button)
 sound = true            # sound when it ends
 done_secs = 20          # how long the "done" alert stays
 ```

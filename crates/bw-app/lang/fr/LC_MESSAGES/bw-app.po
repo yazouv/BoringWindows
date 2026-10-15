@@ -809,3 +809,18 @@ msgstr "Raccourci"
 
 msgid "Each question is sent alone to the provider you picked, with your key. Nothing else leaves your PC."
 msgstr "Chaque question part seule chez le fournisseur choisi, avec ta clé. Rien d'autre ne quitte ton PC."
+
+msgid "Session done!"
+msgstr "Session terminée !"
+
+msgid "Focus {} min"
+msgstr "Focus {} min"
+
+msgid "Focus"
+msgstr "Concentration"
+
+msgid "Focus session (minutes, 0 = no button)"
+msgstr "Session de concentration (minutes, 0 = pas de bouton)"
+
+msgid "Do not disturb during the session, back as it was at the end."
+msgstr "Ne pas déranger pendant la session, rétabli à la fin."

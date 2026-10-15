@@ -352,6 +352,7 @@ de texte aux écrans de l'assistant), puis la fenêtre de réglages.
 - [x] Claude : conversations récentes (reprise `claude --resume`) et consommation estimée de la fenêtre de 5 h, depuis les transcripts locaux (`[modules.claude_activity]`, doc FR + EN)
 - [ ] Spotify Web API (like, queue, Connect)
 - [x] Minuteur (module `bw-timer`, durées prédéfinies, doc FR + EN)
+- [x] Session de concentration (bouton « Focus » du minuteur, `focus_minutes`) : ne pas déranger le temps de la session puis rétabli, trait de progression au bas de la pilule, mascotte concentrée et immobile ; doc FR + EN
 - [x] Étagère de fichiers (glisser-déposer sur l'île, `[modules.shelf]`, doc FR + EN)
 - [x] Volume (module `bw-volume`, callback WASAPI sans polling, doc FR + EN)
 - [x] Luminosité (`[modules.brightness]` dans `bw-volume`, événement WMI `WmiMonitorBrightnessEvent`, écrans intégrés seulement, doc FR + EN ; à valider sur un portable)

@@ -138,6 +138,7 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 |---|---|---|---|
 | `enabled` | `false` | | turn on the [timer](minuteur.md) |
 | `presets` | `[5, 15, 25]` | 1 to 5 durations, 1 to 600 | offered durations (min) |
+| `focus_minutes` | `25` | 0 to 600 | length of the "Focus" button: a [focus session](minuteur.md#focus-session), do not disturb for its length (0: no button) |
 | `sound` | `true` | | sound when it ends |
 | `done_secs` | `20` | 1 to 600 | how long the "done" alert stays (s) |
 

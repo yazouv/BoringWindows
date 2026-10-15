@@ -139,6 +139,7 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 |---|---|---|---|
 | `enabled` | `false` | | activer le [minuteur](minuteur.md) |
 | `presets` | `[5, 15, 25]` | 1 à 5 durées, 1 à 600 | durées proposées (min) |
+| `focus_minutes` | `25` | 0 à 600 | durée du bouton « Focus » : [session de concentration](minuteur.md#session-de-concentration), ne pas déranger le temps de la session (0 : pas de bouton) |
 | `sound` | `true` | | son à la fin |
 | `done_secs` | `20` | 1 à 600 | durée de l'alerte « terminé » (s) |
 

@@ -415,6 +415,7 @@ export component SettingsWindow inherits Window {
     in-out property <bool> timer-enabled;
     in-out property <bool> timer-sound;
     in-out property <string> timer-presets;
+    in-out property <int> timer-focus-minutes;
     // --- Système ---
     in-out property <bool> system-enabled;
     in-out property <int> system-refresh;
@@ -1510,6 +1511,21 @@ export component SettingsWindow inherits Window {
                             text <=> root.timer-presets;
                             placeholder-text: "5, 15, 25";
                             edited => { root.changed("modules.timer.presets"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.timer-enabled;
+                        title: @tr("Focus session (minutes, 0 = no button)");
+                        description: @tr("Do not disturb during the session, back as it was at the end.");
+                        SpinBox {
+                            width: 110px;
+                            enabled: root.timer-enabled;
+                            minimum: 0;
+                            maximum: 600;
+                            value <=> root.timer-focus-minutes;
+                            edited => { root.changed("modules.timer.focus_minutes"); }
                         }
                     }
                 }

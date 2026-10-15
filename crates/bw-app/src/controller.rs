@@ -141,6 +141,7 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         progress_timer: Timer::default(),
         remind_timer: Timer::default(),
         timer: RefCell::new(None),
+        focus_dnd: Cell::new(None),
         custom_view: RefCell::new(None),
         shelf: RefCell::new(Shelf::load(&shelf_file)),
         shelf_file,
@@ -221,6 +222,9 @@ pub struct Controller {
     remind_timer: Timer,
     /// Dernier état du minuteur (absent si le module est désactivé).
     timer: RefCell<Option<Arc<TimerSnapshot>>>,
+    /// Pendant une session de concentration : « ne pas déranger » d'avant,
+    /// rétabli à la fin.
+    focus_dnd: Cell<Option<bool>>,
     custom_view: RefCell<Option<custom_view::CustomView>>,
     shelf: RefCell<Shelf>,
     shelf_file: PathBuf,
@@ -522,6 +526,8 @@ impl Controller {
     }
 
     fn shutdown(&self) {
+        // Quitter en pleine session ne laisse pas « ne pas déranger » allumé.
+        self.end_focus();
         if let Some(host) = self.host.borrow_mut().take() {
             host.shutdown();
         }
@@ -1524,10 +1530,50 @@ impl Controller {
         if finished && self.timer_config().sound {
             platform::alert_sound();
         }
+        let focusing = |t: &TimerSnapshot| {
+            t.focus && matches!(t.phase, TimerPhase::Running | TimerPhase::Paused)
+        };
+        let was = self.timer.borrow().as_deref().is_some_and(focusing);
+        let is = focusing(&snapshot);
         *self.timer.borrow_mut() = Some(Arc::new(snapshot));
+        if is && !was {
+            self.start_focus();
+        } else if was && !is {
+            self.end_focus();
+        }
         self.ui.set_has_timer(true);
         self.update_timer_ui();
         self.layout_rows();
+        self.update_mascot();
+    }
+
+    /// Début d'une session de concentration : « ne pas déranger », retenu
+    /// pour être rétabli à la fin.
+    fn start_focus(&self) {
+        let before = self.dnd.get();
+        self.focus_dnd.set(Some(before));
+        if !before {
+            self.set_dnd(true);
+        }
+    }
+
+    /// Fin (ou abandon) de la session : « ne pas déranger » revient à son état
+    /// d'avant, sauf si on l'a changé entre-temps.
+    fn end_focus(&self) {
+        if self.focus_dnd.take() == Some(false) && self.dnd.get() {
+            self.set_dnd(false);
+        }
+    }
+
+    /// Où en est la session de concentration (pour la mascotte).
+    fn focus_state(&self) -> Option<mascot::FocusState> {
+        let timer = self.timer.borrow();
+        let t = timer.as_ref().filter(|t| t.focus)?;
+        match t.phase {
+            TimerPhase::Running | TimerPhase::Paused => Some(mascot::FocusState::Running),
+            TimerPhase::Done => Some(mascot::FocusState::Done),
+            TimerPhase::Idle => None,
+        }
     }
 
     fn timer_config(&self) -> TimerConfig {
@@ -1558,7 +1604,17 @@ impl Controller {
                     .map(|m| slint::SharedString::from(m.to_string()))
                     .collect::<Vec<_>>(),
             )),
+            focus: t.focus,
+            focus_minutes: if t.focus_minutes > 0 {
+                t.focus_minutes.to_string().into()
+            } else {
+                Default::default()
+            },
         });
+        // Barre de la pilule repliée : avance à chaque minute (réveil du module).
+        let focusing = t.focus && matches!(t.phase, TimerPhase::Running | TimerPhase::Paused);
+        self.ui.set_focus_visible(focusing);
+        self.ui.set_focus_progress(t.progress_now(now));
         let ticking = self.expanded.get() && t.phase == TimerPhase::Running;
         if ticking && !self.timer_tick.running() {
             self.timer_tick
@@ -2046,7 +2102,13 @@ impl Controller {
             self.ui.set_mascot_animated(false);
             return;
         }
-        let mood = mascot::mood(claude, self.music_playing(), self.away.get(), now.hour());
+        let mood = mascot::mood(
+            claude,
+            self.focus_state(),
+            self.music_playing(),
+            self.away.get(),
+            now.hour(),
+        );
 
         // Au repos, au centre ; à la place du point quand Claude a la pilule ;
         // à droite quand c'est la musique (pochette à gauche) ; cachée sinon.

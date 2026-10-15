@@ -90,6 +90,14 @@ pub enum ClaudeState {
     Done,
 }
 
+/// Session de concentration (minuteur « Focus »).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FocusState {
+    Running,
+    /// Terminée : annoncée quelques secondes.
+    Done,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mood {
     Idle,
@@ -103,6 +111,8 @@ pub enum Mood {
     Wait,
     Happy,
     Music,
+    /// Session de concentration : yeux plissés, immobile.
+    Focus,
 }
 
 impl Mood {
@@ -117,6 +127,7 @@ impl Mood {
             Self::Wait => "wait",
             Self::Happy => "happy",
             Self::Music => "music",
+            Self::Focus => "focus",
         }
     }
 
@@ -126,13 +137,25 @@ impl Mood {
     }
 }
 
-/// Humeur du moment. Claude passe avant la musique, la musique avant le
-/// sommeil, le sommeil avant l'heure de la journée.
-pub fn mood(claude: Option<ClaudeState>, music: bool, away: bool, hour: u32) -> Mood {
+/// Humeur du moment. Claude passe avant la concentration, la concentration
+/// avant la musique (elle ne danse pas pendant une session), la musique avant
+/// le sommeil, le sommeil avant l'heure de la journée.
+pub fn mood(
+    claude: Option<ClaudeState>,
+    focus: Option<FocusState>,
+    music: bool,
+    away: bool,
+    hour: u32,
+) -> Mood {
     match claude {
         Some(ClaudeState::Waiting) => return Mood::Wait,
         Some(ClaudeState::Working) => return Mood::Work,
         Some(ClaudeState::Done) => return Mood::Happy,
+        None => {}
+    }
+    match focus {
+        Some(FocusState::Running) => return Mood::Focus,
+        Some(FocusState::Done) => return Mood::Happy,
         None => {}
     }
     if music {
@@ -185,18 +208,37 @@ mod tests {
 
     #[test]
     fn claude_first_then_music_then_sleep_then_time() {
-        assert_eq!(mood(Some(ClaudeState::Waiting), true, true, 12), Mood::Wait);
         assert_eq!(
-            mood(Some(ClaudeState::Working), true, false, 12),
+            mood(Some(ClaudeState::Waiting), None, true, true, 12),
+            Mood::Wait
+        );
+        assert_eq!(
+            mood(Some(ClaudeState::Working), None, true, false, 12),
             Mood::Work
         );
-        assert_eq!(mood(Some(ClaudeState::Done), false, false, 12), Mood::Happy);
-        assert_eq!(mood(None, true, true, 23), Mood::Music);
-        assert_eq!(mood(None, false, true, 12), Mood::Sleep);
-        assert_eq!(mood(None, false, false, 22), Mood::Evening);
-        assert_eq!(mood(None, false, false, 3), Mood::Evening);
-        assert_eq!(mood(None, false, false, 8), Mood::Morning);
-        assert_eq!(mood(None, false, false, 15), Mood::Idle);
+        assert_eq!(
+            mood(Some(ClaudeState::Done), None, false, false, 12),
+            Mood::Happy
+        );
+        assert_eq!(mood(None, None, true, true, 23), Mood::Music);
+        assert_eq!(mood(None, None, false, true, 12), Mood::Sleep);
+        assert_eq!(mood(None, None, false, false, 22), Mood::Evening);
+        assert_eq!(mood(None, None, false, false, 3), Mood::Evening);
+        assert_eq!(mood(None, None, false, false, 8), Mood::Morning);
+        assert_eq!(mood(None, None, false, false, 15), Mood::Idle);
+        // Concentration : après Claude, avant la musique ; contente à la fin.
+        let focus = Some(FocusState::Running);
+        assert_eq!(mood(None, focus, true, false, 15), Mood::Focus);
+        assert_eq!(
+            mood(Some(ClaudeState::Waiting), focus, true, false, 15),
+            Mood::Wait
+        );
+        assert_eq!(
+            mood(None, Some(FocusState::Done), true, false, 15),
+            Mood::Happy
+        );
+        // Immobile : pas de minuterie pendant toute une session.
+        assert!(!Mood::Focus.is_lively());
         assert!(Mood::Music.is_lively() && !Mood::Sleep.is_lively());
     }
 
