@@ -1,7 +1,8 @@
 //! Vérifie que chaque texte `@tr("…")` des fichiers Slint a sa traduction
 //! française dans `lang/fr/LC_MESSAGES/bw-app.po`.
 
-const SLINT: [(&str, &str); 3] = [
+const SLINT: [(&str, &str); 4] = [
+    ("ask.slint", include_str!("../ui/ask.slint")),
     ("quickadd.slint", include_str!("../ui/quickadd.slint")),
     ("island.slint", include_str!("../ui/island.slint")),
     ("settings.slint", include_str!("../ui/settings.slint")),

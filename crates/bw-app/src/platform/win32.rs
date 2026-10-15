@@ -90,6 +90,7 @@ pub fn single_instance() -> Option<SingleInstance> {
 
 thread_local! {
     static CREATING_ISLAND: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static CREATING_POPUP: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// Crée l'île : seules les fenêtres créées dans `f` reçoivent les attributs
@@ -101,6 +102,15 @@ pub fn creating_island<R>(f: impl FnOnce() -> R) -> R {
     result
 }
 
+/// Crée une fenêtre de saisie sous l'île (question à Claude…) : transparente et
+/// sans cadre comme l'île, mais elle prend le clavier.
+pub fn creating_popup<R>(f: impl FnOnce() -> R) -> R {
+    CREATING_POPUP.set(true);
+    let result = f();
+    CREATING_POPUP.set(false);
+    result
+}
+
 pub fn configure_backend(selector: BackendSelector) -> BackendSelector {
     selector.with_winit_window_attributes_hook(window_attributes)
 }
@@ -108,6 +118,13 @@ pub fn configure_backend(selector: BackendSelector) -> BackendSelector {
 /// Attributs appliqués dès la création : la fenêtre n'apparaît jamais dans la
 /// barre des tâches et ne prend pas le focus en s'affichant.
 fn window_attributes(attrs: WindowAttributes) -> WindowAttributes {
+    if CREATING_POPUP.get() {
+        return attrs
+            .with_skip_taskbar(true)
+            .with_transparent(true)
+            .with_decorations(false)
+            .with_resizable(false);
+    }
     if !CREATING_ISLAND.get() {
         return attrs;
     }

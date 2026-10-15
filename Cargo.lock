@@ -469,6 +469,7 @@ version = "0.7.0"
 dependencies = [
  "anyhow",
  "block2 0.6.2",
+ "bw-ask",
  "bw-calendar",
  "bw-claude",
  "bw-config",
@@ -507,6 +508,20 @@ dependencies = [
  "tray-icon",
  "windows",
  "windows-numerics",
+]
+
+[[package]]
+name = "bw-ask"
+version = "0.7.0"
+dependencies = [
+ "anyhow",
+ "bw-i18n",
+ "bw-net",
+ "bw-secrets",
+ "log",
+ "serde",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]

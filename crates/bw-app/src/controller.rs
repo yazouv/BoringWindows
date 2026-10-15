@@ -32,15 +32,17 @@ use crate::platform::{self, Platform, PlatformEvent, Tray, TrayCommand};
 use crate::shelf::{Shelf, ShelfConfig};
 use crate::tasks::{Tasks, TasksConfig};
 use crate::{
-    AgendaRow, ClaudePrompt, ClaudeRow, GaugeInfo, GithubInfo, Island, MediaInfo, NetworkInfo,
-    NotifInfo, PluginRow, QuickAddWindow, RecentRow, ShelfRow, SystemInfo, TaskRow, TimerInfo,
-    WeatherInfo, clock, demo,
+    AgendaRow, AskWindow, ClaudePrompt, ClaudeRow, GaugeInfo, GithubInfo, Island, MediaInfo,
+    NetworkInfo, NotifInfo, PluginRow, QuickAddWindow, RecentRow, ShelfRow, SystemInfo, TaskRow,
+    TimerInfo, WeatherInfo, clock, demo,
 };
 
 /// Pseudo-module utilisé pour signaler une config invalide dans l'île.
 const CONFIG_ERROR: &str = "config";
 /// Pseudo-module des messages brefs de l'app (« hooks installés »…).
 const FLASH: &str = "app";
+/// Pseudo-module de la question en cours (« Claude réfléchit… »).
+const ASK: &str = "ask";
 /// Lignes (agenda + sessions Claude) qui tiennent dans l'île ouverte, avec ou
 /// sans la carte du lecteur.
 const MAX_ROWS: usize = 4;
@@ -66,6 +68,8 @@ fn spring_settle(animation_ms: u32) -> Duration {
 /// Île ouverte par raccourci : elle se referme après ce délai si la souris
 /// ne vient pas dessus.
 const HOTKEY_OPEN: Duration = Duration::from_secs(6);
+/// Île ouverte par une réponse : le temps de la lire, si la souris ne vient pas.
+const ASK_OPEN: Duration = Duration::from_secs(20);
 /// Processeur ou mémoire au-delà : affichés en couleur d'alerte.
 const HOT_PERCENT: f32 = 90.0;
 
@@ -166,6 +170,11 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         tasks_path: RefCell::new(PathBuf::new()),
         tasks_stamp: Cell::new(None),
         quick_add: RefCell::new(None),
+        ask_window: RefCell::new(None),
+        ask_models: RefCell::new(Vec::new()),
+        ask_remote: RefCell::new(Vec::new()),
+        ask_keys: RefCell::new((String::new(), String::new())),
+        ask_seq: Cell::new(0),
         capture_timer: Timer::default(),
         toast_timer: Timer::default(),
         hotkeys: RefCell::new(None),
@@ -264,6 +273,16 @@ pub struct Controller {
     tasks_stamp: Cell<Option<std::time::SystemTime>>,
     /// Fenêtre d'ajout d'une tâche (créée à la première demande).
     quick_add: RefCell<Option<QuickAddWindow>>,
+    /// Fenêtre de saisie d'une question (créée à la première demande).
+    ask_window: RefCell<Option<AskWindow>>,
+    /// Identifiants des modèles de la liste de la fenêtre, dans son ordre.
+    ask_models: RefCell<Vec<String>>,
+    /// Modèles que les fournisseurs annoncent pour les clés enregistrées.
+    ask_remote: RefCell<Vec<bw_ask::ModelInfo>>,
+    /// Les clés (références) pour lesquelles `ask_remote` a été demandée.
+    ask_keys: RefCell<(String, String)>,
+    /// Numéro de la dernière question : une réponse en retard est ignorée.
+    ask_seq: Cell<u64>,
     /// Revérifie le premier plan une fois l'ouverture de l'outil de capture posée.
     capture_timer: Timer,
     toast_timer: Timer,
@@ -278,6 +297,7 @@ impl Controller {
         self.reload_custom_view();
         self.update_shelf_ui();
         self.apply_tasks();
+        self.apply_ask();
         let (choice, size) = self.placement();
         if let Some(pos) = platform::initial_position(choice, size) {
             self.ui.window().set_position(pos);
@@ -347,6 +367,10 @@ impl Controller {
         self.ui
             .on_task_action(with(&weak, |c, action: slint::SharedString| {
                 c.tasks_action(&action);
+            }));
+        self.ui
+            .on_ask_action(with(&weak, |c, action: slint::SharedString| {
+                c.ask_action(&action);
             }));
         self.ui.on_dnd_toggle({
             let weak = weak.clone();
@@ -870,6 +894,7 @@ impl Controller {
         }
         self.update_shelf_ui();
         self.apply_tasks();
+        self.apply_ask();
         if moved {
             self.place();
         }
@@ -2347,24 +2372,303 @@ impl Controller {
             )
             .into(),
         );
-        // Centrée sous l'île, qui est en haut de l'écran.
-        let scale = self.ui.window().scale_factor();
-        let island = self.ui.window();
-        let (pos, size) = (island.position(), island.size());
-        let width = (window.window().size().width as f32).max(480.0 * scale);
-        let x = pos.x as f32 + size.width as f32 / 2.0 - width / 2.0;
-        let y = pos.y as f32 + (self.theme().top_offset + 64.0) * scale;
-        window
-            .window()
-            .set_position(slint::PhysicalPosition::new(x as i32, y as i32));
+        self.place_under_island(window.window(), 480.0);
         let _ = window.show();
         platform::focus_tool_window(window.window());
         window.invoke_focus_input();
     }
 
+    /// Centre une petite fenêtre de saisie sous l'île, qui est en haut de l'écran.
+    fn place_under_island(&self, window: &slint::Window, logical_width: f32) {
+        let scale = self.ui.window().scale_factor();
+        let island = self.ui.window();
+        let (pos, size) = (island.position(), island.size());
+        let width = (window.size().width as f32).max(logical_width * scale);
+        let x = pos.x as f32 + size.width as f32 / 2.0 - width / 2.0;
+        let y = pos.y as f32 + (self.theme().top_offset + 64.0) * scale;
+        window.set_position(slint::PhysicalPosition::new(x as i32, y as i32));
+    }
+
     fn close_quick_add(&self) {
         if let Some(window) = self.quick_add.borrow().as_ref() {
             let _ = window.hide();
+        }
+    }
+
+    // --- Questions à Claude ou Gemini --------------------------------------------
+
+    fn ask_config(&self) -> bw_ask::AskConfig {
+        bw_ask::AskConfig::from_table(self.config.borrow().modules.get(bw_ask::MODULE_ID))
+            .unwrap_or_default()
+    }
+
+    /// Appliqué à chaque changement de config : désactivé, tout disparaît.
+    fn apply_ask(&self) {
+        let config = self.ask_config();
+        if !config.enabled {
+            self.dismiss_ask();
+            if let Some(window) = self.ask_window.borrow().as_ref() {
+                let _ = window.hide();
+            }
+            return;
+        }
+        // Nouvelle clé : on redemande aux fournisseurs ce qu'ils ouvrent à ce compte.
+        let keys = (
+            config.claude_key.trim().to_owned(),
+            config.gemini_key.trim().to_owned(),
+        );
+        if *self.ask_keys.borrow() != keys {
+            *self.ask_keys.borrow_mut() = keys;
+            self.refresh_ask_models(config);
+        }
+    }
+
+    /// Demande la liste des modèles à chaque fournisseur dont on a la clé : un
+    /// modèle retiré, ou pas encore ouvert à ce compte, répondrait « inconnu ».
+    fn refresh_ask_models(&self, config: bw_ask::AskConfig) {
+        let providers: Vec<bw_ask::Provider> = [bw_ask::Provider::Claude, bw_ask::Provider::Gemini]
+            .into_iter()
+            .filter(|p| config.has_key(*p))
+            .collect();
+        if providers.is_empty() {
+            self.ask_remote.borrow_mut().clear();
+            return;
+        }
+        let spawned = std::thread::Builder::new()
+            .name("bw-ask-models".into())
+            .spawn(move || {
+                let mut models = Vec::new();
+                for provider in providers {
+                    match bw_ask::list_models(&config, provider) {
+                        Ok(list) => models.extend(list),
+                        Err(e) => log::warn!("modèles {} : {e}", provider.name()),
+                    }
+                }
+                post(move |c| {
+                    *c.ask_remote.borrow_mut() = models;
+                    c.refresh_settings_ask();
+                });
+            });
+        if let Err(e) = spawned {
+            log::warn!("modèles : thread impossible : {e}");
+        }
+    }
+
+    /// Nom d'un modèle pour l'affichage : celui que le fournisseur annonce.
+    fn ask_label(&self, model: &str) -> String {
+        let (models, index) = self::settings::ask_models(model, &self.ask_remote.borrow());
+        usize::try_from(index)
+            .ok()
+            .and_then(|i| models.into_iter().nth(i))
+            .map_or_else(|| model.to_owned(), |m| m.label)
+    }
+
+    /// La petite fenêtre de saisie, sous l'île : l'île ne reçoit jamais le clavier.
+    fn open_ask(self: &Rc<Self>, prefill: &str) {
+        let config = self.ask_config();
+        if !config.enabled {
+            return;
+        }
+        if self.ask_window.borrow().is_none() {
+            // Transparente et sans cadre, comme l'île : seule la carte se voit.
+            let window = match platform::creating_popup(AskWindow::new) {
+                Ok(w) => w,
+                Err(e) => {
+                    log::error!("fenêtre de question : {e}");
+                    return;
+                }
+            };
+            let weak = Rc::downgrade(self);
+            // La liste des modèles se déplie sous la carte : la fenêtre grandit.
+            window.on_resized({
+                let weak = weak.clone();
+                move || {
+                    if let Some(c) = weak.upgrade()
+                        && let Some(w) = c.ask_window.borrow().as_ref()
+                    {
+                        w.window()
+                            .set_size(slint::LogicalSize::new(600.0, w.get_wanted_height()));
+                    }
+                }
+            });
+            window.on_accepted({
+                let weak = weak.clone();
+                move |text| {
+                    if let Some(c) = weak.upgrade() {
+                        c.close_ask_window();
+                        c.submit_ask(&text);
+                    }
+                }
+            });
+            window.on_cancelled({
+                let weak = weak.clone();
+                move || {
+                    if let Some(c) = weak.upgrade() {
+                        c.close_ask_window();
+                    }
+                }
+            });
+            window.on_model_selected(move |index| {
+                if let Some(c) = weak.upgrade() {
+                    c.pick_ask_model(index);
+                }
+            });
+            *self.ask_window.borrow_mut() = Some(window);
+        }
+        let window = self.ask_window.borrow();
+        let Some(window) = window.as_ref() else {
+            return;
+        };
+        let (models, index) = self::settings::ask_models(&config.model, &self.ask_remote.borrow());
+        window.set_models(ModelRc::new(VecModel::from(
+            models
+                .iter()
+                .map(|m| slint::SharedString::from(m.label.as_str()))
+                .collect::<Vec<_>>(),
+        )));
+        window.set_model_index(index);
+        *self.ask_models.borrow_mut() = models.into_iter().map(|m| m.id).collect();
+        window.set_text(prefill.into());
+        window.set_picking(false);
+        window.set_hint(
+            tr!(
+                "Enter asks · Shift+Enter new line · Esc cancels",
+                "Entrée envoie · Maj+Entrée va à la ligne · Échap annule"
+            )
+            .into(),
+        );
+        // Aux couleurs de l'île (thème, accent de Windows compris).
+        window.set_bg(self.ui.get_bg());
+        window.set_fg(self.ui.get_fg());
+        window.set_accent(self.ui.get_accent());
+        window.set_border(self.ui.get_border());
+        window.set_font(self.ui.get_font());
+        window
+            .window()
+            .set_size(slint::LogicalSize::new(600.0, window.get_wanted_height()));
+        self.place_under_island(window.window(), 600.0);
+        let _ = window.show();
+        platform::focus_tool_window(window.window());
+        window.invoke_focus_input();
+    }
+
+    fn close_ask_window(&self) {
+        if let Some(window) = self.ask_window.borrow().as_ref() {
+            let _ = window.hide();
+        }
+    }
+
+    /// Modèle choisi dans la fenêtre : il sert tout de suite, et il est retenu.
+    fn pick_ask_model(&self, index: i32) {
+        let id = usize::try_from(index)
+            .ok()
+            .and_then(|i| self.ask_models.borrow().get(i).cloned());
+        let Some(id) = id else { return };
+        let result = self.edit_now(|e| {
+            e.set(&["modules", "ask", "model"], bw_config::Value::Str(id));
+        });
+        if let Err(e) = result {
+            log::warn!("question : modèle non enregistré : {e}");
+        }
+    }
+
+    /// Envoie la question au fournisseur, sur un thread à part.
+    fn submit_ask(self: &Rc<Self>, question: &str) {
+        let question = question.trim().to_owned();
+        if question.is_empty() {
+            return;
+        }
+        // Le modèle choisi dans la fenêtre peut ne pas être encore relu de la config.
+        let mut config = self.ask_config();
+        if let Some(index) = self
+            .ask_window
+            .borrow()
+            .as_ref()
+            .map(|w| w.get_model_index())
+            && let Some(id) = usize::try_from(index)
+                .ok()
+                .and_then(|i| self.ask_models.borrow().get(i).cloned())
+        {
+            config.model = id;
+        }
+        let name = self.ask_label(&config.model);
+        let seq = self.ask_seq.get() + 1;
+        self.ask_seq.set(seq);
+        self.ui.set_ask_title(name.as_str().into());
+        self.ui.set_ask_question(question.as_str().into());
+        self.ui.set_ask_text("".into());
+        self.ui.set_ask_state(1);
+        let provider = config.provider().name();
+        self.arbiter.borrow_mut().claim(
+            ASK,
+            Attention::High,
+            Some(tr!("Asking {provider}…", "Question à {provider}…")),
+        );
+        self.refresh_shape();
+        log::info!(
+            "question à {name} ({} caractères)",
+            question.chars().count()
+        );
+        let spawned = std::thread::Builder::new()
+            .name("bw-ask".into())
+            .spawn(move || {
+                let result = bw_ask::ask(&config, &question);
+                post(move |c| c.on_ask_answer(seq, result));
+            });
+        if let Err(e) = spawned {
+            log::error!("question : thread impossible : {e}");
+            self.on_ask_answer(
+                seq,
+                Err(tr!("Could not send the question", "Envoi impossible")),
+            );
+        }
+    }
+
+    fn on_ask_answer(self: &Rc<Self>, seq: u64, result: Result<String, String>) {
+        // Une autre question est partie depuis, ou la carte a été fermée.
+        if seq != self.ask_seq.get() {
+            return;
+        }
+        self.arbiter.borrow_mut().claim(ASK, Attention::None, None);
+        match result {
+            Ok(text) => {
+                self.ui.set_ask_text(text.as_str().into());
+                self.ui.set_ask_state(2);
+                self.flash(&tr!("Answer ready", "Réponse prête"));
+            }
+            Err(e) => {
+                log::warn!("question : {e}");
+                self.ui.set_ask_text(e.as_str().into());
+                self.ui.set_ask_state(3);
+                self.flash(&tr!("The question failed", "La question a échoué"));
+            }
+        }
+        // En appel ou en partage d'écran, rien ne s'ouvre tout seul : la carte
+        // attend dans l'île.
+        if !self.live.get() {
+            self.set_expanded(true);
+            self.schedule_collapse(ASK_OPEN);
+        }
+    }
+
+    /// Ferme la carte de réponse (et abandonne la question en cours).
+    fn dismiss_ask(&self) {
+        self.ask_seq.set(self.ask_seq.get() + 1);
+        if self.ui.get_ask_state() != 0 {
+            self.ui.set_ask_state(0);
+            self.arbiter.borrow_mut().claim(ASK, Attention::None, None);
+            self.refresh_shape();
+        }
+    }
+
+    fn ask_action(self: &Rc<Self>, action: &str) {
+        match action {
+            "dismiss" => self.dismiss_ask(),
+            "again" => {
+                let previous = self.ui.get_ask_question().to_string();
+                self.open_ask(&previous);
+            }
+            _ => {}
         }
     }
 
@@ -2382,6 +2686,10 @@ impl Controller {
             let mut config = self.config.borrow().hotkeys.clone();
             if !self.tasks_config().enabled {
                 config.quick_add.clear();
+            }
+            // Idem pour la question à Claude ou Gemini.
+            if !self.ask_config().enabled {
+                config.ask.clear();
             }
             hotkeys.apply(&config)
         };
@@ -2430,6 +2738,7 @@ impl Controller {
             }
             HotkeyAction::DoNotDisturb => self.toggle_dnd_with_feedback(),
             HotkeyAction::QuickAdd => self.open_quick_add(),
+            HotkeyAction::Ask => self.open_ask(""),
         }
     }
 
@@ -2525,6 +2834,13 @@ impl Controller {
 fn build_modules(config: &Config) -> (Vec<Box<dyn Module>>, Vec<String>) {
     let mut modules: Vec<Box<dyn Module>> = Vec::new();
     let mut errors = Vec::new();
+    // Pas un module (le contrôleur la gère, comme les tâches) : on la vérifie ici
+    // pour que les réglages et le rechargement à chaud signalent une erreur.
+    if config.module_enabled(bw_ask::MODULE_ID, false)
+        && let Err(e) = bw_ask::AskConfig::from_table(config.modules.get(bw_ask::MODULE_ID))
+    {
+        errors.push(format!("modules.ask : {e:#}"));
+    }
     if config.module_enabled(bw_claude::MODULE_ID, true) {
         match ClaudeConfig::from_table(config.modules.get(bw_claude::MODULE_ID)) {
             Ok(c) => modules.push(Box::new(ClaudeModule::new(c, bw_claude::ipc::endpoint()))),

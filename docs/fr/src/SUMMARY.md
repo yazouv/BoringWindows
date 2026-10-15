@@ -22,6 +22,7 @@
 - [Transferts de fichiers](transferts.md)
 - [GitHub](github.md)
 - [Tâches rapides](taches.md)
+- [Questions à Claude ou Gemini](question.md)
 - [Mascotte](mascotte.md)
 - [Gestes](gestes.md)
 - [Mode présentation](presentation.md)

@@ -761,3 +761,51 @@ msgstr "tasks.md à côté de config.toml : une ligne \"- [ ] tâche\" par tâch
 
 msgid "Open"
 msgstr "Ouvrir"
+
+msgid "Ask"
+msgstr "Question"
+
+msgid "Ask a question…"
+msgstr "Pose une question…"
+
+msgid "Ask again"
+msgstr "Reposer"
+
+msgid "Thinking…"
+msgstr "Réflexion…"
+
+msgid "Ask Claude or Gemini"
+msgstr "Questions à Claude ou Gemini"
+
+msgid "Ask from the island"
+msgstr "Poser des questions depuis l'île"
+
+msgid "A shortcut opens a box under the island: type a question, and the answer shows in the island."
+msgstr "Un raccourci ouvre un champ sous l'île : tape une question, la réponse s'affiche dans l'île."
+
+msgid "Model"
+msgstr "Modèle"
+
+msgid "Picks the provider too. Other models: edit modules.ask.model in config.toml."
+msgstr "Choisit aussi le fournisseur. Autres modèles : modifie modules.ask.model dans config.toml."
+
+msgid "Claude API key"
+msgstr "Clé d'API Claude"
+
+msgid "Gemini API key"
+msgstr "Clé d'API Gemini"
+
+msgid "A key is saved in the Windows Credential Manager."
+msgstr "Une clé est enregistrée dans le Gestionnaire d'identifiants de Windows."
+
+msgid "From console.anthropic.com. Paste it and press Enter: it goes to the Windows Credential Manager."
+msgstr "Depuis console.anthropic.com. Colle-la et appuie sur Entrée : elle va dans le Gestionnaire d'identifiants de Windows."
+
+msgid "From aistudio.google.com. Paste it and press Enter: it goes to the Windows Credential Manager."
+msgstr "Depuis aistudio.google.com. Colle-la et appuie sur Entrée : elle va dans le Gestionnaire d'identifiants de Windows."
+
+msgid "Shortcut"
+msgstr "Raccourci"
+
+msgid "Each question is sent alone to the provider you picked, with your key. Nothing else leaves your PC."
+msgstr "Chaque question part seule chez le fournisseur choisi, avec ta clé. Rien d'autre ne quitte ton PC."

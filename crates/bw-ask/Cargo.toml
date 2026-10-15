@@ -1,0 +1,20 @@
+[package]
+name = "bw-ask"
+description = "Poser une question à Claude ou à Gemini depuis l'île de BoringWindows"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+bw-i18n.workspace = true
+bw-net.workspace = true
+bw-secrets.workspace = true
+anyhow.workspace = true
+log.workspace = true
+serde.workspace = true
+serde_json = "1"
+toml.workspace = true
+
+[lints]
+workspace = true

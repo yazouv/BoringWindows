@@ -31,6 +31,7 @@ bw-system = { path = "crates/bw-system" }
 bw-network = { path = "crates/bw-network" }
 bw-transfers = { path = "crates/bw-transfers" }
 bw-github = { path = "crates/bw-github" }
+bw-ask = { path = "crates/bw-ask" }
 anyhow = "1"
 log = "0.4"
 serde = { version = "1", features = ["derive"] }

@@ -69,6 +69,8 @@ previous_track = ""
 do_not_disturb = ""
 # Add a task (when tasks are enabled).
 quick_add = "Ctrl+Alt+N"
+# Ask Claude or Gemini a question (when modules.ask is enabled).
+ask = "Ctrl+Alt+Space"
 
 # Each module is configured in its [modules.<name>] section.
 # A module with enabled = false is not even started.
@@ -225,6 +227,23 @@ show_secs = 6
 enabled = false
 # Markdown file ("- [ ]" checkboxes), next to config.toml; empty: tasks.md.
 file = ""
+
+[modules.ask]
+# Ask Claude or Gemini a question: the hotkeys.ask shortcut opens a box under the
+# island, and the answer shows in the island.
+enabled = false
+# The model also picks the provider: "claude-…" or "gemini-…".
+# Offered: claude-haiku-5-5, claude-sonnet-5-5, claude-opus-5-5,
+# gemini-2.5-flash-lite, gemini-2.5-flash, gemini-2.5-pro.
+model = "claude-sonnet-5-5"
+# API keys: "secret:<id>" (filled by the settings, OS vault) or the key itself.
+# One is enough: the one of the provider you use.
+claude_key = ""
+gemini_key = ""
+# Maximum answer length (tokens, 64 to 8192).
+max_tokens = 1024
+# Instruction given to the model; empty: short plain-text answers.
+system = ""
 
 [modules.mascot]
 # The mascot: a little blob in the pill that reacts to Claude Code, dances to

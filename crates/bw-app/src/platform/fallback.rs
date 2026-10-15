@@ -132,6 +132,10 @@ pub fn creating_island<R>(f: impl FnOnce() -> R) -> R {
     f()
 }
 
+pub fn creating_popup<R>(f: impl FnOnce() -> R) -> R {
+    f()
+}
+
 /// Pas de sélecteur de fichier natif ici : le chemin se tape à la main.
 pub fn pick_ics_file() -> Option<std::path::PathBuf> {
     None

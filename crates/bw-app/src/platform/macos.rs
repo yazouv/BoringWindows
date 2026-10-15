@@ -79,6 +79,7 @@ type EventCallback = Box<dyn Fn(PlatformEvent)>;
 
 thread_local! {
     static CREATING_ISLAND: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static CREATING_POPUP: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static ISLAND: RefCell<Option<IslandState>> = const { RefCell::new(None) };
     static ON_EVENT: RefCell<Option<EventCallback>> = const { RefCell::new(None) };
     /// Moniteur posé par `watch_user_return`, retiré à la première saisie.
@@ -91,6 +92,15 @@ pub fn creating_island<R>(f: impl FnOnce() -> R) -> R {
     CREATING_ISLAND.set(true);
     let result = f();
     CREATING_ISLAND.set(false);
+    result
+}
+
+/// Crée une fenêtre de saisie sous l'île (question à Claude…) : transparente et
+/// sans cadre comme l'île, mais elle prend le clavier.
+pub fn creating_popup<R>(f: impl FnOnce() -> R) -> R {
+    CREATING_POPUP.set(true);
+    let result = f();
+    CREATING_POPUP.set(false);
     result
 }
 
@@ -108,6 +118,13 @@ pub fn configure_backend(selector: BackendSelector) -> BackendSelector {
 }
 
 fn window_attributes(attrs: WindowAttributes) -> WindowAttributes {
+    if CREATING_POPUP.get() {
+        return attrs
+            .with_transparent(true)
+            .with_decorations(false)
+            .with_resizable(false)
+            .with_has_shadow(false);
+    }
     if !CREATING_ISLAND.get() {
         return attrs;
     }

@@ -42,6 +42,7 @@ Shortcuts that work in every app:
 | Previous track | `previous_track` | none |
 | Do not disturb | `do_not_disturb` | none |
 | Add a [task](taches.md) | `quick_add` | `Ctrl+Alt+N` (when tasks are enabled) |
+| [Ask a question](question.md) | `ask` | `Ctrl+Alt+Space` (when enabled) |
 
 When opened with the keyboard, the island closes by itself after 6 seconds if
 the mouse doesn't come over it (or on the next press of the shortcut).
