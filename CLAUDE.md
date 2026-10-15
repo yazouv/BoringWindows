@@ -48,6 +48,7 @@ GitHub-hosted runners only (free for a public repo). Never add a self-hosted run
 - **Commit messages must follow Conventional Commits** (`feat:`, `fix:`, `docs:`, `chore:`…). release-please derives the version and changelog from them.
 - Never bump versions by hand. release-please owns `[workspace.package] version` in `Cargo.toml`, plus `version.txt`, `CHANGELOG.md` and the manifest.
 - **`docs.yml`**: builds the mdBook on PRs touching `docs/`, and publishes it to GitHub Pages when `docs/` changes on `main`.
+- **`codeql.yml`** (advanced setup; GitHub's default setup is turned off, the two cannot coexist): the `actions` analysis runs on every PR (under a minute); the Rust analysis (about 15 min) only on pushes to `main`, weekly and on dispatch, so it never slows a PR. Neither is a required check; Rust alerts show up after the merge, in the Security tab. Keep the categories `/language:actions` and `/language:rust` so existing alerts stay matched.
 
 ## Architecture
 

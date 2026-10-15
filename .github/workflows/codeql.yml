@@ -1,0 +1,65 @@
+name: CodeQL
+
+# Analyse de sécurité CodeQL, en configuration avancée (la configuration par
+# défaut de GitHub est désactivée : les deux ne peuvent pas coexister).
+#
+# - Workflows (`actions`) : sur chaque PR, c'est rapide (moins d'une minute).
+# - Rust : seulement sur main et chaque semaine. L'analyse prend un quart
+#   d'heure (toutes les dépendances, Slint et windows-rs compris) et rallongeait
+#   chaque PR ; elle n'est pas un check obligatoire, une alerte arrive donc
+#   après la fusion, dans l'onglet Security.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths-ignore: ["docs/**", "**.md"]
+  schedule:
+    - cron: "41 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  actions:
+    name: Analyze (actions)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          languages: actions
+          build-mode: none
+      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          category: /language:actions
+
+  rust:
+    name: Analyze (rust)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Extraction sans compilation, comme la configuration par défaut.
+      - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          languages: rust
+          build-mode: none
+      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          category: /language:rust
