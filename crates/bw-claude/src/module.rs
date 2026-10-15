@@ -343,3 +343,106 @@ mod tests {
         assert!(start.elapsed() < hook::CONNECT_BUDGET + Duration::from_millis(100));
     }
 }
+
+#[cfg(test)]
+mod restart_tests {
+    use std::sync::mpsc;
+
+    use bw_core::{Action, ModuleEvent, ModuleEventKind, ModuleHost};
+
+    use super::*;
+    use crate::event::HookEvent;
+    use crate::hook;
+
+    fn permission_request() -> Message {
+        Message {
+            v: ipc::PROTOCOL_VERSION,
+            wants_reply: true,
+            ancestors: vec![],
+            console_window: None,
+            event: HookEvent {
+                session_id: "s1".into(),
+                cwd: "/dev/boring".into(),
+                kind: "PermissionRequest".into(),
+                tool_name: Some("Bash".into()),
+                tool_detail: Some("cargo test".into()),
+                ..HookEvent::default()
+            },
+        }
+    }
+
+    fn start(endpoint: &str) -> (ModuleHost, mpsc::Receiver<ModuleEvent>) {
+        let (tx, rx) = mpsc::channel();
+        let module = ClaudeModule::new(ClaudeConfig::default(), endpoint.to_owned());
+        let host = ModuleHost::spawn(vec![Box::new(module)], move |e| {
+            let _ = tx.send(e);
+        })
+        .unwrap();
+        (host, rx)
+    }
+
+    /// Relaie une demande depuis un autre thread. Le module démarre en
+    /// arrière-plan : on réessaie tant qu'il n'écoute pas (5 s au plus).
+    fn relay_soon(endpoint: &str) -> std::thread::JoinHandle<hook::Outcome> {
+        let endpoint = endpoint.to_owned();
+        std::thread::spawn(move || {
+            let deadline = Instant::now() + Duration::from_secs(5);
+            loop {
+                match hook::relay(&endpoint, &permission_request()) {
+                    hook::Outcome::Unreachable(_) if Instant::now() < deadline => {
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                    outcome => break outcome,
+                }
+            }
+        })
+    }
+
+    fn wait_prompt(rx: &mpsc::Receiver<ModuleEvent>) -> u64 {
+        loop {
+            let event = rx.recv_timeout(Duration::from_secs(10)).unwrap();
+            if let ModuleEventKind::State(state) = event.kind
+                && let Some(prompt) = &state.downcast_ref::<Snapshot>().unwrap().prompt
+            {
+                break prompt.id;
+            }
+        }
+    }
+
+    /// La config change pendant qu'une demande attend : le module redémarre
+    /// et écoute de nouveau, la demande en attente repart au terminal.
+    #[test]
+    fn restart_while_a_permission_waits() {
+        #[cfg(unix)]
+        let dir = tempfile::tempdir().unwrap();
+        #[cfg(unix)]
+        let endpoint = dir.path().join("bw.sock").to_string_lossy().into_owned();
+        #[cfg(windows)]
+        let endpoint = format!(
+            r"\\.\pipe\boringwindows-test-restart-{}",
+            std::process::id()
+        );
+
+        let (host, rx) = start(&endpoint);
+        let pending = relay_soon(&endpoint);
+        wait_prompt(&rx);
+
+        // Ce que fait `Controller::restart_modules`.
+        host.shutdown();
+        let (host, rx) = start(&endpoint);
+        assert_eq!(pending.join().unwrap(), hook::Outcome::NoReply);
+
+        // Le nouveau module reçoit les demandes et y répond.
+        let next = relay_soon(&endpoint);
+        let id = wait_prompt(&rx);
+        host.send_action(Action {
+            module: MODULE_ID.into(),
+            name: format!("allow:{id}"),
+        });
+        assert_eq!(
+            next.join().unwrap(),
+            hook::Outcome::Decided(Decision::Allow)
+        );
+        host.shutdown();
+    }
+}
