@@ -50,7 +50,10 @@ fn main() -> anyhow::Result<()> {
         .renderer_name("femtovg".into());
     platform::configure_backend(selector).select()?;
 
-    controller::run(std::env::args().any(|a| a == "--settings"))
+    controller::run(
+        std::env::args().any(|a| a == "--settings"),
+        std::env::args().any(|a| a == "--welcome"),
+    )
 }
 
 /// `boringwindows doctor` : diagnostic Claude Code, affiché et enregistré.
