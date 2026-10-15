@@ -15,6 +15,7 @@ pub enum HotkeyAction {
     Previous,
     DoNotDisturb,
     QuickAdd,
+    Ask,
 }
 
 impl HotkeyAction {
@@ -26,6 +27,7 @@ impl HotkeyAction {
             "previous_track" => Self::Previous,
             "do_not_disturb" => Self::DoNotDisturb,
             "quick_add" => Self::QuickAdd,
+            "ask" => Self::Ask,
             _ => return None,
         })
     }
@@ -186,6 +188,7 @@ mod tests {
             previous_track: "nope".into(),
             do_not_disturb: String::new(),
             quick_add: "Ctrl+Alt+N".into(),
+            ask: String::new(),
         };
         let (found, errors) = bindings(&config);
         assert_eq!(

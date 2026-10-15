@@ -26,6 +26,7 @@ bw-system.workspace = true
 bw-network.workspace = true
 bw-transfers.workspace = true
 bw-github.workspace = true
+bw-ask.workspace = true
 bw-weather.workspace = true
 bw-timer.workspace = true
 bw-volume.workspace = true

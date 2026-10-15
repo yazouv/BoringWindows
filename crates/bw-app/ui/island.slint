@@ -1236,6 +1236,14 @@ export component Island inherits Window {
     // L'onglet Tâches (quatrième valeur de `tab`) vient en dernier.
     property <int> tasks-slot: 1 + (root.has-notif-tab ? 1 : 0) + (root.has-claude-tab ? 1 : 0);
     property <int> tab-slot: root.tab == 0 ? 0 : root.tab == 2 ? 1 : root.tab == 3 ? root.tasks-slot : root.claude-slot;
+    // Réponse à une question posée à Claude ou Gemini (raccourci hotkeys.ask) :
+    // 0 rien, 1 en attente, 2 réponse, 3 erreur. La carte couvre les onglets
+    // jusqu'à ce qu'on la ferme.
+    in property <int> ask-state;
+    in property <string> ask-title;
+    in property <string> ask-question;
+    in property <string> ask-text;
+    callback ask-action(string /* dismiss | again */);
     in property <bool> has-tasks-tab;
     in property <[TaskRow]> tasks-rows;
     in property <int> tasks-open;
@@ -3273,6 +3281,91 @@ export component Island inherits Window {
 
                                 clear-done-ta := TouchArea {
                                     clicked => { root.task-action("clear"); }
+                                }
+                            }
+                        }
+                    }
+
+                    // Réponse de Claude ou Gemini : une carte par-dessus les onglets,
+                    // qui reste jusqu'à ce qu'on la ferme (× ou nouvelle question).
+                    ask-card := Rectangle {
+                        property <bool> shown: root.expanded && !root.custom-view && root.ask-state != 0;
+                        width: parent.width;
+                        height: parent.height;
+                        background: root.bg.with-alpha(1);
+                        opacity: self.shown ? 1 : 0;
+                        visible: self.opacity > 0;
+                        animate opacity { duration: 160ms; }
+
+                        // Le fond de la carte ne laisse rien passer vers les onglets.
+                        TouchArea { }
+
+                        VerticalLayout {
+                            spacing: 6px;
+                            padding-top: 2px;
+
+                            HorizontalLayout {
+                                height: 20px;
+                                spacing: 8px;
+
+                                Text {
+                                    text: root.ask-title;
+                                    color: root.accent;
+                                    font-size: 12px;
+                                    font-weight: 700;
+                                    vertical-alignment: center;
+                                }
+
+                                Text {
+                                    text: root.ask-question;
+                                    color: root.fg.with-alpha(0.45);
+                                    font-size: 12px;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                    horizontal-stretch: 1;
+                                }
+
+                                if root.ask-state >= 2: Text {
+                                    text: @tr("Ask again");
+                                    color: ask-again-ta.has-hover ? root.accent : root.fg.with-alpha(0.6);
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    vertical-alignment: center;
+
+                                    ask-again-ta := TouchArea {
+                                        clicked => { root.ask-action("again"); }
+                                    }
+                                }
+
+                                Rectangle {
+                                    width: 20px;
+                                    border-radius: 10px;
+                                    background: ask-close-ta.has-hover ? root.fg.with-alpha(0.2) : transparent;
+
+                                    Text {
+                                        text: "×";
+                                        color: root.fg;
+                                        font-size: 15px;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+
+                                    ask-close-ta := TouchArea {
+                                        clicked => { root.ask-action("dismiss"); }
+                                    }
+                                }
+                            }
+
+                            Flickable {
+                                vertical-stretch: 1;
+                                content-height: ask-body.preferred-height;
+
+                                ask-body := Text {
+                                    width: parent.width;
+                                    text: root.ask-state == 1 ? @tr("Thinking…") : root.ask-text;
+                                    color: root.ask-state == 3 ? root.alert-color : root.ask-state == 1 ? root.fg.with-alpha(0.55) : root.fg;
+                                    font-size: 13px;
+                                    wrap: word-wrap;
                                 }
                             }
                         }

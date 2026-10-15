@@ -86,6 +86,7 @@ for example `"Ctrl+Alt+B"`; `""`: none.
 | `previous_track` | `""` | music: previous track |
 | `do_not_disturb` | `""` | turn "do not disturb" on or off |
 | `quick_add` | `"Ctrl+Alt+N"` | add a [task](taches.md) (when tasks are enabled) |
+| `ask` | `"Ctrl+Alt+Space"` | [ask a question](question.md) to Claude or Gemini (when enabled) |
 
 ## `[modules.claude]`
 
@@ -250,6 +251,17 @@ Each calendar is a `[[modules.calendar.sources]]` block:
 |---|---|---|---|
 | `enabled` | `false` | | show the [quick tasks](taches.md) tab |
 | `file` | `""` | | Markdown tasks file, relative to the config.toml folder; empty: `tasks.md` |
+
+## `[modules.ask]`
+
+| Option | Default | Range | Role |
+|---|---|---|---|
+| `enabled` | `false` | | [ask questions](question.md) to Claude or Gemini from the island |
+| `model` | `"claude-sonnet-5-5"` | | model, hence provider: `claude-…` or `gemini-…` |
+| `claude_key` | `""` | | Anthropic API key: `secret:<id>` (OS vault, what the settings do) or the key |
+| `gemini_key` | `""` | | Google AI Studio API key, same |
+| `max_tokens` | `1024` | 64 to 8192 | maximum answer length (tokens) |
+| `system` | `""` | | instruction given to the model; empty: short plain-text answers |
 
 ## `[modules.mascot]`
 

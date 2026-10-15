@@ -211,6 +211,8 @@ pub struct Hotkeys {
     pub do_not_disturb: String,
     /// Ajouter une tâche (seulement si les tâches sont activées).
     pub quick_add: String,
+    /// Poser une question à Claude ou Gemini (seulement si `modules.ask` est activé).
+    pub ask: String,
 }
 
 impl Default for Hotkeys {
@@ -222,13 +224,14 @@ impl Default for Hotkeys {
             previous_track: String::new(),
             do_not_disturb: String::new(),
             quick_add: "Ctrl+Alt+N".into(),
+            ask: "Ctrl+Alt+Space".into(),
         }
     }
 }
 
 impl Hotkeys {
     /// Clé de config et raccourci de chaque action.
-    pub fn entries(&self) -> [(&'static str, &str); 6] {
+    pub fn entries(&self) -> [(&'static str, &str); 7] {
         [
             ("toggle", &self.toggle),
             ("play_pause", &self.play_pause),
@@ -236,6 +239,7 @@ impl Hotkeys {
             ("previous_track", &self.previous_track),
             ("do_not_disturb", &self.do_not_disturb),
             ("quick_add", &self.quick_add),
+            ("ask", &self.ask),
         ]
     }
 }

@@ -430,6 +430,15 @@ export component SettingsWindow inherits Window {
     in-out property <bool> transfers-copies;
     in-out property <bool> transfers-downloads;
     in-out property <bool> transfers-announce;
+    in-out property <bool> ask-enabled;
+    // Modèles proposés (un identifiant écrit à la main vient en premier).
+    in property <[string]> ask-models;
+    in-out property <int> ask-model-index;
+    in-out property <string> ask-claude-key;
+    in property <bool> ask-claude-saved;
+    in-out property <string> ask-gemini-key;
+    in property <bool> ask-gemini-saved;
+    in-out property <string> hotkey-ask;
     in-out property <bool> github-enabled;
     in-out property <bool> github-use-gh;
     in-out property <string> github-token;
@@ -1967,6 +1976,90 @@ export component SettingsWindow inherits Window {
                             clicked => { root.changed("tasks.open_file"); }
                         }
                     }
+                }
+            }
+
+            Section {
+                title: @tr("Ask Claude or Gemini");
+
+                Card {
+                    Setting {
+                        title: @tr("Ask from the island");
+                        description: @tr("A shortcut opens a box under the island: type a question, and the answer shows in the island.");
+                        Toggle {
+                            checked <=> root.ask-enabled;
+                            toggled => { root.changed("modules.ask.enabled"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.ask-enabled;
+                        title: @tr("Model");
+                        description: @tr("Picks the provider too. Other models: edit modules.ask.model in config.toml.");
+                        ComboBox {
+                            width: 210px;
+                            enabled: root.ask-enabled;
+                            model: root.ask-models;
+                            current-index <=> root.ask-model-index;
+                            selected => { root.changed("modules.ask.model"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.ask-enabled;
+                        title: @tr("Claude API key");
+                        description: root.ask-claude-saved ? @tr("A key is saved in the Windows Credential Manager.") : @tr("From console.anthropic.com. Paste it and press Enter: it goes to the Windows Credential Manager.");
+                        LineEdit {
+                            width: 200px;
+                            enabled: root.ask-enabled;
+                            text <=> root.ask-claude-key;
+                            input-type: password;
+                            placeholder-text: "sk-ant-…";
+                            accepted => { root.changed("modules.ask.claude_key"); }
+                        }
+                        if root.ask-claude-saved: Button {
+                            text: @tr("Forget");
+                            clicked => { root.changed("modules.ask.claude_key_clear"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.ask-enabled;
+                        title: @tr("Gemini API key");
+                        description: root.ask-gemini-saved ? @tr("A key is saved in the Windows Credential Manager.") : @tr("From aistudio.google.com. Paste it and press Enter: it goes to the Windows Credential Manager.");
+                        LineEdit {
+                            width: 200px;
+                            enabled: root.ask-enabled;
+                            text <=> root.ask-gemini-key;
+                            input-type: password;
+                            placeholder-text: "AIza…";
+                            accepted => { root.changed("modules.ask.gemini_key"); }
+                        }
+                        if root.ask-gemini-saved: Button {
+                            text: @tr("Forget");
+                            clicked => { root.changed("modules.ask.gemini_key_clear"); }
+                        }
+                    }
+
+                    Setting {
+                        nested: true;
+                        enabled: root.ask-enabled;
+                        title: @tr("Shortcut");
+                        LineEdit {
+                            width: 200px;
+                            enabled: root.ask-enabled;
+                            text <=> root.hotkey-ask;
+                            placeholder-text: "Ctrl+Alt+Space";
+                            edited => { root.changed("hotkeys.ask"); }
+                        }
+                    }
+                }
+
+                Hint {
+                    text: @tr("Each question is sent alone to the provider you picked, with your key. Nothing else leaves your PC.");
                 }
             }
 

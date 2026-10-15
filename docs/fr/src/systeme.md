@@ -43,6 +43,7 @@ Des raccourcis valables dans toutes les applications :
 | Morceau précédent | `previous_track` | aucun |
 | Ne pas déranger | `do_not_disturb` | aucun |
 | Ajouter une [tâche](taches.md) | `quick_add` | `Ctrl+Alt+N` (si les tâches sont activées) |
+| [Poser une question](question.md) | `ask` | `Ctrl+Alt+Space` (si activé) |
 
 Ouverte au clavier, l'île se referme seule au bout de 6 secondes si la souris
 ne vient pas dessus (ou au prochain appui sur le raccourci).

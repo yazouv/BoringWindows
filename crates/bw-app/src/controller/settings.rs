@@ -242,6 +242,7 @@ impl Controller {
         ui.set_github_refresh_index(github_refresh_index(github.refresh_secs));
         ui.set_github_announce_ci(github.announce_ci);
         ui.set_github_announce_reviews(github.announce_reviews);
+        self.fill_ask(ui, &config);
         let hotkeys = &config.hotkeys;
         ui.set_hotkey_toggle(hotkeys.toggle.as_str().into());
         ui.set_hotkey_play_pause(hotkeys.play_pause.as_str().into());
@@ -318,6 +319,24 @@ impl Controller {
 
     /// Lecteurs vus depuis le lancement, plus ceux déjà ignorés (qui ne
     /// remontent plus), avec leur état coché.
+    /// Section « Poser une question » : modèle, clés enregistrées, raccourci.
+    fn fill_ask(&self, ui: &SettingsWindow, config: &Config) {
+        let ask = bw_ask::AskConfig::from_table(config.modules.get(bw_ask::MODULE_ID))
+            .unwrap_or_default();
+        let (models, index) = ask_models(&ask.model);
+        ui.set_ask_enabled(config.module_enabled(bw_ask::MODULE_ID, false));
+        ui.set_ask_models(ModelRc::new(VecModel::from(
+            models
+                .into_iter()
+                .map(|m| SharedString::from(m.label))
+                .collect::<Vec<_>>(),
+        )));
+        ui.set_ask_model_index(index);
+        ui.set_ask_claude_saved(ask.has_key(bw_ask::Provider::Claude));
+        ui.set_ask_gemini_saved(ask.has_key(bw_ask::Provider::Gemini));
+        ui.set_hotkey_ask(config.hotkeys.ask.as_str().into());
+    }
+
     fn refresh_players(&self, ui: &SettingsWindow) {
         let ignored = ignored_list(&ui.get_media_ignore());
         let mut tokens: Vec<String> = self.media_seen.borrow().iter().cloned().collect();
@@ -1023,6 +1042,64 @@ impl Controller {
                     Value::Str(String::new()),
                 ))
             }
+            "modules.ask.enabled" => Some((
+                vec!["modules", "ask", "enabled"],
+                Value::Bool(ui.get_ask_enabled()),
+            )),
+            "modules.ask.model" => {
+                let (models, _) = ask_models(&self.ask_config().model);
+                usize::try_from(ui.get_ask_model_index())
+                    .ok()
+                    .and_then(|i| models.into_iter().nth(i))
+                    .map(|m| (vec!["modules", "ask", "model"], Value::Str(m.id)))
+            }
+            "modules.ask.claude_key" | "modules.ask.gemini_key" => {
+                let claude = key == "modules.ask.claude_key";
+                // La clé saisie va dans le coffre de l'OS ; la config n'en garde
+                // que la référence. Le champ est vidé aussitôt.
+                let typed = if claude {
+                    ui.get_ask_claude_key()
+                } else {
+                    ui.get_ask_gemini_key()
+                }
+                .trim()
+                .to_owned();
+                if claude {
+                    ui.set_ask_claude_key("".into());
+                } else {
+                    ui.set_ask_gemini_key("".into());
+                }
+                if typed.is_empty() {
+                    None
+                } else {
+                    let (field, prefix) = ask_key_field(claude);
+                    forget_ask_key(&self.config.borrow(), field);
+                    if claude {
+                        ui.set_ask_claude_saved(true);
+                    } else {
+                        ui.set_ask_gemini_saved(true);
+                    }
+                    Some((
+                        vec!["modules", "ask", field],
+                        Value::Str(protect(prefix, &typed)),
+                    ))
+                }
+            }
+            "modules.ask.claude_key_clear" | "modules.ask.gemini_key_clear" => {
+                let claude = key == "modules.ask.claude_key_clear";
+                let (field, _) = ask_key_field(claude);
+                forget_ask_key(&self.config.borrow(), field);
+                if claude {
+                    ui.set_ask_claude_saved(false);
+                } else {
+                    ui.set_ask_gemini_saved(false);
+                }
+                Some((vec!["modules", "ask", field], Value::Str(String::new())))
+            }
+            "hotkeys.ask" => Some((
+                vec!["hotkeys", "ask"],
+                Value::Str(ui.get_hotkey_ask().trim().to_owned()),
+            )),
             "hotkeys.toggle" => Some((
                 vec!["hotkeys", "toggle"],
                 Value::Str(ui.get_hotkey_toggle().trim().to_owned()),
@@ -1196,7 +1273,7 @@ impl Controller {
 
     /// Relit config.toml, applique `f`, vérifie le tout (modules compris)
     /// et enregistre. Le rechargement à chaud applique ensuite les réglages.
-    fn edit_now(&self, f: impl FnOnce(&mut ConfigEditor)) -> Result<Config, String> {
+    pub(super) fn edit_now(&self, f: impl FnOnce(&mut ConfigEditor)) -> Result<Config, String> {
         let mut editor = ConfigEditor::open(&self.path).map_err(|e| e.to_string())?;
         f(&mut editor);
         let config = editor.config().map_err(|e| e.to_string())?;
@@ -1221,6 +1298,53 @@ fn github_refresh_index(secs: u32) -> i32 {
     (0..GITHUB_REFRESH_SECS.len())
         .min_by_key(|&i| GITHUB_REFRESH_SECS[i].abs_diff(i64::from(secs)))
         .unwrap_or(1) as i32
+}
+
+/// Un modèle de la liste déroulante : l'identifiant écrit dans la config, et son nom.
+pub(super) struct AskModel {
+    pub id: String,
+    pub label: String,
+}
+
+/// Modèles proposés et rang du modèle courant. Un identifiant écrit à la main
+/// dans config.toml vient en premier, pour ne pas être perdu.
+pub(super) fn ask_models(current: &str) -> (Vec<AskModel>, i32) {
+    let current = current.trim();
+    let mut models = Vec::new();
+    if bw_ask::preset_index(current).is_none() {
+        models.push(AskModel {
+            id: current.to_owned(),
+            label: current.to_owned(),
+        });
+    }
+    models.extend(bw_ask::PRESETS.iter().map(|p| AskModel {
+        id: p.id.to_owned(),
+        label: p.label.to_owned(),
+    }));
+    let index = models.iter().position(|m| m.id == current).unwrap_or(0);
+    (models, index as i32)
+}
+
+/// Champ de config et préfixe de secret de la clé d'un fournisseur.
+fn ask_key_field(claude: bool) -> (&'static str, &'static str) {
+    if claude {
+        ("claude_key", "ask-claude")
+    } else {
+        ("gemini_key", "ask-gemini")
+    }
+}
+
+/// Retire du coffre la clé que la config référence dans `field`, s'il y en a une.
+fn forget_ask_key(config: &bw_config::Config, field: &str) {
+    let id = config
+        .modules
+        .get(bw_ask::MODULE_ID)
+        .and_then(|t| t.get(field))
+        .and_then(toml::Value::as_str)
+        .and_then(bw_secrets::reference_id);
+    if let Some(id) = id {
+        let _ = bw_secrets::delete(id);
+    }
 }
 
 /// Retire du coffre le jeton GitHub que la config référence, s'il y en a un.

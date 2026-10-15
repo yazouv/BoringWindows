@@ -1,0 +1,80 @@
+// Poser une question à Claude ou à Gemini : une petite fenêtre sans cadre, ouverte
+// par un raccourci global sous l'île. Comme pour l'ajout de tâche, c'est cette
+// fenêtre normale qui reçoit le clavier (l'île ne le prend jamais) ; la réponse
+// s'affiche ensuite dans l'île. Entrée envoie, Échap annule (comme perdre le focus).
+
+import { ComboBox, LineEdit, Palette } from "std-widgets.slint";
+
+export component AskWindow inherits Window {
+    title: @tr("Ask");
+    no-frame: true;
+    always-on-top: true;
+    width: 520px;
+    height: 92px;
+    background: Palette.color-scheme == ColorScheme.dark ? #202020 : #fbfbfb;
+
+    // Modèles proposés (le premier peut être un identifiant écrit à la main).
+    in property <[string]> models;
+    in-out property <int> model-index;
+    // Rappel affiché à côté du choix du modèle (raccourci pour rouvrir…).
+    in property <string> hint;
+    in-out property <string> text;
+    callback accepted(string);
+    callback cancelled();
+    callback model-selected(int);
+
+    public function focus-input() {
+        input.focus();
+    }
+
+    // Liseré qui détache la fenêtre du fond.
+    Rectangle {
+        border-width: 1px;
+        border-color: Palette.foreground.with-alpha(0.25);
+    }
+
+    FocusScope {
+        key-pressed(event) => {
+            if event.text == Key.Escape {
+                root.cancelled();
+                return accept;
+            }
+            return reject;
+        }
+
+        VerticalLayout {
+            padding: 14px;
+            spacing: 8px;
+            alignment: center;
+
+            input := LineEdit {
+                placeholder-text: @tr("Ask a question…");
+                text <=> root.text;
+                accepted(value) => { root.accepted(value); }
+            }
+
+            HorizontalLayout {
+                spacing: 10px;
+
+                ComboBox {
+                    width: 210px;
+                    model: root.models;
+                    current-index <=> root.model-index;
+                    selected => {
+                        root.model-selected(self.current-index);
+                        input.focus();
+                    }
+                }
+
+                Text {
+                    text: root.hint;
+                    color: Palette.foreground.with-alpha(0.6);
+                    font-size: 11px;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    horizontal-stretch: 1;
+                }
+            }
+        }
+    }
+}

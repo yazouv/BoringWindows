@@ -87,6 +87,7 @@ exemple `"Ctrl+Alt+B"` ; `""` : aucun.
 | `previous_track` | `""` | musique : morceau précédent |
 | `do_not_disturb` | `""` | activer ou couper « ne pas déranger » |
 | `quick_add` | `"Ctrl+Alt+N"` | ajouter une [tâche](taches.md) (si les tâches sont activées) |
+| `ask` | `"Ctrl+Alt+Space"` | [poser une question](question.md) à Claude ou Gemini (si activé) |
 
 ## `[modules.claude]`
 
@@ -251,6 +252,17 @@ Chaque calendrier est un bloc `[[modules.calendar.sources]]` :
 |---|---|---|---|
 | `enabled` | `false` | | afficher l'onglet des [tâches rapides](taches.md) |
 | `file` | `""` | | fichier Markdown des tâches, relatif au dossier de config.toml ; vide : `tasks.md` |
+
+## `[modules.ask]`
+
+| Option | Défaut | Plage | Rôle |
+|---|---|---|---|
+| `enabled` | `false` | | [poser des questions](question.md) à Claude ou Gemini depuis l'île |
+| `model` | `"claude-sonnet-5-5"` | | modèle, et donc fournisseur : `claude-…` ou `gemini-…` |
+| `claude_key` | `""` | | clé d'API Anthropic : `secret:<id>` (coffre de l'OS, ce que font les réglages) ou la clé |
+| `gemini_key` | `""` | | clé d'API Google AI Studio, idem |
+| `max_tokens` | `1024` | 64 à 8192 | longueur maximale de la réponse (jetons) |
+| `system` | `""` | | consigne donnée au modèle ; vide : réponses brèves, en texte brut |
 
 ## `[modules.mascot]`
 
