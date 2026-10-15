@@ -19,6 +19,7 @@ pub const MODULE_ID: &str = "ask";
 pub const MAX_QUESTION: usize = 4000;
 
 const ANTHROPIC_URL: &str = "https://api.anthropic.com/v1/messages";
+const ANTHROPIC_MODELS_URL: &str = "https://api.anthropic.com/v1/models";
 const ANTHROPIC_VERSION: &str = "2023-06-01";
 const GEMINI_URL: &str = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -57,7 +58,7 @@ pub struct Preset {
     pub label: &'static str,
 }
 
-pub const PRESETS: [Preset; 6] = [
+pub const PRESETS: [Preset; 7] = [
     Preset {
         id: "claude-haiku-5-5",
         label: "Claude Haiku 5.5",
@@ -82,6 +83,10 @@ pub const PRESETS: [Preset; 6] = [
         id: "gemini-2.5-pro",
         label: "Gemini 2.5 Pro",
     },
+    Preset {
+        id: "gemini-3.1-flash-lite",
+        label: "Gemini 3.1 Flash-Lite",
+    },
 ];
 
 /// Rang d'un modèle dans `PRESETS` ; `None` pour un identifiant écrit à la main.
@@ -92,6 +97,130 @@ pub fn preset_index(model: &str) -> Option<usize> {
 /// Nom lisible d'un modèle : celui du préréglage, sinon l'identifiant.
 pub fn label(model: &str) -> String {
     preset_index(model).map_or_else(|| model.trim().to_owned(), |i| PRESETS[i].label.to_owned())
+}
+
+/// Un modèle de la liste déroulante : l'identifiant écrit dans la config, et son nom.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModelInfo {
+    pub id: String,
+    pub label: String,
+}
+
+/// Modèles à proposer. Pour chaque fournisseur, ceux qu'il annonce pour la clé
+/// (`remote`, voir `list_models`), sinon les préréglages : un modèle retiré ou
+/// pas encore ouvert à ce compte ferait répondre « modèle inconnu ».
+pub fn model_list(remote: &[ModelInfo]) -> Vec<ModelInfo> {
+    let mut out = Vec::new();
+    for provider in [Provider::Claude, Provider::Gemini] {
+        let own: Vec<&ModelInfo> = remote
+            .iter()
+            .filter(|m| Provider::of_model(&m.id) == Some(provider))
+            .collect();
+        if own.is_empty() {
+            out.extend(
+                PRESETS
+                    .iter()
+                    .filter(|p| Provider::of_model(p.id) == Some(provider))
+                    .map(|p| ModelInfo {
+                        id: p.id.to_owned(),
+                        label: p.label.to_owned(),
+                    }),
+            );
+        } else {
+            out.extend(own.into_iter().cloned());
+        }
+    }
+    out
+}
+
+/// Mots d'un identifiant Gemini qui n'est pas un modèle de texte.
+const NOT_TEXT: [&str; 7] = [
+    "embedding",
+    "tts",
+    "image",
+    "live",
+    "audio",
+    "robotics",
+    "computer-use",
+];
+
+/// Modèles de texte d'une réponse « liste des modèles ».
+pub fn parse_models(provider: Provider, body: &str) -> anyhow::Result<Vec<ModelInfo>> {
+    let json: Value = serde_json::from_str(body)?;
+    if let Some(message) = json.pointer("/error/message").and_then(Value::as_str) {
+        anyhow::bail!("{message}");
+    }
+    let mut models = Vec::new();
+    match provider {
+        Provider::Claude => {
+            for m in json
+                .get("data")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+            {
+                let Some(id) = m.get("id").and_then(Value::as_str) else {
+                    continue;
+                };
+                if Provider::of_model(id) == Some(provider) {
+                    let label = m.get("display_name").and_then(Value::as_str).unwrap_or(id);
+                    models.push(ModelInfo {
+                        id: id.to_owned(),
+                        label: label.to_owned(),
+                    });
+                }
+            }
+        }
+        Provider::Gemini => {
+            for m in json
+                .get("models")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+            {
+                let Some(id) = m
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .map(|n| n.trim_start_matches("models/"))
+                else {
+                    continue;
+                };
+                let generates = m
+                    .get("supportedGenerationMethods")
+                    .and_then(Value::as_array)
+                    .is_some_and(|methods| methods.iter().any(|v| v == "generateContent"));
+                if generates
+                    && Provider::of_model(id) == Some(provider)
+                    && !NOT_TEXT.iter().any(|word| id.contains(word))
+                {
+                    let label = m.get("displayName").and_then(Value::as_str).unwrap_or(id);
+                    models.push(ModelInfo {
+                        id: id.to_owned(),
+                        label: label.to_owned(),
+                    });
+                }
+            }
+            models.sort_by(|a, b| a.id.cmp(&b.id));
+        }
+    }
+    Ok(models)
+}
+
+/// Modèles que le fournisseur ouvre à cette clé. Bloque : hors du thread UI.
+pub fn list_models(config: &AskConfig, provider: Provider) -> Result<Vec<ModelInfo>, String> {
+    let key = resolve_key(config, provider)?;
+    let (url, key_header) = match provider {
+        Provider::Claude => (format!("{ANTHROPIC_MODELS_URL}?limit=100"), "x-api-key"),
+        Provider::Gemini => (format!("{GEMINI_URL}?pageSize=200"), "x-goog-api-key"),
+    };
+    let mut headers: Vec<(&str, &str)> =
+        vec![(key_header, key.as_str()), ("Accept-Encoding", "identity")];
+    if provider == Provider::Claude {
+        headers.push(("anthropic-version", ANTHROPIC_VERSION));
+    }
+    let body = bw_net::get(&url, &headers).map_err(|e| friendly_error(provider, &e))?;
+    parse_models(provider, &String::from_utf8_lossy(&body))
+        .map_err(|e| format!("{} : {e:#}", provider.name()))
 }
 
 const DEFAULT_SYSTEM: &str = "Answer briefly and directly, in a few sentences, in the language \
@@ -285,7 +414,10 @@ pub fn friendly_error(provider: Provider, error: &anyhow::Error) -> String {
             "{name}: bad request or invalid key",
             "{name} : requête invalide ou clé refusée"
         ),
-        Some(404) => tr!("{name}: unknown model", "{name} : modèle inconnu"),
+        Some(404) => tr!(
+            "{name}: unknown model (pick another one in the list)",
+            "{name} : modèle inconnu (choisis-en un autre dans la liste)"
+        ),
         Some(429) => tr!(
             "{name}: rate limit or quota reached",
             "{name} : limite ou quota atteint"
@@ -443,6 +575,36 @@ mod tests {
     }
 
     #[test]
+    fn model_lists_follow_the_provider() {
+        let gemini = r#"{"models":[
+            {"name":"models/gemini-3.5-flash","displayName":"Gemini 3.5 Flash","supportedGenerationMethods":["generateContent","countTokens"]},
+            {"name":"models/gemini-3.5-flash-preview-tts","displayName":"TTS","supportedGenerationMethods":["generateContent"]},
+            {"name":"models/gemini-embedding-001","displayName":"Embedding","supportedGenerationMethods":["embedContent"]},
+            {"name":"models/gemma-3-27b","displayName":"Gemma","supportedGenerationMethods":["generateContent"]},
+            {"name":"models/gemini-3.5-flash-lite","supportedGenerationMethods":["generateContent"]}
+        ]}"#;
+        let parsed = parse_models(Provider::Gemini, gemini).unwrap();
+        let ids: Vec<&str> = parsed.iter().map(|m| m.id.as_str()).collect();
+        assert_eq!(ids, ["gemini-3.5-flash", "gemini-3.5-flash-lite"]);
+        assert_eq!(parsed[0].label, "Gemini 3.5 Flash");
+        assert_eq!(parsed[1].label, "gemini-3.5-flash-lite");
+
+        let claude = r#"{"data":[{"id":"claude-sonnet-5-5","display_name":"Claude Sonnet 5.5"},{"id":"autre"}]}"#;
+        let parsed = parse_models(Provider::Claude, claude).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].label, "Claude Sonnet 5.5");
+        assert!(parse_models(Provider::Claude, r#"{"error":{"message":"nope"}}"#).is_err());
+
+        // Sans liste, les préréglages ; avec une liste, elle remplace ceux du fournisseur.
+        let presets = model_list(&[]);
+        assert_eq!(presets.len(), PRESETS.len());
+        let mixed = model_list(&parse_models(Provider::Gemini, gemini).unwrap());
+        assert!(mixed.iter().any(|m| m.id == "claude-haiku-5-5"));
+        assert!(mixed.iter().any(|m| m.id == "gemini-3.5-flash"));
+        assert!(!mixed.iter().any(|m| m.id == "gemini-2.5-flash"));
+    }
+
+    #[test]
     fn parses_claude_answers() {
         let body = r#"{"content":[{"type":"text","text":"Paris"},{"type":"text","text":"."}],"stop_reason":"end_turn"}"#;
         assert_eq!(parse_response(Provider::Claude, body).unwrap(), "Paris.");
@@ -504,7 +666,7 @@ mod tests {
         );
         assert_eq!(
             friendly_error(Provider::Gemini, &err("HTTP 404")),
-            "Gemini: unknown model"
+            "Gemini: unknown model (pick another one in the list)"
         );
         assert_eq!(
             friendly_error(Provider::Claude, &err("HTTP 429")),

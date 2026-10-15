@@ -319,11 +319,18 @@ impl Controller {
 
     /// Lecteurs vus depuis le lancement, plus ceux déjà ignorés (qui ne
     /// remontent plus), avec leur état coché.
+    /// La liste des modèles vient d'arriver : la fenêtre de réglages la reprend.
+    pub(super) fn refresh_settings_ask(&self) {
+        if let Some(s) = self.settings.borrow().as_ref() {
+            self.fill_ask(&s.ui, &self.config.borrow());
+        }
+    }
+
     /// Section « Poser une question » : modèle, clés enregistrées, raccourci.
     fn fill_ask(&self, ui: &SettingsWindow, config: &Config) {
         let ask = bw_ask::AskConfig::from_table(config.modules.get(bw_ask::MODULE_ID))
             .unwrap_or_default();
-        let (models, index) = ask_models(&ask.model);
+        let (models, index) = ask_models(&ask.model, &self.ask_remote.borrow());
         ui.set_ask_enabled(config.module_enabled(bw_ask::MODULE_ID, false));
         ui.set_ask_models(ModelRc::new(VecModel::from(
             models
@@ -1047,7 +1054,7 @@ impl Controller {
                 Value::Bool(ui.get_ask_enabled()),
             )),
             "modules.ask.model" => {
-                let (models, _) = ask_models(&self.ask_config().model);
+                let (models, _) = ask_models(&self.ask_config().model, &self.ask_remote.borrow());
                 usize::try_from(ui.get_ask_model_index())
                     .ok()
                     .and_then(|i| models.into_iter().nth(i))
@@ -1300,27 +1307,24 @@ fn github_refresh_index(secs: u32) -> i32 {
         .unwrap_or(1) as i32
 }
 
-/// Un modèle de la liste déroulante : l'identifiant écrit dans la config, et son nom.
-pub(super) struct AskModel {
-    pub id: String,
-    pub label: String,
-}
-
-/// Modèles proposés et rang du modèle courant. Un identifiant écrit à la main
-/// dans config.toml vient en premier, pour ne pas être perdu.
-pub(super) fn ask_models(current: &str) -> (Vec<AskModel>, i32) {
+/// Modèles proposés (ceux que le fournisseur annonce pour la clé, sinon des
+/// préréglages) et rang du modèle courant. Un identifiant écrit à la main dans
+/// config.toml vient en premier, pour ne pas être perdu.
+pub(super) fn ask_models(
+    current: &str,
+    remote: &[bw_ask::ModelInfo],
+) -> (Vec<bw_ask::ModelInfo>, i32) {
     let current = current.trim();
-    let mut models = Vec::new();
-    if bw_ask::preset_index(current).is_none() {
-        models.push(AskModel {
-            id: current.to_owned(),
-            label: current.to_owned(),
-        });
+    let mut models = bw_ask::model_list(remote);
+    if !models.iter().any(|m| m.id == current) {
+        models.insert(
+            0,
+            bw_ask::ModelInfo {
+                id: current.to_owned(),
+                label: current.to_owned(),
+            },
+        );
     }
-    models.extend(bw_ask::PRESETS.iter().map(|p| AskModel {
-        id: p.id.to_owned(),
-        label: p.label.to_owned(),
-    }));
     let index = models.iter().position(|m| m.id == current).unwrap_or(0);
     (models, index as i32)
 }

@@ -172,6 +172,8 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         quick_add: RefCell::new(None),
         ask_window: RefCell::new(None),
         ask_models: RefCell::new(Vec::new()),
+        ask_remote: RefCell::new(Vec::new()),
+        ask_keys: RefCell::new((String::new(), String::new())),
         ask_seq: Cell::new(0),
         capture_timer: Timer::default(),
         toast_timer: Timer::default(),
@@ -275,6 +277,10 @@ pub struct Controller {
     ask_window: RefCell<Option<AskWindow>>,
     /// Identifiants des modèles de la liste de la fenêtre, dans son ordre.
     ask_models: RefCell<Vec<String>>,
+    /// Modèles que les fournisseurs annoncent pour les clés enregistrées.
+    ask_remote: RefCell<Vec<bw_ask::ModelInfo>>,
+    /// Les clés (références) pour lesquelles `ask_remote` a été demandée.
+    ask_keys: RefCell<(String, String)>,
     /// Numéro de la dernière question : une réponse en retard est ignorée.
     ask_seq: Cell<u64>,
     /// Revérifie le premier plan une fois l'ouverture de l'outil de capture posée.
@@ -2398,12 +2404,63 @@ impl Controller {
 
     /// Appliqué à chaque changement de config : désactivé, tout disparaît.
     fn apply_ask(&self) {
-        if !self.ask_config().enabled {
+        let config = self.ask_config();
+        if !config.enabled {
             self.dismiss_ask();
             if let Some(window) = self.ask_window.borrow().as_ref() {
                 let _ = window.hide();
             }
+            return;
         }
+        // Nouvelle clé : on redemande aux fournisseurs ce qu'ils ouvrent à ce compte.
+        let keys = (
+            config.claude_key.trim().to_owned(),
+            config.gemini_key.trim().to_owned(),
+        );
+        if *self.ask_keys.borrow() != keys {
+            *self.ask_keys.borrow_mut() = keys;
+            self.refresh_ask_models(config);
+        }
+    }
+
+    /// Demande la liste des modèles à chaque fournisseur dont on a la clé : un
+    /// modèle retiré, ou pas encore ouvert à ce compte, répondrait « inconnu ».
+    fn refresh_ask_models(&self, config: bw_ask::AskConfig) {
+        let providers: Vec<bw_ask::Provider> = [bw_ask::Provider::Claude, bw_ask::Provider::Gemini]
+            .into_iter()
+            .filter(|p| config.has_key(*p))
+            .collect();
+        if providers.is_empty() {
+            self.ask_remote.borrow_mut().clear();
+            return;
+        }
+        let spawned = std::thread::Builder::new()
+            .name("bw-ask-models".into())
+            .spawn(move || {
+                let mut models = Vec::new();
+                for provider in providers {
+                    match bw_ask::list_models(&config, provider) {
+                        Ok(list) => models.extend(list),
+                        Err(e) => log::warn!("modèles {} : {e}", provider.name()),
+                    }
+                }
+                post(move |c| {
+                    *c.ask_remote.borrow_mut() = models;
+                    c.refresh_settings_ask();
+                });
+            });
+        if let Err(e) = spawned {
+            log::warn!("modèles : thread impossible : {e}");
+        }
+    }
+
+    /// Nom d'un modèle pour l'affichage : celui que le fournisseur annonce.
+    fn ask_label(&self, model: &str) -> String {
+        let (models, index) = self::settings::ask_models(model, &self.ask_remote.borrow());
+        usize::try_from(index)
+            .ok()
+            .and_then(|i| models.into_iter().nth(i))
+            .map_or_else(|| model.to_owned(), |m| m.label)
     }
 
     /// La petite fenêtre de saisie, sous l'île : l'île ne reçoit jamais le clavier.
@@ -2413,7 +2470,8 @@ impl Controller {
             return;
         }
         if self.ask_window.borrow().is_none() {
-            let window = match AskWindow::new() {
+            // Transparente et sans cadre, comme l'île : seule la carte se voit.
+            let window = match platform::creating_popup(AskWindow::new) {
                 Ok(w) => w,
                 Err(e) => {
                     log::error!("fenêtre de question : {e}");
@@ -2421,6 +2479,18 @@ impl Controller {
                 }
             };
             let weak = Rc::downgrade(self);
+            // La liste des modèles se déplie sous la carte : la fenêtre grandit.
+            window.on_resized({
+                let weak = weak.clone();
+                move || {
+                    if let Some(c) = weak.upgrade()
+                        && let Some(w) = c.ask_window.borrow().as_ref()
+                    {
+                        w.window()
+                            .set_size(slint::LogicalSize::new(600.0, w.get_wanted_height()));
+                    }
+                }
+            });
             window.on_accepted({
                 let weak = weak.clone();
                 move |text| {
@@ -2449,7 +2519,7 @@ impl Controller {
         let Some(window) = window.as_ref() else {
             return;
         };
-        let (models, index) = self::settings::ask_models(&config.model);
+        let (models, index) = self::settings::ask_models(&config.model, &self.ask_remote.borrow());
         window.set_models(ModelRc::new(VecModel::from(
             models
                 .iter()
@@ -2459,15 +2529,24 @@ impl Controller {
         window.set_model_index(index);
         *self.ask_models.borrow_mut() = models.into_iter().map(|m| m.id).collect();
         window.set_text(prefill.into());
+        window.set_picking(false);
         window.set_hint(
             tr!(
-                "Enter asks · Esc cancels · {} to reopen",
-                "Entrée envoie · Échap annule · {} pour rouvrir",
-                self.config.borrow().hotkeys.ask.trim()
+                "Enter asks · Shift+Enter new line · Esc cancels",
+                "Entrée envoie · Maj+Entrée va à la ligne · Échap annule"
             )
             .into(),
         );
-        self.place_under_island(window.window(), 520.0);
+        // Aux couleurs de l'île (thème, accent de Windows compris).
+        window.set_bg(self.ui.get_bg());
+        window.set_fg(self.ui.get_fg());
+        window.set_accent(self.ui.get_accent());
+        window.set_border(self.ui.get_border());
+        window.set_font(self.ui.get_font());
+        window
+            .window()
+            .set_size(slint::LogicalSize::new(600.0, window.get_wanted_height()));
+        self.place_under_island(window.window(), 600.0);
         let _ = window.show();
         platform::focus_tool_window(window.window());
         window.invoke_focus_input();
@@ -2512,7 +2591,7 @@ impl Controller {
         {
             config.model = id;
         }
-        let name = bw_ask::label(&config.model);
+        let name = self.ask_label(&config.model);
         let seq = self.ask_seq.get() + 1;
         self.ask_seq.set(seq);
         self.ui.set_ask_title(name.as_str().into());

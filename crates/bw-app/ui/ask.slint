@@ -1,78 +1,258 @@
 // Poser une question à Claude ou à Gemini : une petite fenêtre sans cadre, ouverte
 // par un raccourci global sous l'île. Comme pour l'ajout de tâche, c'est cette
-// fenêtre normale qui reçoit le clavier (l'île ne le prend jamais) ; la réponse
-// s'affiche ensuite dans l'île. Entrée envoie, Échap annule (comme perdre le focus).
+// fenêtre qui reçoit le clavier (l'île ne le prend jamais) ; la réponse s'affiche
+// ensuite dans l'île.
+//
+// Même allure que l'île : fenêtre transparente, carte arrondie aux couleurs du
+// thème (`bg`, `fg`, `accent`, `border`, réglées côté Rust). La question passe à
+// la ligne et défile : Entrée envoie, Maj+Entrée ajoute une ligne, Échap annule.
+// La puce du modèle déplie la liste sous la carte ; la fenêtre grandit d'autant
+// (`wanted-height`, appliquée côté Rust).
 
-import { ComboBox, LineEdit, Palette } from "std-widgets.slint";
+component ModelRow inherits Rectangle {
+    in property <string> text;
+    in property <bool> picked;
+    in property <color> ink;
+    in property <color> accent;
+    callback clicked;
+
+    height: 28px;
+    border-radius: 9px;
+    background: ta.has-hover ? root.ink.with-alpha(0.08) : transparent;
+    animate background { duration: 100ms; }
+
+    Rectangle {
+        x: 10px;
+        y: (parent.height - self.height) / 2;
+        width: 6px;
+        height: 6px;
+        border-radius: 3px;
+        background: root.accent;
+        opacity: root.picked ? 1 : 0;
+    }
+
+    Text {
+        x: 24px;
+        width: parent.width - 32px;
+        text: root.text;
+        color: root.picked ? root.accent : root.ink.with-alpha(0.85);
+        font-size: 12.5px;
+        font-weight: root.picked ? 600 : 400;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+
+    ta := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
 
 export component AskWindow inherits Window {
     title: @tr("Ask");
     no-frame: true;
     always-on-top: true;
-    width: 520px;
-    height: 92px;
-    background: Palette.color-scheme == ColorScheme.dark ? #202020 : #fbfbfb;
+    background: transparent;
+    width: 600px;
+    height: root.wanted-height;
+
+    // Couleurs et police du thème de l'île.
+    in property <color> bg: #000000;
+    in property <color> fg: white;
+    in property <color> accent: #ff8a3d;
+    in property <color> border: transparent;
+    in property <string> font;
+    default-font-family: root.font;
 
     // Modèles proposés (le premier peut être un identifiant écrit à la main).
     in property <[string]> models;
     in-out property <int> model-index;
-    // Rappel affiché à côté du choix du modèle (raccourci pour rouvrir…).
+    // Rappel affiché à côté du modèle (touches, raccourci pour rouvrir…).
     in property <string> hint;
     in-out property <string> text;
+    // Liste des modèles dépliée.
+    in-out property <bool> picking;
     callback accepted(string);
     callback cancelled();
     callback model-selected(int);
+    // La hauteur voulue a changé (liste dépliée ou repliée).
+    callback resized();
+
+    property <length> card-height: 112px;
+    property <int> visible-rows: min(root.models.length, 7);
+    property <length> list-height: root.visible-rows * 28px + 12px;
+    out property <length> wanted-height: root.card-height + (root.picking ? 6px + root.list-height : 0px);
+
+    changed picking => {
+        root.resized();
+    }
 
     public function focus-input() {
         input.focus();
     }
 
-    // Liseré qui détache la fenêtre du fond.
-    Rectangle {
-        border-width: 1px;
-        border-color: Palette.foreground.with-alpha(0.25);
-    }
-
     FocusScope {
-        key-pressed(event) => {
+        // Avant la zone de texte, qui garderait Entrée pour aller à la ligne.
+        capture-key-pressed(event) => {
             if event.text == Key.Escape {
-                root.cancelled();
+                if root.picking {
+                    root.picking = false;
+                } else {
+                    root.cancelled();
+                }
+                return accept;
+            }
+            if event.text == Key.Return && !event.modifiers.shift {
+                root.accepted(root.text);
                 return accept;
             }
             return reject;
         }
 
-        VerticalLayout {
-            padding: 14px;
-            spacing: 8px;
-            alignment: center;
+        // La carte : la question, puis le modèle et les touches.
+        Rectangle {
+            x: 0;
+            y: 0;
+            width: parent.width;
+            height: root.card-height;
+            border-radius: 22px;
+            background: root.bg.with-alpha(0.94);
+            border-width: 1px;
+            border-color: root.border.alpha > 0 ? root.border : root.fg.with-alpha(0.12);
 
-            input := LineEdit {
-                placeholder-text: @tr("Ask a question…");
-                text <=> root.text;
-                accepted(value) => { root.accepted(value); }
-            }
-
-            HorizontalLayout {
+            VerticalLayout {
+                padding-left: 18px;
+                padding-right: 18px;
+                padding-top: 14px;
+                padding-bottom: 12px;
                 spacing: 10px;
 
-                ComboBox {
-                    width: 210px;
-                    model: root.models;
-                    current-index <=> root.model-index;
-                    selected => {
-                        root.model-selected(self.current-index);
-                        input.focus();
+                HorizontalLayout {
+                    spacing: 10px;
+                    vertical-stretch: 1;
+
+                    Text {
+                        text: "✦";
+                        color: root.accent;
+                        font-size: 16px;
+                        vertical-alignment: top;
+                    }
+
+                    flick := Flickable {
+                        horizontal-stretch: 1;
+                        content-height: max(self.height, input.preferred-height);
+
+                        input := TextInput {
+                            width: parent.width;
+                            height: max(flick.height, self.preferred-height);
+                            text <=> root.text;
+                            single-line: false;
+                            wrap: word-wrap;
+                            color: root.fg;
+                            font-size: 15px;
+                            selection-background-color: root.accent.with-alpha(0.35);
+                            selection-foreground-color: root.fg;
+                            // Le curseur reste visible quand la question dépasse.
+                            cursor-position-changed(pos) => {
+                                if pos.y + 22px > flick.height - flick.content-y {
+                                    flick.content-y = flick.height - pos.y - 22px;
+                                }
+                                if pos.y < -flick.content-y {
+                                    flick.content-y = -pos.y;
+                                }
+                            }
+                        }
+
+                        if root.text == "": Text {
+                            text: @tr("Ask a question…");
+                            color: root.fg.with-alpha(0.4);
+                            font-size: 15px;
+                        }
                     }
                 }
 
-                Text {
-                    text: root.hint;
-                    color: Palette.foreground.with-alpha(0.6);
-                    font-size: 11px;
-                    vertical-alignment: center;
-                    overflow: elide;
-                    horizontal-stretch: 1;
+                HorizontalLayout {
+                    height: 24px;
+                    spacing: 10px;
+
+                    // Puce du modèle : un clic déplie ou replie la liste.
+                    Rectangle {
+                        width: chip-text.preferred-width + 30px;
+                        border-radius: 12px;
+                        background: chip-ta.has-hover || root.picking ? root.fg.with-alpha(0.14) : root.fg.with-alpha(0.08);
+                        animate background { duration: 100ms; }
+
+                        chip-text := Text {
+                            x: 11px;
+                            text: root.models[root.model-index];
+                            color: root.fg.with-alpha(0.9);
+                            font-size: 12px;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                        }
+
+                        Text {
+                            x: parent.width - 16px;
+                            text: "▾";
+                            color: root.fg.with-alpha(0.6);
+                            font-size: 10px;
+                            vertical-alignment: center;
+                            transform-rotation: root.picking ? 180deg : 0deg;
+                            animate transform-rotation { duration: 160ms; easing: ease-out; }
+                        }
+
+                        chip-ta := TouchArea {
+                            clicked => {
+                                root.picking = !root.picking;
+                                input.focus();
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: root.hint;
+                        color: root.fg.with-alpha(0.4);
+                        font-size: 11px;
+                        vertical-alignment: center;
+                        horizontal-alignment: right;
+                        overflow: elide;
+                        horizontal-stretch: 1;
+                    }
+                }
+            }
+        }
+
+        // La liste des modèles, sous la carte.
+        if root.picking: Rectangle {
+            x: 0;
+            y: root.card-height + 6px;
+            width: 280px;
+            height: root.list-height;
+            border-radius: 16px;
+            background: root.bg.with-alpha(0.94);
+            border-width: 1px;
+            border-color: root.border.alpha > 0 ? root.border : root.fg.with-alpha(0.12);
+            clip: true;
+
+            Flickable {
+                x: 6px;
+                y: 6px;
+                width: parent.width - 12px;
+                height: parent.height - 12px;
+                content-height: root.models.length * 28px;
+
+                for name[i] in root.models: ModelRow {
+                    y: i * 28px;
+                    width: parent.width;
+                    text: name;
+                    picked: i == root.model-index;
+                    ink: root.fg;
+                    accent: root.accent;
+                    clicked => {
+                        root.model-index = i;
+                        root.model-selected(i);
+                        root.picking = false;
+                        input.focus();
+                    }
                 }
             }
         }
