@@ -96,6 +96,8 @@ pub fn check_private(path: &std::path::Path) -> std::io::Result<()> {
 
 #[cfg(windows)]
 mod server {
+    use std::time::{Duration, Instant};
+
     use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 
     /// Serveur de named pipe : une instance libre attend toujours un client.
@@ -104,18 +106,49 @@ mod server {
         next: NamedPipeServer,
     }
 
+    const ERROR_ACCESS_DENIED: i32 = 5;
+    /// Attente maximale d'un nom encore pris (voir `bind`).
+    const BUSY_WAIT: Duration = Duration::from_secs(1);
+
     impl Listener {
         pub fn bind(name: &str) -> std::io::Result<Self> {
+            // Quand le module redémarre (rechargement de config), une instance
+            // de l'ancien module peut exister encore quelques dizaines de ms
+            // après son arrêt (vu surtout avec une demande en attente). Sans
+            // ces nouvelles tentatives, le module restait muet jusqu'au
+            // redémarrage de l'app. Un autre compte qui occupe le nom fait
+            // toujours échouer le bind, une seconde plus tard.
+            let start = Instant::now();
+            let deadline = start + BUSY_WAIT;
+            loop {
+                match Self::create_first(name) {
+                    Ok(next) => {
+                        if start.elapsed() >= Duration::from_millis(20) {
+                            log::info!("claude : pipe libéré après {:?}", start.elapsed());
+                        }
+                        return Ok(Self {
+                            name: name.to_owned(),
+                            next,
+                        });
+                    }
+                    Err(e)
+                        if e.raw_os_error() == Some(ERROR_ACCESS_DENIED)
+                            && Instant::now() < deadline =>
+                    {
+                        std::thread::sleep(Duration::from_millis(20));
+                    }
+                    Err(e) => return Err(e),
+                }
+            }
+        }
+
+        fn create_first(name: &str) -> std::io::Result<NamedPipeServer> {
             // `first_pipe_instance` : échoue si un autre processus occupe déjà
             // le nom, au lieu de partager le pipe avec lui.
-            let next = ServerOptions::new()
+            ServerOptions::new()
                 .first_pipe_instance(true)
                 .reject_remote_clients(true)
-                .create(name)?;
-            Ok(Self {
-                name: name.to_owned(),
-                next,
-            })
+                .create(name)
         }
 
         pub async fn accept(&mut self) -> std::io::Result<NamedPipeServer> {
@@ -209,6 +242,56 @@ mod tests {
             let _listener = Listener::bind(socket.to_str().unwrap()).unwrap();
             assert!(check_private(socket.parent().unwrap()).is_ok());
             assert!(check_private(&socket).is_ok());
+        });
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use std::time::Duration;
+
+    use super::*;
+
+    fn runtime() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+    }
+
+    /// Juste après l'arrêt de l'ancien module, une de ses instances peut
+    /// encore exister un instant. Le nouveau module doit quand même écouter.
+    #[test]
+    fn rebind_while_the_old_instance_lingers() {
+        let name = format!(r"\\.\pipe\boringwindows-test-rebind-{}", std::process::id());
+        let (ready_tx, ready) = std::sync::mpsc::channel();
+        let pipe = name.clone();
+        let old = std::thread::spawn(move || {
+            let rt = runtime();
+            let instance = rt.block_on(async { Listener::bind(&pipe) }).unwrap();
+            ready_tx.send(()).unwrap();
+            std::thread::sleep(Duration::from_millis(100));
+            drop(instance);
+        });
+        ready.recv().unwrap();
+
+        runtime().block_on(async {
+            Listener::bind(&name).unwrap();
+        });
+        old.join().unwrap();
+    }
+
+    /// Un autre serveur qui occupe le nom (un autre compte, par exemple) fait
+    /// toujours échouer le bind : l'attente ne partage jamais le pipe.
+    #[test]
+    fn squatted_name_still_refused() {
+        let name = format!(r"\\.\pipe\boringwindows-test-squat-{}", std::process::id());
+        runtime().block_on(async {
+            let _squatter = tokio::net::windows::named_pipe::ServerOptions::new()
+                .create(&name)
+                .unwrap();
+            let err = Listener::bind(&name).err().unwrap();
+            assert_eq!(err.kind(), std::io::ErrorKind::PermissionDenied);
         });
     }
 }
