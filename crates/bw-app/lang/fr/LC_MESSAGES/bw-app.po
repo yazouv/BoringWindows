@@ -246,6 +246,21 @@ msgstr "Jouer un son à la fin"
 msgid "Durations (minutes)"
 msgstr "Durées (minutes)"
 
+msgid "Session done!"
+msgstr "Session terminée !"
+
+msgid "Focus {} min"
+msgstr "Focus {} min"
+
+msgid "Focus"
+msgstr "Concentration"
+
+msgid "Focus session (minutes, 0 = no button)"
+msgstr "Session de concentration (minutes, 0 = pas de bouton)"
+
+msgid "Do not disturb during the session, back as it was at the end."
+msgstr "Ne pas déranger pendant la session, rétabli à la fin."
+
 msgid "Custom view of the open island"
 msgstr "Vue personnelle de l'île ouverte"
 

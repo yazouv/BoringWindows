@@ -310,6 +310,7 @@ impl Controller {
             .unwrap_or_default();
         ui.set_timer_enabled(config.module_enabled(bw_timer::MODULE_ID, false));
         ui.set_timer_sound(timer.sound);
+        ui.set_timer_focus_minutes(timer.focus_minutes as i32);
         ui.set_timer_presets(
             timer
                 .presets
@@ -1184,6 +1185,10 @@ impl Controller {
             "modules.timer.sound" => Some((
                 vec!["modules", "timer", "sound"],
                 Value::Bool(ui.get_timer_sound()),
+            )),
+            "modules.timer.focus_minutes" => Some((
+                vec!["modules", "timer", "focus_minutes"],
+                Value::Int(i64::from(ui.get_timer_focus_minutes().clamp(0, 600))),
             )),
             "modules.timer.presets" => {
                 let minutes: Vec<i64> = ui

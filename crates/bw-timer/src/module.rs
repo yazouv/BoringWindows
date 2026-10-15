@@ -30,7 +30,12 @@ impl Module for TimerModule {
     fn start(&mut self, ctx: ModuleCtx) -> anyhow::Result<()> {
         let (tx, mut rx) = unbounded_channel::<String>();
         self.actions = Some(tx);
-        let mut machine = Machine::new(self.config.presets.clone(), self.config.done_for());
+        let focus_minutes = self.config.focus_minutes;
+        let mut machine = Machine::new(
+            self.config.presets.clone(),
+            focus_minutes,
+            self.config.done_for(),
+        );
         let presets = self.config.presets.clone();
 
         ctx.clone().spawn(async move {
@@ -59,10 +64,13 @@ impl Module for TimerModule {
                                 if let Ok(m) = minutes.parse::<u32>()
                                     && presets.contains(&m)
                                 {
-                                    machine.start(m, now);
+                                    machine.start(m, false, now);
                                 }
                             }
                             _ => match action.as_str() {
+                                "focus" if focus_minutes > 0 => {
+                                    machine.start(focus_minutes, true, now);
+                                }
                                 "pause" => machine.pause(now),
                                 "resume" => machine.resume(now),
                                 "reset" => machine.reset(),
@@ -77,7 +85,8 @@ impl Module for TimerModule {
         Ok(())
     }
 
-    /// Actions : `start:<minutes>`, `pause`, `resume`, `reset`.
+    /// Actions : `start:<minutes>`, `focus` (session de concentration),
+    /// `pause`, `resume`, `reset`.
     fn on_action(&mut self, action: &str) {
         if let Some(tx) = &self.actions {
             let _ = tx.send(action.to_owned());
@@ -86,14 +95,30 @@ impl Module for TimerModule {
 }
 
 fn publish(ctx: &ModuleCtx, machine: &Machine, now: Instant) {
+    let focus = machine.focus();
     let (level, summary) = match machine.phase() {
         Phase::Idle => (Attention::None, None),
+        Phase::Running | Phase::Paused if focus => (
+            Attention::Low,
+            Some(bw_i18n::tr!(
+                "Focus · {} min",
+                "Concentration · {} min",
+                machine.minutes_left(now)
+            )),
+        ),
         Phase::Running | Phase::Paused => (
             Attention::Low,
             Some(bw_i18n::tr!(
                 "Timer · {} min",
                 "Minuteur · {} min",
                 machine.minutes_left(now)
+            )),
+        ),
+        Phase::Done if focus => (
+            Attention::High,
+            Some(bw_i18n::tr!(
+                "Focus session done",
+                "Session de concentration terminée"
             )),
         ),
         Phase::Done => (

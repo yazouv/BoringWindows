@@ -58,6 +58,10 @@ export struct TimerInfo {
     time: string,
     progress: float,
     presets: [string],
+    /// Session de concentration en cours ou qui vient de finir.
+    focus: bool,
+    /// Durée du bouton « Focus » ; vide : pas de bouton.
+    focus-minutes: string,
 }
 
 export struct MediaInfo {
@@ -264,7 +268,7 @@ component MascotEye inherits Rectangle {
 // dans les yeux, sourcils, bras, pieds, bouche selon l'humeur, ombre au sol,
 // notes de musique et « z » qui s'envolent.
 component Mascot inherits Rectangle {
-    // idle | morning | evening | sleep | work | wait | happy | music
+    // idle | morning | evening | sleep | work | wait | happy | music | focus
     in property <string> mood: "idle";
     // "" | halloween | christmas | newyear
     in property <string> season;
@@ -356,7 +360,7 @@ component Mascot inherits Rectangle {
     property <float> look: root.animated && root.face == "work" ? Math.sin(root.t * 0.8 * 360deg) * 1.3 : 0;
     property <string> eyes: root.blink || root.face == "sleep" ? "closed"
         : root.face == "happy" || root.face == "music" || root.face == "morning" ? "happy"
-        : root.face == "evening" ? "half"
+        : root.face == "evening" || root.face == "focus" ? "half"
         : root.face == "wait" ? "big" : "open";
     property <color> tone: root.mood == "wait" ? root.accent : root.body-color;
     // Ombre du corps : sa couleur mêlée à celle des yeux (thèmes clairs et sombres).
@@ -1297,6 +1301,10 @@ export component Island inherits Window {
     in property <bool> transfer-visible;
     in property <bool> transfer-indeterminate;
     in property <float> transfer-progress;
+    // Session de concentration : sa progression au bord bas de la pilule
+    // (un transfert, plus pressant, passe devant).
+    in property <bool> focus-visible;
+    in property <float> focus-progress;
     // Phase du va-et-vient de la barre indéterminée.
     property <float> transfer-t;
     in property <bool> has-github;
@@ -1608,6 +1616,22 @@ export component Island inherits Window {
                     interval: 33ms;
                     running: root.transfer-visible && root.transfer-indeterminate && !root.expanded;
                     triggered => { root.transfer-t += 0.025; }
+                }
+            }
+
+            // Session de concentration : même trait, plus discret, qui avance à
+            // chaque minute (rien ne tourne entre deux).
+            Rectangle {
+                y: parent.height - self.height;
+                height: 2px;
+                visible: root.focus-visible && !root.transfer-visible && !root.expanded;
+                background: root.fg.with-alpha(0.08);
+
+                Rectangle {
+                    x: 0;
+                    width: parent.width * clamp(root.focus-progress, 0, 1);
+                    background: root.accent.with-alpha(0.8);
+                    animate width { duration: 600ms; easing: ease-out; }
                 }
             }
 
@@ -2483,6 +2507,7 @@ export component Island inherits Window {
 
                                 Text {
                                     text: root.timer.phase == 0 ? @tr("Timer")
+                                        : root.timer.phase == 3 && root.timer.focus ? @tr("Session done!")
                                         : root.timer.phase == 3 ? @tr("Time's up!") : root.timer.time;
                                     color: root.timer.phase == 0 ? root.fg.with-alpha(0.7) : root.accent;
                                     font-size: root.timer.phase == 0 ? 12px : 16px;
@@ -2504,6 +2529,26 @@ export component Island inherits Window {
                                         ink: root.fg;
                                         clicked => { root.timer-action("start:" + minutes); }
                                     }
+
+                                    // Session de concentration : coupe les notifications le temps
+                                    // de la session.
+                                    if root.timer.focus-minutes != "": PillButton {
+                                        grow: false;
+                                        min-width: 64px;
+                                        text: @tr("Focus {} min", root.timer.focus-minutes);
+                                        fill: root.accent.with-alpha(0.18);
+                                        ink: root.accent;
+                                        clicked => { root.timer-action("focus"); }
+                                    }
+                                }
+
+                                // Pendant une session de concentration, on le rappelle.
+                                if root.timer.focus && (root.timer.phase == 1 || root.timer.phase == 2): Text {
+                                    text: @tr("Focus");
+                                    color: root.fg.with-alpha(0.6);
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    vertical-alignment: center;
                                 }
 
                                 if root.timer.phase == 1 || root.timer.phase == 2: Rectangle {

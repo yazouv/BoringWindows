@@ -13,6 +13,9 @@ pub struct TimerConfig {
     pub presets: Vec<u32>,
     /// Son à la fin du minuteur.
     pub sound: bool,
+    /// Durée d'une session de concentration (minutes) : bouton « Focus » de
+    /// l'île, qui coupe les annonces le temps de la session (0 : pas de bouton).
+    pub focus_minutes: u32,
     /// Combien de temps l'île signale la fin (secondes).
     pub done_secs: u32,
 }
@@ -23,6 +26,7 @@ impl Default for TimerConfig {
             enabled: false,
             presets: vec![5, 15, 25],
             sound: true,
+            focus_minutes: 25,
             done_secs: 20,
         }
     }
@@ -46,6 +50,13 @@ impl TimerConfig {
             tr!(
                 "modules.timer.presets: each duration between 1 and 600 minutes",
                 "modules.timer.presets : chaque durée entre 1 et 600 minutes"
+            )
+        );
+        anyhow::ensure!(
+            config.focus_minutes <= 600,
+            tr!(
+                "modules.timer.focus_minutes must be between 0 and 600",
+                "modules.timer.focus_minutes doit être entre 0 et 600"
             )
         );
         anyhow::ensure!(
@@ -80,6 +91,7 @@ mod tests {
             "presets = [601]",
             "presets = [1,2,3,4,5,6]",
             "done_secs = 0",
+            "focus_minutes = 601",
             "preset = [5]",
         ] {
             let t: toml::Table = toml::from_str(bad).unwrap();

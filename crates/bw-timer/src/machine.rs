@@ -21,6 +21,10 @@ pub struct TimerSnapshot {
     pub remaining: Duration,
     pub at: Instant,
     pub presets: Vec<u32>,
+    /// Session de concentration : les annonces se taisent jusqu'à la fin.
+    pub focus: bool,
+    /// Durée du bouton « Focus » (0 : pas de bouton).
+    pub focus_minutes: u32,
 }
 
 impl TimerSnapshot {
@@ -50,10 +54,12 @@ pub(crate) struct Machine {
     done_until: Option<Instant>,
     done_for: Duration,
     presets: Vec<u32>,
+    focus: bool,
+    focus_minutes: u32,
 }
 
 impl Machine {
-    pub fn new(presets: Vec<u32>, done_for: Duration) -> Self {
+    pub fn new(presets: Vec<u32>, focus_minutes: u32, done_for: Duration) -> Self {
         Self {
             phase: Phase::Idle,
             total: Duration::ZERO,
@@ -62,6 +68,8 @@ impl Machine {
             done_until: None,
             done_for,
             presets,
+            focus: false,
+            focus_minutes,
         }
     }
 
@@ -69,7 +77,12 @@ impl Machine {
         self.phase
     }
 
-    pub fn start(&mut self, minutes: u32, now: Instant) {
+    pub fn focus(&self) -> bool {
+        self.focus
+    }
+
+    pub fn start(&mut self, minutes: u32, focus: bool, now: Instant) {
+        self.focus = focus;
         self.total = Duration::from_secs(u64::from(minutes) * 60);
         self.remaining = self.total;
         self.ends_at = Some(now + self.total);
@@ -94,6 +107,7 @@ impl Machine {
 
     pub fn reset(&mut self) {
         self.phase = Phase::Idle;
+        self.focus = false;
         self.total = Duration::ZERO;
         self.remaining = Duration::ZERO;
         self.ends_at = None;
@@ -151,6 +165,8 @@ impl Machine {
             remaining: self.remaining(now),
             at: now,
             presets: self.presets.clone(),
+            focus: self.focus,
+            focus_minutes: self.focus_minutes,
         }
     }
 }
@@ -161,7 +177,7 @@ mod tests {
 
     fn machine() -> (Machine, Instant) {
         (
-            Machine::new(vec![5], Duration::from_secs(20)),
+            Machine::new(vec![5], 25, Duration::from_secs(20)),
             Instant::now(),
         )
     }
@@ -173,7 +189,7 @@ mod tests {
     #[test]
     fn runs_to_done_then_back_to_idle() {
         let (mut m, t0) = machine();
-        m.start(2, t0);
+        m.start(2, false, t0);
         assert_eq!(m.phase(), Phase::Running);
         assert_eq!(m.remaining(t0 + secs(30)), secs(90));
         assert!(!m.tick(t0 + secs(119)));
@@ -189,7 +205,7 @@ mod tests {
     #[test]
     fn pause_freezes_and_resume_continues() {
         let (mut m, t0) = machine();
-        m.start(10, t0);
+        m.start(10, false, t0);
         m.pause(t0 + secs(60));
         assert_eq!(m.phase(), Phase::Paused);
         assert_eq!(m.remaining(t0 + secs(500)), secs(540));
@@ -203,7 +219,7 @@ mod tests {
     #[test]
     fn wakes_at_each_minute_boundary() {
         let (mut m, t0) = machine();
-        m.start(3, t0);
+        m.start(3, false, t0);
         assert_eq!(m.minutes_left(t0), 3);
         // 180 s restantes : la pilule passe de « 3 min » à « 2 min » à 120 s.
         assert_eq!(m.next_wake(t0), Some(t0 + secs(60)));
@@ -214,9 +230,27 @@ mod tests {
     }
 
     #[test]
+    fn focus_lasts_until_the_end_is_dismissed() {
+        let (mut m, t0) = machine();
+        m.start(1, true, t0);
+        assert!(m.focus() && m.snapshot(t0).focus);
+        assert_eq!(m.snapshot(t0).focus_minutes, 25);
+        // Terminé : encore une session de concentration, le temps de l'annoncer.
+        assert!(m.tick(t0 + secs(60)));
+        assert!(m.focus());
+        assert!(m.tick(t0 + secs(80)));
+        assert!(!m.focus());
+        // Un minuteur ordinaire ensuite n'en est pas une.
+        m.start(1, true, t0);
+        m.reset();
+        m.start(5, false, t0);
+        assert!(!m.focus());
+    }
+
+    #[test]
     fn snapshot_extrapolates_while_running() {
         let (mut m, t0) = machine();
-        m.start(1, t0);
+        m.start(1, false, t0);
         let s = m.snapshot(t0);
         assert_eq!(s.remaining_now(t0 + secs(15)), secs(45));
         assert!((s.progress_now(t0 + secs(30)) - 0.5).abs() < 1e-3);
