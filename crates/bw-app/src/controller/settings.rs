@@ -161,6 +161,14 @@ impl Controller {
         self.sync_settings_update(self.update_state.get());
     }
 
+    /// Ouvre les réglages sur une page donnée (rang dans la barre latérale).
+    pub(super) fn open_settings_page(self: &Rc<Self>, page: i32) {
+        self.open_settings();
+        if let Some(s) = self.settings.borrow().as_ref() {
+            s.ui.set_page(page);
+        }
+    }
+
     fn fill_settings(&self, ui: &SettingsWindow) {
         let config = self.config.borrow();
         let g = &config.general;
@@ -623,6 +631,7 @@ impl Controller {
             platform::open_path(&dir);
         }));
         ui.on_open_config_file(with(|c, _| platform::open_path(&c.path)));
+        ui.on_open_welcome(with(|c, _| c.open_welcome()));
         ui.on_open_docs(with(|_, _| {
             platform::open_path(std::path::Path::new(docs()))
         }));
@@ -1434,7 +1443,7 @@ fn fill_layout(ui: &SettingsWindow, order: &[String]) {
     )));
 }
 
-fn language_index(language: bw_config::Language) -> i32 {
+pub(super) fn language_index(language: bw_config::Language) -> i32 {
     match language {
         bw_config::Language::Auto => 0,
         bw_config::Language::En => 1,

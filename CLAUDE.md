@@ -11,6 +11,7 @@ Code comments, commit bodies, logs and docs are in **French**. UI strings use En
 ```sh
 cargo run -p bw-app                      # dev run (logs to console; RUST_LOG=debug for more)
 cargo run -p bw-app -- --settings        # open the settings window at startup
+cargo run -p bw-app -- --welcome         # open the welcome assistant (also opens on first launch)
 cargo run -p bw-app -- doctor            # Claude Code hook diagnostic (writes doctor.txt)
 cargo build --release                    # target/release/boringwindows(.exe)
 
@@ -97,7 +98,7 @@ The Cargo workspace (edition 2024) has one crate per concern. `bw-app` is the on
 - **`bw-app`**:
   - `controller.rs` is the single-threaded hub. It holds `Rc<Controller>` in a thread-local and owns the Slint windows, arbiter, module host, tray, config watcher and timers.
   - Other threads (module host, notify watcher, tray, worker threads) reach it only through `post(|c| …)`, which uses `slint::invoke_from_event_loop`.
-  - Submodules: `controller/settings.rs` (settings window: fills it from config, each change goes through `ConfigEditor` with a 300 ms debounce) and `controller/update.rs` (update checks, restart via `--restarted`).
+  - Submodules: `controller/settings.rs` (settings window: fills it from config, each change goes through `ConfigEditor` with a 300 ms debounce), `controller/update.rs` (update checks, restart via `--restarted`) and `controller/welcome.rs` (welcome assistant, `WelcomeWindow` at the end of `settings.slint` to share its widgets: opened when config.toml did not exist yet, with `--welcome`, or from Settings › General; module choices are written once at the end, only those that differ, since every write restarts the modules).
   - `hotkeys.rs`: global shortcuts (`[hotkeys]` in config.toml) through `global-hotkey`, created on the UI thread. Syntax errors and shortcuts taken by another app show in the island like config errors; the settings window rejects them before saving.
   - `platform/macos.rs`: the island's winit `NSWindow` gets its class swapped to a runtime `NSPanel` subclass (non-activating, never key) and sits above the menu bar. Click-through: `ignoresMouseEvents` flips on mouse moves seen by global/local `NSEvent` monitors, and `PlatformEvent::PointerLeft` makes the controller dispatch `PointerExited` to Slint. An always-active `NSTrackingArea` gives hover without being key. Music on macOS is `bw-media/src/macos.rs`: Spotify and Music distributed notifications wake an AppleScript query (`applescript.rs` is the pure part).
   - `platform/`: `win32.rs` has all Win32 code behind `cfg(windows)`: non-activating tool window, `SetWindowRgn` click-through region, full-screen detection, single-instance mutex, autostart, file picker, Windows light/dark mode and accent (`UISettings`, with its change event).

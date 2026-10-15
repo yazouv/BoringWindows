@@ -288,6 +288,7 @@ de vérité (versionnable, partageable), mais une interface l'édite pour nous.
       et mode présentation), réglages en tuiles avec interrupteurs, options dépendantes rangées
       sous leur interrupteur, défilement par page, clair/sombre
 - [ ] Captures d'écran par service dans l'assistant
+- [x] Assistant d'accueil au premier lancement (langue, modules, hooks Claude Code, agenda, prise en main ; relançable depuis Réglages › Général, `--welcome`)
 - [x] Tailles de l'île (compacte / ouverte) et ordre des modules (priorité en mode compact)
 
 - Fenêtre Slint séparée, créée à l'ouverture et détruite à la fermeture : coût
