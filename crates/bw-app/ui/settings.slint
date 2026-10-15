@@ -475,6 +475,7 @@ export component SettingsWindow inherits Window {
     callback run-doctor();
     callback open-config-file();
     callback open-docs();
+    callback open-welcome();
 
     property <bool> source-ready: root.new-url != "" && (!root.provider-is-caldav || (root.new-username != "" && root.new-password != ""));
 
@@ -607,6 +608,16 @@ export component SettingsWindow inherits Window {
                             model: [@tr("Automatic (Windows)"), "English", "Français"];
                             current-index <=> root.language-index;
                             selected => { root.changed("general.language"); }
+                        }
+                    }
+
+                    Setting {
+                        divided: true;
+                        title: @tr("Welcome assistant");
+                        description: @tr("Pick the modules again, connect Claude Code or a calendar.");
+                        Button {
+                            text: @tr("Open");
+                            clicked => { root.open-welcome(); }
                         }
                     }
                 }
@@ -2125,6 +2136,337 @@ export component SettingsWindow inherits Window {
                 Hint {
                     text: @tr("They work in every app. Combine Ctrl, Alt, Shift or Super (Windows key, Cmd on a Mac) with a key: A to Z, 0 to 9, F1 to F24, Space, Up, Down, Left, Right… Leave empty for no shortcut.");
                 }
+            }
+        }
+    }
+}
+
+// Un module proposé par l'assistant d'accueil : nom, ce qu'il montre,
+// interrupteur.
+component ModuleChoice inherits Setting {
+    in-out property <bool> on;
+    divided: true;
+
+    Toggle {
+        checked <=> root.on;
+    }
+}
+
+// Assistant d'accueil : ouvert au premier lancement (ou depuis Réglages ›
+// Général). Quatre étapes ; les choix de modules ne sont écrits qu'à la fin,
+// en une fois (chaque écriture redémarre les modules).
+export component WelcomeWindow inherits Window {
+    title: @tr("Welcome to BoringWindows");
+    preferred-width: 640px;
+    preferred-height: 640px;
+    min-width: 560px;
+    min-height: 540px;
+    background: Ui.window;
+
+    // 0 bienvenue, 1 modules, 2 outils, 3 prêt.
+    in-out property <int> step;
+    in-out property <int> language-index;
+
+    in-out property <bool> claude;
+    in-out property <bool> media;
+    in-out property <bool> calendar;
+    in-out property <bool> notifications;
+    in-out property <bool> weather;
+    in-out property <string> weather-city;
+    in-out property <bool> timer;
+    in-out property <bool> tasks;
+    in-out property <bool> mascot;
+    in-out property <bool> network;
+    in-out property <bool> system;
+
+    // Claude Code trouvé sur ce PC (`~/.claude`), hooks déjà là.
+    in property <bool> claude-detected;
+    in property <bool> hooks-installed;
+    // Raccourci qui ouvre l'île (vide : aucun).
+    in property <string> toggle-hotkey;
+
+    callback language-changed();
+    callback install-hooks();
+    callback add-calendar();
+    callback open-settings();
+    callback finish();
+
+    VerticalLayout {
+        padding: 32px;
+        spacing: 20px;
+
+        // Avancement : un trait par étape.
+        HorizontalLayout {
+            spacing: 6px;
+            for i in 4: Rectangle {
+                height: 4px;
+                border-radius: 2px;
+                background: i <= root.step ? Ui.accent : Ui.divider;
+                animate background { duration: 200ms; }
+            }
+        }
+
+        // --- 0 : bienvenue ---
+        if root.step == 0: VerticalLayout {
+            spacing: 16px;
+            vertical-stretch: 1;
+
+            Text {
+                text: @tr("Welcome to BoringWindows");
+                color: Ui.text;
+                font-size: 28px;
+                font-weight: 600;
+                wrap: word-wrap;
+            }
+
+            Text {
+                text: @tr("A small island at the top of your screen: it stays out of the way, and grows when something deserves your attention (Claude Code waiting for you, a new song, a meeting in 5 minutes). Hover it to open it.");
+                color: Ui.muted;
+                font-size: 14px;
+                wrap: word-wrap;
+            }
+
+            Text {
+                text: @tr("This takes a minute. Everything can be changed later in Settings.");
+                color: Ui.muted;
+                font-size: 14px;
+                wrap: word-wrap;
+            }
+
+            Card {
+                Setting {
+                    title: @tr("Language");
+                    ComboBox {
+                        width: 220px;
+                        // Noms des langues dans leur propre langue : non traduits.
+                        model: [@tr("Automatic (Windows)"), "English", "Français"];
+                        current-index <=> root.language-index;
+                        selected => { root.language-changed(); }
+                    }
+                }
+            }
+
+            Rectangle { vertical-stretch: 1; }
+        }
+
+        // --- 1 : modules ---
+        if root.step == 1: VerticalLayout {
+            spacing: 12px;
+            vertical-stretch: 1;
+
+            Text {
+                text: @tr("What should the island show?");
+                color: Ui.text;
+                font-size: 24px;
+                font-weight: 600;
+                wrap: word-wrap;
+            }
+
+            Text {
+                text: @tr("A module that is off costs nothing: it doesn't even start.");
+                color: Ui.muted;
+                font-size: 13px;
+                wrap: word-wrap;
+            }
+
+            sv := ScrollView {
+                vertical-stretch: 1;
+                content-width: self.visible-width;
+                content-height: list.preferred-height;
+
+                list := VerticalLayout {
+                    width: sv.visible-width;
+                    padding-right: 12px;
+
+                    Card {
+                        ModuleChoice {
+                            divided: false;
+                            title: "Claude Code";
+                            description: @tr("What Claude is doing, its questions and permission requests");
+                            on <=> root.claude;
+                        }
+                        ModuleChoice {
+                            title: @tr("Music");
+                            description: @tr("Song, cover and controls (Spotify, browsers, Apple Music…)");
+                            on <=> root.media;
+                        }
+                        ModuleChoice {
+                            title: @tr("Calendar");
+                            description: @tr("Next meeting, countdown and a Join button");
+                            on <=> root.calendar;
+                        }
+                        ModuleChoice {
+                            title: @tr("Notifications");
+                            description: @tr("Messages from your apps (Discord, Slack, Teams…)");
+                            on <=> root.notifications;
+                        }
+                        ModuleChoice {
+                            title: @tr("Weather");
+                            description: @tr("Current weather next to the date");
+                            on <=> root.weather;
+                        }
+                        if root.weather: Setting {
+                            nested: true;
+                            title: @tr("City");
+                            LineEdit {
+                                width: 200px;
+                                text <=> root.weather-city;
+                                placeholder-text: "Paris";
+                            }
+                        }
+                        ModuleChoice {
+                            title: @tr("Timer");
+                            description: @tr("Pomodoro, focus sessions, cooking");
+                            on <=> root.timer;
+                        }
+                        ModuleChoice {
+                            title: @tr("Quick tasks");
+                            description: @tr("A checklist in the island, added with a shortcut");
+                            on <=> root.tasks;
+                        }
+                        ModuleChoice {
+                            title: @tr("Mascot");
+                            description: @tr("A little blob that reacts to Claude, music and the time of day");
+                            on <=> root.mascot;
+                        }
+                        ModuleChoice {
+                            title: @tr("Network");
+                            description: @tr("Wi-Fi, VPN and speed");
+                            on <=> root.network;
+                        }
+                        ModuleChoice {
+                            title: @tr("CPU and memory");
+                            description: @tr("Next to the time, measured only while the island is open");
+                            on <=> root.system;
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- 2 : outils ---
+        if root.step == 2: VerticalLayout {
+            spacing: 12px;
+            vertical-stretch: 1;
+
+            Text {
+                text: @tr("Connect your tools");
+                color: Ui.text;
+                font-size: 24px;
+                font-weight: 600;
+                wrap: word-wrap;
+            }
+
+            Text {
+                text: @tr("Both are optional; you can do it later from Settings.");
+                color: Ui.muted;
+                font-size: 13px;
+                wrap: word-wrap;
+            }
+
+            Card {
+                Setting {
+                    title: "Claude Code";
+                    description: !root.claude ? @tr("The Claude Code module is off.")
+                        : !root.claude-detected ? @tr("Claude Code was not found on this PC. Install it, then come back to Settings › Claude Code.")
+                        : root.hooks-installed ? @tr("Connected. Restart your Claude Code sessions so they pick it up.")
+                        : @tr("BoringWindows adds a few hooks to ~/.claude/settings.json (with a backup) to follow your sessions.");
+                    enabled: root.claude && root.claude-detected;
+                    if root.hooks-installed: Badge {
+                        text: @tr("Installed");
+                        good: true;
+                    }
+                    if !root.hooks-installed: Button {
+                        text: @tr("Install the hooks…");
+                        enabled: root.claude && root.claude-detected;
+                        clicked => { root.install-hooks(); }
+                    }
+                }
+            }
+
+            Card {
+                Setting {
+                    title: @tr("Calendar");
+                    description: root.calendar
+                        ? @tr("Google, Outlook, iCloud, Proton… The settings walk you through finding the link.")
+                        : @tr("The Calendar module is off.");
+                    enabled: root.calendar;
+                    Button {
+                        text: @tr("Add a calendar…");
+                        enabled: root.calendar;
+                        clicked => { root.add-calendar(); }
+                    }
+                }
+            }
+
+            Rectangle { vertical-stretch: 1; }
+        }
+
+        // --- 3 : prêt ---
+        if root.step == 3: VerticalLayout {
+            spacing: 14px;
+            vertical-stretch: 1;
+
+            Text {
+                text: @tr("You're all set");
+                color: Ui.text;
+                font-size: 24px;
+                font-weight: 600;
+                wrap: word-wrap;
+            }
+
+            Card {
+                Setting {
+                    title: @tr("Open the island");
+                    description: root.toggle-hotkey == ""
+                        ? @tr("Hover the pill at the top of the screen, or click it.")
+                        : @tr("Hover the pill at the top of the screen, or press {}.", root.toggle-hotkey);
+                }
+                Setting {
+                    divided: true;
+                    title: @tr("Settings");
+                    description: @tr("Right-click the BoringWindows icon in the notification area.");
+                }
+                Setting {
+                    divided: true;
+                    title: @tr("Make it yours");
+                    description: @tr("Themes, sizes, shortcuts, order of the modules: everything is in Settings, or in config.toml.");
+                    Button {
+                        text: @tr("Open Settings");
+                        clicked => { root.open-settings(); }
+                    }
+                }
+            }
+
+            Rectangle { vertical-stretch: 1; }
+        }
+
+        // Navigation.
+        HorizontalLayout {
+            spacing: 8px;
+
+            if root.step < 3: Button {
+                text: @tr("Skip");
+                clicked => { root.finish(); }
+            }
+
+            Rectangle { horizontal-stretch: 1; }
+
+            if root.step > 0: Button {
+                text: @tr("Back");
+                clicked => { root.step -= 1; }
+            }
+
+            if root.step < 3: Button {
+                text: @tr("Next");
+                primary: true;
+                clicked => { root.step += 1; }
+            }
+
+            if root.step == 3: Button {
+                text: @tr("Finish");
+                primary: true;
+                clicked => { root.finish(); }
             }
         }
     }
