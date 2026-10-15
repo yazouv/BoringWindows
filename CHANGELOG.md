@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.8.0](https://github.com/yazouv/BoringWindows/compare/v0.7.0...v0.8.0) (2026-10-15)
+
+
+### Nouveautés
+
+* ajout de la gestion des modèles pour les fournisseurs dans la fenêtre de saisie ([85c3b4b](https://github.com/yazouv/BoringWindows/commit/85c3b4b2eb9aac87c706cae17ab802a5c61917fa))
+* alerte de consommation Claude (seuil de la fenêtre, puis renouvellement) ([2c11be2](https://github.com/yazouv/BoringWindows/commit/2c11be231087b142ed82fb9c41017f0f636305c8))
+* alerte de consommation Claude (seuil de la fenêtre, puis renouvellement) ([7865630](https://github.com/yazouv/BoringWindows/commit/78656307c11063d98a7b303656007550b9b26f8a))
+* assistant d'accueil au premier lancement ([a4a9bd3](https://github.com/yazouv/BoringWindows/commit/a4a9bd31c8066fc862f8683ab82bfe7bda17165b))
+* assistant d'accueil au premier lancement ([b73604c](https://github.com/yazouv/BoringWindows/commit/b73604caef95471df2551f53caf9f4e89473bca5))
+* questions à Claude ou Gemini depuis l'île ([0f41680](https://github.com/yazouv/BoringWindows/commit/0f41680669ec58b6cf5a14692fe99f8f96fca1d1))
+* répondre aux questions de Claude et « Toujours autoriser » depuis l'île ([44b38be](https://github.com/yazouv/BoringWindows/commit/44b38beabd611b1cb159224006114bf658abaa1b))
+* répondre aux questions de Claude et « Toujours autoriser » depuis l'île ([bd15701](https://github.com/yazouv/BoringWindows/commit/bd15701ed78c55900bf3062034a623a31d531652))
+* session de concentration (bouton « Focus » du minuteur) ([ad18224](https://github.com/yazouv/BoringWindows/commit/ad18224f80ab2ffae28c5d9c17c4b6cf8f0f8569))
+* session de concentration (bouton « Focus » du minuteur) ([821f623](https://github.com/yazouv/BoringWindows/commit/821f62304a313028a32363c90fd647f7fa5f40be))
+
+
+### Corrections
+
+* le module claude écoute de nouveau après un rechargement de config ([0c2a739](https://github.com/yazouv/BoringWindows/commit/0c2a7399af1340f3c4a9663c664737e971d01d7c))
+* le module claude écoute de nouveau après un rechargement de config ([75c31ba](https://github.com/yazouv/BoringWindows/commit/75c31ba001086fd2ab944fdf317b2f8d524cdf3c))
+
+
+### Documentation
+
+* PLAN.md et CLAUDE.md à jour ([2a117ed](https://github.com/yazouv/BoringWindows/commit/2a117ed937c1f023d43cba426d0326ce916baa8b))
+* PLAN.md et CLAUDE.md à jour (réseau, transferts, GitHub, tâches, questions) ([5f09690](https://github.com/yazouv/BoringWindows/commit/5f09690cc4ea73bb65096eda118fe20c1a101790))
+
 ## [0.7.0](https://github.com/yazouv/BoringWindows/compare/v0.6.0...v0.7.0) (2026-10-13)
 
 
