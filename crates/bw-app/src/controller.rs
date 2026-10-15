@@ -3,6 +3,7 @@
 mod custom_view;
 mod settings;
 mod update;
+mod welcome;
 
 use std::cell::{Cell, OnceCell, RefCell};
 use std::collections::BTreeSet;
@@ -89,7 +90,9 @@ fn post(f: impl FnOnce(&Rc<Controller>) + Send + 'static) {
 }
 
 /// `open_settings` : ouvrir la fenêtre de réglages dès le démarrage (`--settings`).
-pub fn run(open_settings: bool) -> anyhow::Result<()> {
+/// `welcome` : ouvrir l'assistant d'accueil (`--welcome`) ; il s'ouvre aussi au
+/// premier lancement, quand config.toml n'existe pas encore.
+pub fn run(open_settings: bool, welcome: bool) -> anyhow::Result<()> {
     // Avant de lire la config : le thème « auto » dépend du mode de Windows.
     let look = platform::system_look();
     log::info!(
@@ -99,6 +102,7 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
     );
     bw_config::set_system_light(look.light);
     let path = bw_config::config_path();
+    let open_welcome = welcome || !path.exists();
     let (config, config_error) = match Config::load_or_create(&path) {
         Ok(config) => (config, None),
         Err(e) => (Config::default(), Some(e)),
@@ -133,6 +137,8 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         media: RefCell::new(None),
         calendar: RefCell::new(None),
         settings: RefCell::new(None),
+        welcome: RefCell::new(None),
+        open_welcome_at_start: Cell::new(open_welcome),
         open_settings_at_start: Cell::new(open_settings),
         update_state: Cell::new(update::UpdateState::Idle),
         update_timer: Timer::default(),
@@ -247,6 +253,10 @@ pub struct Controller {
     /// Icônes des applications converties pour Slint, par AppUserModelID.
     app_icons: RefCell<std::collections::HashMap<String, Image>>,
     settings: RefCell<Option<settings::SettingsState>>,
+    /// Assistant d'accueil, tant qu'il est ouvert.
+    welcome: RefCell<Option<crate::WelcomeWindow>>,
+    /// Premier lancement (ou `--welcome`) : l'assistant s'ouvre au démarrage.
+    open_welcome_at_start: Cell<bool>,
     open_settings_at_start: Cell<bool>,
     update_state: Cell<update::UpdateState>,
     update_timer: Timer,
@@ -459,6 +469,9 @@ impl Controller {
 
     fn on_platform_ready(self: &Rc<Self>, platform: Platform) {
         log::info!("intégration système prête");
+        if self.open_welcome_at_start.get() {
+            self.open_welcome();
+        }
         if self.open_settings_at_start.get() {
             self.open_settings();
         }

@@ -85,8 +85,22 @@ commented:
 %APPDATA%\BoringWindows\config.toml
 ```
 
-You don't need to change anything to start: music works right away. For Claude
-Code and the calendar, follow their pages.
+A **welcome assistant** opens at the same time, in four steps:
+
+1. the language;
+2. what the island should show: Claude Code, music, calendar, notifications,
+   weather (with your city), timer, tasks, mascot, network, CPU and memory. A
+   module that is off costs nothing;
+3. connect Claude Code (installing the hooks, in one click) and add a calendar
+   (opens Settings on the calendar wizard);
+4. how to open the island and find Settings.
+
+Your choices are saved at the end, or if you close the window; **Skip** keeps
+what is shown. To run it again later: Settings › **General** › **Welcome
+assistant**.
+
+You don't need to change anything else to start: music works right away. To go
+further with Claude Code and the calendar, follow their pages.
 
 ## Start with Windows
 
