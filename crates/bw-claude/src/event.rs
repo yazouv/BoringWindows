@@ -25,15 +25,41 @@ pub struct HookEvent {
     /// `PostToolUseFailure` : l'outil a été interrompu par l'utilisateur (Échap).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub interrupted: Option<bool>,
+    /// `AskUserQuestion` : les questions et leurs choix, dans l'ordre de Claude.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub questions: Vec<Question>,
+    /// `PermissionRequest` : les règles que Claude Code propose d'ajouter pour
+    /// ne plus demander (« Bash(cargo test:*) »…), résumées pour l'île.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub always: Option<String>,
+}
+
+/// Une question d'`AskUserQuestion`, résumée.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Question {
+    pub header: String,
+    pub question: String,
+    pub options: Vec<String>,
+    #[serde(default)]
+    pub multi: bool,
 }
 
 const MAX_DETAIL: usize = 200;
 const MAX_MESSAGE: usize = 200;
+const MAX_QUESTION: usize = 300;
+const MAX_OPTION: usize = 60;
+const MAX_HEADER: usize = 30;
+/// Au-delà, l'île ne saurait pas les afficher : la question part au terminal.
+const MAX_QUESTIONS: usize = 4;
+const MAX_OPTIONS: usize = 6;
 
 impl HookEvent {
     /// `None` si l'entrée n'est pas un événement exploitable.
     pub fn from_hook_input(input: &str) -> Option<Self> {
-        let v: Value = serde_json::from_str(input).ok()?;
+        Self::from_value(&serde_json::from_str(input).ok()?)
+    }
+
+    pub fn from_value(v: &Value) -> Option<Self> {
         let str_field = |k: &str| v.get(k).and_then(Value::as_str).map(str::to_owned);
         let session_id = str_field("session_id").filter(|s| !s.is_empty())?;
         let kind = str_field("hook_event_name")?;
@@ -41,6 +67,10 @@ impl HookEvent {
         let tool_detail = tool_name
             .as_deref()
             .and_then(|name| tool_detail(name, v.get("tool_input")?));
+        let questions = match (tool_name.as_deref(), v.get("tool_input")) {
+            (Some("AskUserQuestion"), Some(input)) => questions(input).unwrap_or_default(),
+            _ => Vec::new(),
+        };
         Some(Self {
             session_id,
             cwd: str_field("cwd").unwrap_or_default(),
@@ -50,6 +80,8 @@ impl HookEvent {
             tool_name,
             tool_detail,
             interrupted: v.get("is_interrupt").and_then(Value::as_bool),
+            questions,
+            always: v.get("permission_suggestions").and_then(suggestions_label),
         })
     }
 
@@ -94,6 +126,90 @@ fn tool_detail(tool: &str, input: &Value) -> Option<String> {
     };
     // Une seule ligne, sans espaces superflus.
     let one_line = detail.split_whitespace().collect::<Vec<_>>().join(" ");
+    Some(truncate(&one_line, MAX_DETAIL))
+}
+
+/// Questions d'`AskUserQuestion`. Tout ou rien : les réponses renvoyées par
+/// l'île désignent les questions et les options par leur rang.
+fn questions(input: &Value) -> Option<Vec<Question>> {
+    let list = input.get("questions")?.as_array()?;
+    if list.is_empty() || list.len() > MAX_QUESTIONS {
+        return None;
+    }
+    list.iter()
+        .map(|q| {
+            let text = q.get("question")?.as_str()?;
+            let options = q.get("options")?.as_array()?;
+            if options.is_empty() || options.len() > MAX_OPTIONS {
+                return None;
+            }
+            let options = options
+                .iter()
+                .map(|o| Some(truncate(o.get("label")?.as_str()?, MAX_OPTION)))
+                .collect::<Option<Vec<_>>>()?;
+            Some(Question {
+                header: truncate(
+                    q.get("header").and_then(Value::as_str).unwrap_or_default(),
+                    MAX_HEADER,
+                ),
+                question: truncate(text, MAX_QUESTION),
+                options,
+                multi: q
+                    .get("multiSelect")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
+            })
+        })
+        .collect()
+}
+
+/// Résumé des règles proposées par Claude Code. `None` si l'une d'elles ne se
+/// résume pas (retrait de règles, refus…) : l'île n'applique que ce qu'elle montre.
+fn suggestions_label(suggestions: &Value) -> Option<String> {
+    let list = suggestions.as_array()?;
+    if list.is_empty() {
+        return None;
+    }
+    let parts = list
+        .iter()
+        .map(|s| {
+            let field = |k: &str| s.get(k).and_then(Value::as_str);
+            match field("type")? {
+                "addRules" if field("behavior") == Some("allow") => {
+                    let rules = s.get("rules")?.as_array()?;
+                    if rules.is_empty() {
+                        return None;
+                    }
+                    rules
+                        .iter()
+                        .map(|r| {
+                            let tool = r.get("toolName")?.as_str()?;
+                            Some(match r.get("ruleContent").and_then(Value::as_str) {
+                                Some(content) => format!("{tool}({content})"),
+                                None => tool.to_owned(),
+                            })
+                        })
+                        .collect::<Option<Vec<_>>>()
+                        .map(|r| r.join(", "))
+                }
+                "setMode" => Some(bw_i18n::tr!("{} mode", "mode {}", field("mode")?)),
+                "addDirectories" => {
+                    let dirs = s.get("directories")?.as_array()?;
+                    let names = dirs
+                        .iter()
+                        .map(|d| d.as_str().map(project_name))
+                        .collect::<Option<Vec<_>>>()?;
+                    (!names.is_empty()).then(|| names.join(", "))
+                }
+                _ => None,
+            }
+        })
+        .collect::<Option<Vec<_>>>()?;
+    let one_line = parts
+        .join(", ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
     Some(truncate(&one_line, MAX_DETAIL))
 }
 
@@ -169,6 +285,85 @@ mod tests {
         )
         .unwrap();
         assert_eq!(e.tool_detail.as_deref(), Some("hello"));
+    }
+
+    #[test]
+    fn questions_are_summarized_in_order() {
+        let e = HookEvent::from_hook_input(
+            r#"{"session_id":"s","hook_event_name":"PreToolUse","tool_name":"AskUserQuestion",
+                "tool_input":{"questions":[
+                    {"question":"Which framework?","header":"Framework","multiSelect":false,
+                     "options":[{"label":"React","description":"lib"},{"label":"Vue","description":"x"}]},
+                    {"question":"Extras?","header":"Extras","multiSelect":true,
+                     "options":[{"label":"Tests"},{"label":"CI"},{"label":"Docs"}]}]}}"#,
+        )
+        .unwrap();
+        assert_eq!(e.questions.len(), 2);
+        assert_eq!(e.questions[0].question, "Which framework?");
+        assert_eq!(e.questions[0].options, ["React", "Vue"]);
+        assert!(!e.questions[0].multi);
+        assert!(e.questions[1].multi);
+        assert_eq!(e.questions[1].header, "Extras");
+    }
+
+    #[test]
+    fn malformed_questions_are_all_dropped() {
+        // Une option sans libellé : les rangs ne correspondraient plus.
+        let e = HookEvent::from_hook_input(
+            r#"{"session_id":"s","hook_event_name":"PreToolUse","tool_name":"AskUserQuestion",
+                "tool_input":{"questions":[
+                    {"question":"A?","options":[{"label":"1"}]},
+                    {"question":"B?","options":[{"description":"no label"}]}]}}"#,
+        )
+        .unwrap();
+        assert!(e.questions.is_empty());
+        // Les questions des autres outils ne sont pas lues.
+        let e = HookEvent::from_hook_input(
+            r#"{"session_id":"s","hook_event_name":"PreToolUse","tool_name":"Bash",
+                "tool_input":{"questions":[{"question":"A?","options":[{"label":"1"}]}]}}"#,
+        )
+        .unwrap();
+        assert!(e.questions.is_empty());
+    }
+
+    #[test]
+    fn permission_suggestions_label() {
+        // Comme les tests du tracker : tout le crate teste en français.
+        bw_i18n::set(bw_i18n::Lang::Fr);
+        let e = HookEvent::from_hook_input(
+            r#"{"session_id":"s","hook_event_name":"PermissionRequest","tool_name":"Bash",
+                "tool_input":{"command":"cargo test"},
+                "permission_suggestions":[
+                    {"type":"addRules","rules":[{"toolName":"Bash","ruleContent":"cargo test:*"}],
+                     "behavior":"allow","destination":"localSettings"},
+                    {"type":"addDirectories","directories":["/home/me/other"],"destination":"session"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(e.always.as_deref(), Some("Bash(cargo test:*), other"));
+
+        let e = HookEvent::from_hook_input(
+            r#"{"session_id":"s","hook_event_name":"PermissionRequest","tool_name":"Edit",
+                "permission_suggestions":[{"type":"setMode","mode":"acceptEdits","destination":"session"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(e.always.as_deref(), Some("mode acceptEdits"));
+    }
+
+    #[test]
+    fn suggestions_the_island_cannot_show_are_not_offered() {
+        for suggestions in [
+            r#"[]"#,
+            r#"[{"type":"removeRules","rules":[{"toolName":"Bash"}],"behavior":"deny","destination":"session"}]"#,
+            r#"[{"type":"addRules","rules":[{"toolName":"Bash"}],"behavior":"deny","destination":"session"}]"#,
+            // Une seule inconnue suffit : on n'applique pas ce qu'on ne montre pas.
+            r#"[{"type":"setMode","mode":"plan","destination":"session"},{"type":"replaceRules","rules":[],"behavior":"allow","destination":"session"}]"#,
+        ] {
+            let input = format!(
+                r#"{{"session_id":"s","hook_event_name":"PermissionRequest","tool_name":"Bash","permission_suggestions":{suggestions}}}"#
+            );
+            let e = HookEvent::from_hook_input(&input).unwrap();
+            assert_eq!(e.always, None, "{suggestions}");
+        }
     }
 
     #[test]

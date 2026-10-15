@@ -9,6 +9,8 @@ pub struct ClaudeConfig {
     pub enabled: bool,
     /// Répondre aux demandes de permission depuis l'île.
     pub permissions: bool,
+    /// Répondre aux questions de Claude (`AskUserQuestion`) depuis l'île.
+    pub questions: bool,
     pub permission_wait_secs: u32,
     pub done_secs: u32,
     /// Son système quand une session se met à t'attendre (question, permission…).
@@ -22,6 +24,7 @@ impl Default for ClaudeConfig {
         Self {
             enabled: true,
             permissions: true,
+            questions: true,
             permission_wait_secs: 60,
             done_secs: 8,
             sound: true,

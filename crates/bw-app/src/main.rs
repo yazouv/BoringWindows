@@ -1,6 +1,7 @@
 // Pas de console en release.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod answering;
 mod clock;
 mod controller;
 mod demo;
@@ -20,7 +21,9 @@ fn main() -> anyhow::Result<()> {
     // `boringwindows hook` : relais appelé par Claude Code. Il sort avant
     // toute initialisation de l'UI, et ne doit rien écrire d'autre sur stdout.
     match std::env::args().nth(1).as_deref() {
-        Some("hook") => std::process::exit(bw_claude::hook::run()),
+        Some("hook") => {
+            std::process::exit(bw_claude::hook::run(std::env::args().nth(2).as_deref()))
+        }
         Some("doctor") => return doctor(),
         _ => {}
     }

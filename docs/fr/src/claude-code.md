@@ -2,7 +2,7 @@
 
 L'île suit tes sessions [Claude Code](https://claude.com/claude-code) : elle
 montre ce que fait Claude, te prévient quand il t'attend, et te laisse
-**autoriser ou refuser une commande sans revenir au terminal**.
+**autoriser une commande ou répondre à ses questions sans revenir au terminal**.
 
 ![Pilule : question, demande de permission, puis Claude qui reprend](images/claude-pilule.png)
 
@@ -33,7 +33,7 @@ Ce qui se passe :
 | ● gris · `projet · Bash` | Claude travaille (outil en cours) |
 | ● gris · `projet · réfléchit…` | Claude rédige sa réponse |
 | ● orange · `projet · autoriser Bash ?` | **demande de permission**, à traiter dans l'île |
-| ● orange · `projet · te pose une question` | question ou plan à valider : **réponds dans le terminal** |
+| ● orange · `projet · te pose une question` | **question** à traiter dans l'île, ou plan à valider dans le terminal |
 | ● orange · `projet · attend ta réponse` | Claude a fini et attend ton prochain message |
 | `projet · terminé` | fin de tour (quelques secondes) |
 
@@ -51,20 +51,39 @@ qui en fait le tour une fois quand il a fini. Pour l'enlever : Réglages ›
 ## Répondre à une demande de permission
 
 Quand Claude veut lancer une commande qui demande ton accord, survole l'île :
-elle affiche l'outil et la commande, avec trois boutons.
+elle affiche l'outil et la commande, avec ses boutons.
 
 - **Autoriser** : Claude exécute la commande.
+- **Toujours** : Claude l'exécute, et ajoute la règle qu'il propose (affichée
+  sous la commande, par exemple `Bash(cargo test:*)`) pour ne plus te
+  demander. C'est la même règle que « toujours autoriser » dans le terminal ;
+  le bouton n'apparaît que si Claude en propose une.
 - **Refuser** : Claude ne l'exécute pas et continue autrement.
 - **Terminal** : la question repasse dans le terminal, qui revient au premier
-  plan (pour choisir « toujours autoriser », par exemple).
+  plan.
 
 Sans réponse au bout de 60 secondes, la question repasse aussi dans le
 terminal. Si tu réponds directement dans le terminal, la demande disparaît de
 l'île.
 
-Les **questions** de Claude (choix multiples, validation d'un plan) ne passent
-pas par ces boutons : elles s'affichent normalement dans le terminal, l'île te
-signale juste « te pose une question ».
+## Répondre à une question de Claude
+
+Quand Claude te pose une question à choix (« Quelle bibliothèque ? »), l'île
+l'affiche avec ses réponses possibles : **un clic répond**. Pour une question à
+choix multiple, coche les réponses puis **Envoyer**. S'il pose plusieurs
+questions d'un coup, elles défilent une par une (`1/2`, `2/2`) et la réponse part
+quand toutes en ont une.
+
+**Terminal**, en haut à droite de la carte, renvoie la question dans le
+terminal : pour écrire une autre réponse que celles proposées, par exemple.
+Comme pour les permissions, sans réponse au bout de 60 secondes la question
+repasse dans le terminal.
+
+Restent dans le terminal : la validation d'un **plan**, et les questions trop
+grandes pour l'île (plus de 4 questions ou de 6 choix).
+
+> Tant que la question est dans l'île, le terminal ne l'affiche pas encore :
+> clique sur **Terminal** pour y répondre là-bas.
 
 ## Réglages
 
@@ -73,6 +92,7 @@ Dans [`[modules.claude]`](configuration.md#modulesclaude) :
 ```toml
 [modules.claude]
 permissions = true          # répondre aux permissions depuis l'île
+questions = true            # répondre aux questions de Claude depuis l'île
 permission_wait_secs = 60   # délai avant de rendre la main au terminal
 sound = true                # son quand Claude t'attend
 ```

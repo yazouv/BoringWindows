@@ -290,6 +290,7 @@ impl Controller {
             ClaudeConfig::from_table(config.modules.get(bw_claude::MODULE_ID)).unwrap_or_default();
         ui.set_hooks_installed(self.installer.is_installed());
         ui.set_claude_permissions(claude.permissions);
+        ui.set_claude_questions(claude.questions);
         ui.set_claude_sound(claude.sound);
         ui.set_claude_wait(claude.permission_wait_secs as i32);
 
@@ -803,6 +804,10 @@ impl Controller {
             "modules.claude.permissions" => Some((
                 vec!["modules", "claude", "permissions"],
                 Value::Bool(ui.get_claude_permissions()),
+            )),
+            "modules.claude.questions" => Some((
+                vec!["modules", "claude", "questions"],
+                Value::Bool(ui.get_claude_questions()),
             )),
             "modules.claude.sound" => Some((
                 vec!["modules", "claude", "sound"],

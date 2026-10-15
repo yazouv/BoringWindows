@@ -96,6 +96,7 @@ See [Claude Code](claude-code.md).
 |---|---|---|---|
 | `enabled` | `true` | | enable the module |
 | `permissions` | `true` | | answer permission requests from the island |
+| `questions` | `true` | | answer Claude's questions (multiple choice) from the island |
 | `permission_wait_secs` | `60` | 5 to 280 | time to answer in the island before handing back to the terminal (s) |
 | `done_secs` | `8` | 0 to 600 | how long "done" stays (s) |
 | `sound` | `true` | | system sound when Claude starts waiting for you |

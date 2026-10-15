@@ -32,9 +32,9 @@ use crate::platform::{self, Platform, PlatformEvent, Tray, TrayCommand};
 use crate::shelf::{Shelf, ShelfConfig};
 use crate::tasks::{Tasks, TasksConfig};
 use crate::{
-    AgendaRow, AskWindow, ClaudePrompt, ClaudeRow, GaugeInfo, GithubInfo, Island, MediaInfo,
-    NetworkInfo, NotifInfo, PluginRow, QuickAddWindow, RecentRow, ShelfRow, SystemInfo, TaskRow,
-    TimerInfo, WeatherInfo, clock, demo,
+    AgendaRow, AskWindow, ChoiceItem, ClaudePrompt, ClaudeRow, GaugeInfo, GithubInfo, Island,
+    MediaInfo, NetworkInfo, NotifInfo, PluginRow, QuickAddWindow, RecentRow, ShelfRow, SystemInfo,
+    TaskRow, TimerInfo, WeatherInfo, clock, demo,
 };
 
 /// Pseudo-module utilisé pour signaler une config invalide dans l'île.
@@ -129,6 +129,7 @@ pub fn run(open_settings: bool) -> anyhow::Result<()> {
         clock_timer: Timer::default(),
         flash_timer: Timer::default(),
         claude: RefCell::new(None),
+        answering: RefCell::new(None),
         installer: Installer::default(),
         media: RefCell::new(None),
         calendar: RefCell::new(None),
@@ -209,6 +210,8 @@ pub struct Controller {
     flash_timer: Timer,
     /// Dernier état Claude reçu (pour retrouver le terminal d'une session).
     claude: RefCell<Option<Arc<Snapshot>>>,
+    /// Réponse en cours à une question de Claude (choix déjà faits).
+    answering: RefCell<Option<crate::answering::Answering>>,
     installer: Installer,
     /// Dernier état musical et module qui l'a publié (destinataire des actions).
     media: RefCell<Option<(&'static str, Arc<MediaSnapshot>)>>,
@@ -1844,18 +1847,111 @@ impl Controller {
                 || post(|c| c.remind_claude()),
             );
         }
-        self.ui.set_has_prompt(prompt.is_some());
-        if let Some(p) = prompt {
-            self.ui.set_prompt(ClaudePrompt {
-                id: p.id.to_string().into(),
-                project: p.project.as_str().into(),
-                tool: p.tool.as_str().into(),
-                detail: p.detail.as_str().into(),
-            });
+        // Une autre demande (ou plus aucune) : les choix en cours ne valent plus.
+        let prompt_id = prompt.filter(|p| !p.questions.is_empty()).map(|p| p.id);
+        let mut answering = self.answering.borrow_mut();
+        if answering.as_ref().map(|a| a.id) != prompt_id {
+            *answering = prompt
+                .filter(|p| !p.questions.is_empty())
+                .map(|p| crate::answering::Answering::new(p.id, &p.questions));
         }
+        drop(answering);
         *self.claude.borrow_mut() = snapshot;
+        self.show_prompt();
         self.layout_rows();
         self.update_mascot();
+    }
+
+    /// Carte de la demande en cours : permission, ou question (celle où on en est).
+    fn show_prompt(&self) {
+        let claude = self.claude.borrow();
+        let prompt = claude.as_ref().and_then(|s| s.prompt.as_ref());
+        self.ui.set_has_prompt(prompt.is_some());
+        let Some(p) = prompt else { return };
+        let mut card = ClaudePrompt {
+            id: p.id.to_string().into(),
+            project: p.project.as_str().into(),
+            tool: p.tool.as_str().into(),
+            detail: p.detail.as_str().into(),
+            always: p.always.as_deref().unwrap_or_default().into(),
+            ..ClaudePrompt::default()
+        };
+        let answering = self.answering.borrow();
+        if let Some(a) = answering.as_ref()
+            && let Some(q) = p.questions.get(a.index)
+        {
+            let picked = &a.picks[a.index];
+            let choices: Vec<ChoiceItem> = q
+                .options
+                .iter()
+                .enumerate()
+                .map(|(i, label)| ChoiceItem {
+                    label: label.as_str().into(),
+                    picked: picked.contains(&i),
+                    index: i as i32,
+                })
+                .collect();
+            // Plus de quatre choix : deux lignes équilibrées.
+            let split = if choices.len() > 4 {
+                choices.len().div_ceil(2)
+            } else {
+                choices.len()
+            };
+            let (a_row, b_row) = choices.split_at(split);
+            card.question = true;
+            card.text = q.question.as_str().into();
+            card.header = q.header.as_str().into();
+            card.step = if p.questions.len() > 1 {
+                format!("{}/{}", a.index + 1, p.questions.len()).into()
+            } else {
+                Default::default()
+            };
+            card.multi = q.multi;
+            card.choices_a = ModelRc::new(VecModel::from(a_row.to_vec()));
+            card.choices_b = ModelRc::new(VecModel::from(b_row.to_vec()));
+            card.can_next = !picked.is_empty();
+            card.last = a.index + 1 == p.questions.len();
+        }
+        self.ui.set_prompt(card);
+    }
+
+    /// Clic sur un choix ou sur « Suivant » : la réponse part quand chaque
+    /// question en a une.
+    fn on_claude_answer(&self, id: &str, decision: &str) {
+        let questions = self
+            .claude
+            .borrow()
+            .as_ref()
+            .and_then(|s| s.prompt.as_ref())
+            .filter(|p| p.id.to_string() == id)
+            .map(|p| p.questions.clone());
+        let Some(questions) = questions else { return };
+        let action = {
+            let mut answering = self.answering.borrow_mut();
+            let Some(a) = answering.as_mut().filter(|a| a.id.to_string() == id) else {
+                return;
+            };
+            match decision.strip_prefix("pick:") {
+                Some(i) => match i.parse() {
+                    Ok(i) => a.pick(&questions, i),
+                    Err(_) => return,
+                },
+                None => a.next(&questions),
+            }
+        };
+        match action {
+            Some(action) => self.send_claude_action(action),
+            None => self.show_prompt(),
+        }
+    }
+
+    fn send_claude_action(&self, name: String) {
+        if let Some(host) = self.host.borrow().as_ref() {
+            host.send_action(Action {
+                module: bw_claude::MODULE_ID.into(),
+                name,
+            });
+        }
     }
 
     fn remind_claude(&self) {
@@ -1877,12 +1973,14 @@ impl Controller {
     }
 
     fn on_claude_decide(&self, id: &str, decision: &str) {
-        if let Some(host) = self.host.borrow().as_ref() {
-            host.send_action(Action {
-                module: bw_claude::MODULE_ID.into(),
-                name: format!("{decision}:{id}"),
-            });
+        if decision == "next" || decision.starts_with("pick:") {
+            self.on_claude_answer(id, decision);
+            return;
         }
+        if !matches!(decision, "allow" | "always" | "deny" | "ask") {
+            return;
+        }
+        self.send_claude_action(format!("{decision}:{id}"));
         // « Terminal » : la question passe dans le terminal, on l'y amène.
         if decision == "ask" {
             let session = self

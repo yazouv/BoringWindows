@@ -15,11 +15,33 @@ export struct ClaudeRow {
     kind: string,
 }
 
+/// Un choix d'une question de Claude ; `index` : son rang dans la question.
+export struct ChoiceItem {
+    label: string,
+    picked: bool,
+    index: int,
+}
+
 export struct ClaudePrompt {
     id: string,
     project: string,
     tool: string,
     detail: string,
+    /// Règles ajoutées par « Toujours autoriser » ; vide : pas de bouton.
+    always: string,
+    /// Question de Claude (`AskUserQuestion`) au lieu d'une permission.
+    question: bool,
+    /// La question affichée (une à la fois), son en-tête et « 1/2 ».
+    text: string,
+    header: string,
+    step: string,
+    multi: bool,
+    /// Les choix, sur deux lignes au plus.
+    choices-a: [ChoiceItem],
+    choices-b: [ChoiceItem],
+    /// Choix multiple : au moins une option cochée.
+    can-next: bool,
+    last: bool,
 }
 
 export struct AgendaRow {
@@ -998,6 +1020,44 @@ component PillButton inherits Rectangle {
     }
 }
 
+// Choix d'une question de Claude : libellé coupé s'il est trop long, plein
+// quand il est coché (choix multiple).
+component ChoiceChip inherits Rectangle {
+    in property <string> text;
+    in property <bool> picked;
+    in property <color> accent;
+    in property <color> fg;
+    in property <color> bg;
+    callback clicked;
+
+    height: 28px;
+    min-width: 48px;
+    preferred-width: label.preferred-width + 24px;
+    horizontal-stretch: 1;
+    border-radius: 14px;
+    border-width: 1px;
+    border-color: root.picked ? root.accent : root.fg.with-alpha(0.25);
+    background: root.picked ? root.accent
+        : ta.pressed ? root.fg.with-alpha(0.16) : ta.has-hover ? root.fg.with-alpha(0.1) : transparent;
+    animate background, border-color { duration: 120ms; }
+
+    label := Text {
+        x: 12px;
+        width: parent.width - 24px;
+        text: root.text;
+        color: root.picked ? root.bg.with-alpha(1) : root.fg;
+        font-size: 12px;
+        font-weight: 600;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+
+    ta := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
 // Pastille ronde de l'application : son icône sur un fond de sa couleur, ou
 // à défaut son initiale.
 component Avatar inherits Rectangle {
@@ -1462,7 +1522,7 @@ export component Island inherits Window {
 
     callback hover-changed(bool);
     callback clicked();
-    callback claude-decide(string /* id */, string /* allow | deny | ask */);
+    callback claude-decide(string /* id */, string /* allow | always | deny | ask | pick:<n> | next */);
     callback claude-focus(string /* session */);
     callback media-action(string /* toggle | next | prev | source */);
     callback media-seek(float /* 0..1 */);
@@ -2429,7 +2489,7 @@ export component Island inherits Window {
                             }
 
                             // Demande de permission de Claude Code.
-                            if root.has-prompt: VerticalLayout {
+                            if root.has-prompt && !root.prompt.question: VerticalLayout {
                                 spacing: 6px;
 
                                 Text {
@@ -2448,6 +2508,14 @@ export component Island inherits Window {
                                     overflow: elide;
                                 }
 
+                                // Ce que « Toujours » ajoutera aux règles de Claude Code.
+                                if root.prompt.always != "": Text {
+                                    text: @tr("Always: {}", root.prompt.always);
+                                    color: root.fg.with-alpha(0.5);
+                                    font-size: 11px;
+                                    overflow: elide;
+                                }
+
                                 HorizontalLayout {
                                     spacing: 8px;
 
@@ -2456,6 +2524,13 @@ export component Island inherits Window {
                                         fill: root.accent;
                                         ink: root.bg;
                                         clicked => { root.claude-decide(root.prompt.id, "allow"); }
+                                    }
+
+                                    if root.prompt.always != "": PillButton {
+                                        text: @tr("Always");
+                                        fill: root.accent.with-alpha(0.18);
+                                        ink: root.accent;
+                                        clicked => { root.claude-decide(root.prompt.id, "always"); }
                                     }
 
                                     PillButton {
@@ -2471,6 +2546,101 @@ export component Island inherits Window {
                                         ink: root.fg.with-alpha(0.8);
                                         line: root.fg.with-alpha(0.25);
                                         clicked => { root.claude-decide(root.prompt.id, "ask"); }
+                                    }
+                                }
+                            }
+
+                            // Question de Claude Code : un clic sur un choix répond (choix
+                            // multiple : cocher puis « Suivant » / « Envoyer »).
+                            if root.has-prompt && root.prompt.question: VerticalLayout {
+                                spacing: 6px;
+
+                                HorizontalLayout {
+                                    spacing: 8px;
+
+                                    Text {
+                                        text: root.prompt.header == ""
+                                            ? @tr("{} asks you", root.prompt.project)
+                                            : @tr("{} asks you · {}", root.prompt.project, root.prompt.header);
+                                        color: root.accent;
+                                        font-size: 14px;
+                                        font-weight: 600;
+                                        overflow: elide;
+                                        horizontal-stretch: 1;
+                                    }
+
+                                    if root.prompt.step != "": Text {
+                                        text: root.prompt.step;
+                                        color: root.fg.with-alpha(0.5);
+                                        font-size: 12px;
+                                        vertical-alignment: center;
+                                    }
+
+                                    // Répondre dans le terminal (texte libre, « Other »…).
+                                    Text {
+                                        text: @tr("Terminal");
+                                        color: terminal-ta.has-hover ? root.fg : root.fg.with-alpha(0.6);
+                                        font-size: 12px;
+                                        font-weight: 600;
+                                        vertical-alignment: center;
+
+                                        terminal-ta := TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { root.claude-decide(root.prompt.id, "ask"); }
+                                        }
+                                    }
+                                }
+
+                                // Deux lignes de texte, une seule si les choix en prennent deux.
+                                Text {
+                                    text: root.prompt.text;
+                                    color: root.fg;
+                                    font-size: 13px;
+                                    wrap: word-wrap;
+                                    overflow: elide;
+                                    max-height: root.prompt.choices-b.length > 0 ? 18px : 36px;
+                                }
+
+                                // « Suivant » / « Envoyer » (choix multiple) au bout de la dernière ligne.
+                                HorizontalLayout {
+                                    spacing: 6px;
+
+                                    for choice in root.prompt.choices-a: ChoiceChip {
+                                        text: choice.label;
+                                        picked: choice.picked;
+                                        accent: root.accent;
+                                        fg: root.fg;
+                                        bg: root.bg;
+                                        clicked => { root.claude-decide(root.prompt.id, "pick:" + choice.index); }
+                                    }
+
+                                    if root.prompt.multi && root.prompt.choices-b.length == 0: PillButton {
+                                        grow: false;
+                                        text: root.prompt.last ? @tr("Send") : @tr("Next");
+                                        fill: root.prompt.can-next ? root.accent : root.fg.with-alpha(0.09);
+                                        ink: root.prompt.can-next ? root.bg : root.fg.with-alpha(0.4);
+                                        clicked => { root.claude-decide(root.prompt.id, "next"); }
+                                    }
+                                }
+
+                                if root.prompt.choices-b.length > 0: HorizontalLayout {
+                                    spacing: 6px;
+
+                                    for choice in root.prompt.choices-b: ChoiceChip {
+                                        text: choice.label;
+                                        picked: choice.picked;
+                                        accent: root.accent;
+                                        fg: root.fg;
+                                        bg: root.bg;
+                                        clicked => { root.claude-decide(root.prompt.id, "pick:" + choice.index); }
+                                    }
+
+                                    if root.prompt.multi: PillButton {
+                                        grow: false;
+                                        text: root.prompt.last ? @tr("Send") : @tr("Next");
+                                        fill: root.prompt.can-next ? root.accent : root.fg.with-alpha(0.09);
+                                        ink: root.prompt.can-next ? root.bg : root.fg.with-alpha(0.4);
+                                        clicked => { root.claude-decide(root.prompt.id, "next"); }
                                     }
                                 }
                             }

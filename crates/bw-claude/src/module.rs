@@ -21,11 +21,11 @@ static NEXT_PROMPT_ID: AtomicU64 = AtomicU64::new(1);
 enum Cmd {
     Event {
         message: Box<Message>,
-        prompt: Option<(u64, oneshot::Sender<Decision>)>,
+        prompt: Option<(u64, oneshot::Sender<Reply>)>,
     },
     Decide {
         id: u64,
-        decision: Decision,
+        reply: Reply,
     },
     /// Le relais est parti avant la réponse (Claude l'a interrompu).
     Cancel {
@@ -66,33 +66,74 @@ impl Module for ClaudeModule {
 
         let (tx, rx) = unbounded_channel();
         self.commands = Some(tx.clone());
-        ctx.spawn(accept_loop(listener, tx, self.config.permissions));
+        let island = Island {
+            permissions: self.config.permissions,
+            questions: self.config.questions,
+        };
+        ctx.spawn(accept_loop(listener, tx, island));
         ctx.spawn(state_loop(rx, ctx.clone(), self.config.clone()));
         Ok(())
     }
 
-    /// Actions : `allow:<id>`, `deny:<id>`, `ask:<id>`.
+    /// Actions : `allow:<id>`, `always:<id>`, `deny:<id>`, `ask:<id>`, et
+    /// `answer:<id>:<choix>` (voir `parse_action`).
     fn on_action(&mut self, action: &str) {
-        let Some((verb, id)) = action.split_once(':') else {
-            return;
-        };
-        let decision = match verb {
-            "allow" => Decision::Allow,
-            "deny" => Decision::Deny,
-            "ask" => Decision::Ask,
-            _ => return,
-        };
-        if let (Ok(id), Some(tx)) = (id.parse(), &self.commands) {
-            let _ = tx.send(Cmd::Decide { id, decision });
+        if let (Some((id, reply)), Some(tx)) = (parse_action(action), &self.commands) {
+            let _ = tx.send(Cmd::Decide { id, reply });
         }
     }
 }
 
-async fn accept_loop(mut listener: Listener, tx: UnboundedSender<Cmd>, permissions: bool) {
+/// Ce à quoi l'île répond ; le reste part au terminal sans attendre.
+#[derive(Debug, Clone, Copy)]
+struct Island {
+    permissions: bool,
+    questions: bool,
+}
+
+impl Island {
+    fn handles(self, message: &Message) -> bool {
+        if crate::hook::is_island_question(&message.event) {
+            self.questions
+        } else {
+            self.permissions
+        }
+    }
+}
+
+/// `answer:<id>:<choix>` : les rangs des options choisies, `,` entre les
+/// options d'une question, `;` entre les questions (`answer:7:1;0,2`).
+fn parse_action(action: &str) -> Option<(u64, Reply)> {
+    let (verb, rest) = action.split_once(':')?;
+    let decision = match verb {
+        "allow" => Decision::Allow,
+        "always" => Decision::AllowAlways,
+        "deny" => Decision::Deny,
+        "ask" => Decision::Ask,
+        "answer" => {
+            let (id, picks) = rest.split_once(':')?;
+            let answers = picks
+                .split(';')
+                .map(|q| q.split(',').map(|i| i.parse().ok()).collect())
+                .collect::<Option<Vec<Vec<usize>>>>()?;
+            return Some((
+                id.parse().ok()?,
+                Reply {
+                    decision: Decision::Answer,
+                    answers,
+                },
+            ));
+        }
+        _ => return None,
+    };
+    Some((rest.parse().ok()?, Reply::new(decision)))
+}
+
+async fn accept_loop(mut listener: Listener, tx: UnboundedSender<Cmd>, island: Island) {
     loop {
         match listener.accept().await {
             Ok(stream) => {
-                tokio::spawn(handle_client(stream, tx.clone(), permissions));
+                tokio::spawn(handle_client(stream, tx.clone(), island));
             }
             Err(e) => {
                 log::warn!("claude : connexion refusée : {e}");
@@ -105,7 +146,7 @@ async fn accept_loop(mut listener: Listener, tx: UnboundedSender<Cmd>, permissio
     }
 }
 
-async fn handle_client<S>(stream: S, tx: UnboundedSender<Cmd>, permissions: bool)
+async fn handle_client<S>(stream: S, tx: UnboundedSender<Cmd>, island: Island)
 where
     S: AsyncRead + AsyncWrite + Send + 'static,
 {
@@ -131,7 +172,7 @@ where
         return;
     }
 
-    let decision = if permissions {
+    let reply = if island.handles(&message) {
         let id = NEXT_PROMPT_ID.fetch_add(1, Ordering::Relaxed);
         let (reply_tx, reply_rx) = oneshot::channel();
         let _ = tx.send(Cmd::Event {
@@ -139,7 +180,7 @@ where
             prompt: Some((id, reply_tx)),
         });
         tokio::select! {
-            d = reply_rx => d.unwrap_or(Decision::Ask),
+            r = reply_rx => r.unwrap_or_default(),
             () = wait_eof(&mut reader) => {
                 let _ = tx.send(Cmd::Cancel { id });
                 return;
@@ -150,10 +191,10 @@ where
             message: Box::new(message),
             prompt: None,
         });
-        Decision::Ask
+        Reply::new(Decision::Ask)
     };
 
-    let Ok(reply) = serde_json::to_string(&Reply { decision }) else {
+    let Ok(reply) = serde_json::to_string(&reply) else {
         return;
     };
     if write
@@ -175,7 +216,7 @@ async fn wait_eof<R: AsyncRead + Unpin>(reader: &mut R) {
 
 async fn state_loop(mut rx: UnboundedReceiver<Cmd>, ctx: ModuleCtx, config: ClaudeConfig) {
     let mut tracker = Tracker::new(config.done_for());
-    let mut replies: HashMap<u64, oneshot::Sender<Decision>> = HashMap::new();
+    let mut replies: HashMap<u64, oneshot::Sender<Reply>> = HashMap::new();
     let mut last: Option<Snapshot> = None;
 
     loop {
@@ -200,7 +241,7 @@ async fn state_loop(mut rx: UnboundedReceiver<Cmd>, ctx: ModuleCtx, config: Clau
                 // Réglées dans le terminal : on libère les relais en attente.
                 for id in settled {
                     if let Some(reply) = replies.remove(&id) {
-                        let _ = reply.send(Decision::Ask);
+                        let _ = reply.send(Reply::new(Decision::Ask));
                     }
                 }
                 if let Some((id, reply)) = prompt {
@@ -208,10 +249,10 @@ async fn state_loop(mut rx: UnboundedReceiver<Cmd>, ctx: ModuleCtx, config: Clau
                     replies.insert(id, reply);
                 }
             }
-            Some(Cmd::Decide { id, decision }) => {
-                if let Some(reply) = replies.remove(&id) {
-                    let _ = reply.send(decision);
-                    tracker.resolve_prompt(id, decision);
+            Some(Cmd::Decide { id, reply }) => {
+                if let Some(sender) = replies.remove(&id) {
+                    tracker.resolve_prompt(id, reply.decision);
+                    let _ = sender.send(reply);
                 }
             }
             Some(Cmd::Cancel { id }) => {
@@ -224,7 +265,7 @@ async fn state_loop(mut rx: UnboundedReceiver<Cmd>, ctx: ModuleCtx, config: Clau
         let (expired, _) = tracker.tick(now);
         for id in expired {
             if let Some(reply) = replies.remove(&id) {
-                let _ = reply.send(Decision::Ask);
+                let _ = reply.send(Reply::new(Decision::Ask));
             }
         }
 
@@ -313,7 +354,7 @@ mod tests {
         });
         assert_eq!(
             pending.join().unwrap(),
-            hook::Outcome::Decided(Decision::Allow)
+            hook::Outcome::Decided(Reply::new(Decision::Allow))
         );
 
         // L'attention retombe sur « travaille ».
@@ -341,5 +382,36 @@ mod tests {
             hook::Outcome::Unreachable(_)
         ));
         assert!(start.elapsed() < hook::CONNECT_BUDGET + Duration::from_millis(100));
+    }
+}
+
+#[cfg(test)]
+mod action_tests {
+    use super::*;
+
+    #[test]
+    fn parses_island_actions() {
+        assert_eq!(
+            parse_action("allow:3"),
+            Some((3, Reply::new(Decision::Allow)))
+        );
+        assert_eq!(
+            parse_action("always:4"),
+            Some((4, Reply::new(Decision::AllowAlways)))
+        );
+        assert_eq!(
+            parse_action("answer:7:1;0,2"),
+            Some((
+                7,
+                Reply {
+                    decision: Decision::Answer,
+                    answers: vec![vec![1], vec![0, 2]],
+                }
+            ))
+        );
+        assert_eq!(parse_action("answer:7:"), None);
+        assert_eq!(parse_action("answer:7:a"), None);
+        assert_eq!(parse_action("allow:x"), None);
+        assert_eq!(parse_action("nope:1"), None);
     }
 }
